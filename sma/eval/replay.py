@@ -146,6 +146,12 @@ def replay(run_dir, out_dir, item):
     skill_codes = {s["function"]: s["code"] for s in json.loads(memory_path.read_text())["skills"]} \
         if memory_path.exists() else {}
     task = find_task(task_id)
+    # Contact-GraspNet samples grasps stochastically. If the recorded episode never received a GraspNet candidate,
+    # the replay runs without the service so grasp_candidates() returns exactly the recorded (geometry) proposals.
+    import os
+    calls = [e for s in record.get("subgoals", []) for a in s["attempts"] for e in a["trace"] if e["call"] == "grasp_candidates"]
+    graspnet_recorded = any("contact-graspnet" in json.dumps(e.get("result"))[:200] for e in calls)
+    graspnet_url = None if graspnet_recorded else os.environ.pop("CAP_HARNESS_GRASPNET_URL", None)
     overlay = Overlay(condition, task)
     overlay.skill_codes = skill_codes
     from ..agent.loop import make_env
@@ -204,9 +210,13 @@ def replay(run_dir, out_dir, item):
     finally:
         imageio.mimwrite(out / "video.mp4", env.frames, fps=20)
         env.close()
+        if graspnet_url:
+            os.environ["CAP_HARNESS_GRASPNET_URL"] = graspnet_url
     match = result.get("success") == record["private_eval"]["success"]
     (out / "replay.json").write_text(json.dumps({"recorded_success": record["private_eval"]["success"],
-                                                 "replayed": result, "matches_recording": match}, indent=1))
+                                                 "replayed": result, "matches_recording": match,
+                                                 "graspnet": "used (stochastic; replay may differ)" if graspnet_recorded
+                                                 else "off (recording had no GraspNet candidate)"}, indent=1))
     shutil.copy(src / "episode.json", out / "episode.json")
     print(item, "replayed GT", result.get("success"), "recorded", record["private_eval"]["success"], "match", match, flush=True)
     return match
