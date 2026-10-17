@@ -15,9 +15,12 @@ observe() -> dict from the top-down RGB-D camera:
   The arm can hide objects from the camera; go_home() first for a clear view.
 move_to(x, y, z, yaw=None) moves the grip point (the midpoint between the two fingertips) to (x, y, z)
   with the gripper pointing straight down. yaw is the direction (angle in the xy plane) along which the
-  fingers close; None keeps the current yaw. Raises an error if the target is unreachable or blocked.
+  fingers close; None keeps the current yaw. yaw and yaw + pi are the same grasp (symmetric fingers). Raises an error if the target is unreachable or blocked.
   Moves in a straight line, without collision avoidance.
 open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}. Fingers open to 0.08 m.
+  The fingertips only touch what lies between table_z and the grip point's height, so an object is
+  grasped only if, when closing, the grip point is below the object's top_z and the object is between
+  the open fingers. holding_something tells whether something ended up between the fingers.
 go_home() moves the arm up and out of the camera view.   wait(steps) holds still (20 steps = 1 s).
 Math: the module math is available. Write plain top-level code; a robot error stops the program
 and is reported back to you."""
@@ -52,9 +55,12 @@ Attempt {n} for this subgoal FAILED. Your program:
 ```python
 {code}
 ```
-Execution feedback:
+What happened (from the robot and camera):
+{diagnosis}
+Raw execution trace:
 {feedback}
-Fix the cause and write a corrected program for the current scene shown above."""
+Fix the cause and write a corrected program for the current scene shown above. Do not repeat a program
+that already failed."""
 
 EXTRACT = """A robot program just achieved this subgoal, verified by the camera:
   place object "{object}" (kind: {kind}) on zone "{zone}".

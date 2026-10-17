@@ -137,6 +137,9 @@ class TabletopEnv:
             raise RobotError("target_outside_workspace", target=target.round(4).tolist(),
                              workspace=WORKSPACE.tolist())
         yaw = self._yaw() if yaw is None else float(yaw)
+        # The two fingers are symmetric: yaw and yaw + pi are the same grasp. Use the
+        # representative in [-pi/2, pi/2) so the wrist stays away from its joint limits.
+        yaw = (yaw + np.pi / 2) % np.pi - np.pi / 2
         goal = self._target_rotation(yaw)
         start = self.steps
         for _ in range(max_steps):

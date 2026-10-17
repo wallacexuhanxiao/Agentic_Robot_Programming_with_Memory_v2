@@ -1,0 +1,70 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    scene = observe()\n    obj = scene[\"objects\"][obj_name]\n    zone = scene[\"zones\"][zone_name]\n    t = scene[\"table_z\"]\n    grip = t + min(obj[\"height\"] - 0.015, 0.045)\n    yaw = obj[\"long_axis_yaw\"] + math.pi / 2\n    open_gripper()\n    move_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.1, yaw)\n    move_to(obj[\"center\"][0], obj[\"center\"][1], grip, yaw)\n    close_gripper()\n    move_to(obj[\"center\"][0], obj[\"center\"][1], t + 0.18, yaw)\n    move_to(zone[\"center\"][0], zone[\"center\"][1], t + 0.18, yaw)\n    move_to(zone[\"center\"][0], zone[\"center\"][1], grip + 0.006, yaw)\n    open_gripper()\n    move_to(zone[\"center\"][0], zone[\"center\"][1], t + 0.18, yaw)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "cube"
+    ],
+    "notes": "top-down grasp"
+   },
+   "origin": {
+    "task": "place_21",
+    "object": "red_cube",
+    "zone": "purple_zone",
+    "attempt": 1,
+    "source_code": "scene = observe()\nobj = scene[\"objects\"][\"red_cube\"]\nzone = scene[\"zones\"][\"purple_zone\"]\nt = scene[\"table_z\"]\ngrip = t + min(obj[\"height\"] - 0.015, 0.045)\nyaw = obj[\"long_axis_yaw\"] + math.pi / 2\nopen_gripper()\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.1, yaw)\nmove_to(obj[\"center\"][0], obj[\"center\"][1], grip, yaw)\nclose_gripper()\nmove_to(obj[\"center\"][0], obj[\"center\"][1], t + 0.18, yaw)\nmove_to(zone[\"center\"][0], zone[\"center\"][1], t + 0.18, yaw)\nmove_to(zone[\"center\"][0], zone[\"center\"][1], grip + 0.006, yaw)\nopen_gripper()\nmove_to(zone[\"center\"][0], zone[\"center\"][1], t + 0.18, yaw)"
+   },
+   "history": [
+    {
+     "task": "place_21",
+     "source": "origin",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0396,
+      "object_reach": 0.532,
+      "zone_reach": 0.47
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5010",
+     "source": "validation",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0377,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5011",
+     "source": "validation",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0395,
+      "object_reach": 0.655,
+      "zone_reach": 0.552
+     },
+     "outcome": false,
+     "failure": "motion_timeout"
+    }
+   ],
+   "status": "validated"
+  }
+ ]
+}
