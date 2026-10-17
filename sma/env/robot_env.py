@@ -237,12 +237,21 @@ class TabletopEnv:
             for _ in range(4):
                 self._step(q)
         q_goal = path[-1]
+
+        def yaw_error():  # finger line is symmetric: compare modulo pi
+            return abs((self._yaw() - yaw + np.pi / 2) % np.pi - np.pi / 2)
+
+        # Done when the grip point is in place AND the wrist has finished turning (large turns lag behind the
+        # waypoints; returning on position alone left the gripper up to ~50 degrees short).
         for _ in range(max_steps):
-            if np.linalg.norm(target - self._ee()) < tolerance:
+            if np.linalg.norm(target - self._ee()) < tolerance and yaw_error() < .05:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "steps": self.steps - start}
             self._step(q_goal)
             if self.steps - start > len(path) + 40 and np.linalg.norm(self.obs.get("robot0_joint_vel", np.zeros(7))) < 1e-3:
                 break
+        if np.linalg.norm(target - self._ee()) < tolerance:  # in place, wrist still slightly off: report, not fail
+            return {"ok": True, "position": self._ee().round(4).tolist(), "steps": self.steps - start,
+                    "yaw_error_deg": round(float(np.degrees(yaw_error())), 1)}
         raise RobotError("motion_blocked", target=target.round(4).tolist(),
                          reached=self._ee().round(4).tolist(),
                          remaining_error_m=round(float(np.linalg.norm(target - self._ee())), 4))
