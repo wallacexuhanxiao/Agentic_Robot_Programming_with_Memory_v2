@@ -122,11 +122,14 @@ def reflect(llm, obj, zone, code, diagnosis, scene):
     view = scene["objects"].get(obj)
     if view is None:
         return None
-    text = llm.chat([{"role": "user", "content": prompts.REFLECT.format(
+    messages = [{"role": "user", "content": prompts.REFLECT.format(
         object=obj, kind=view["kind"], zone=zone, code=code, diagnosis=diagnosis,
         object_view=json.dumps({k: view[k] for k in ("height", "top_z", "footprint_long", "footprint_short",
-                                                     "long_axis_yaw")}))}],
-        purpose="reflect", max_tokens=3000, thinking=True)
+                                                     "long_axis_yaw")}))}]
+    text = llm.chat(messages, purpose="reflect", max_tokens=6000, thinking=True)
+    if llm.last_truncated() or not text.strip():
+        # Thinking ran out of budget: ask once more without thinking rather than lose the lesson.
+        text = llm.chat(messages, purpose="reflect", max_tokens=300, thinking=False)
     match = re.search(r"\{.*\}", text, re.S)
     try:
         return json.loads(match.group(0)).get("lesson") if match else None
