@@ -1,0 +1,363 @@
+{
+ "task_id": "pen_2001",
+ "family": "pen",
+ "instruction": "Put the red pen in the green pen case.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_pen",
+   "zone": "green_case",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "candidates = grasp_candidates(\"red_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - (1.107 - 0.111)) < 0.1:  # align with long axis\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[\"spots\"][0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.12)\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       10
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.0606,
+       0.1975
+      ],
+      "offset_along_across_zone_axis": [
+       0.2032,
+       -0.0372
+      ],
+      "zone_half_size": [
+       0.0763,
+       0.0221
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 19.9,
+      "object_long_axis_yaw": 1.107,
+      "zone_long_axis_yaw": 1.454,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 39.4,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 16,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": -0.464, \"score\": null, \"id\": 0, \"object\": \"red_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0.0115]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": 1.107, \"score\": null, \"id\": 1, \"object\": \"red_pen\", \"squeeze_width\": 0.1318, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0...."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 17,
+       "source": "<program>",
+       "line": 10
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.597,
+      "zone_reach": 0.507
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      2,
+      3
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 10).\n- After the program red_pen is offset [0.0606, 0.1975] m from the centre of green_case ([0.2032, -0.0372] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0763, 0.0221]); inside_zone=False, resting=True, gripper_holding=False.\n- red_pen's long axis is 19.9 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Grasp the red_pen with fingers aligned to its observed long axis (yaw \u2248 1.107 rad) at a height of 0.006 m, and place it on the green_case using a spot with yaw aligned to the pen's observed orientation to ensure proper alignment and prevent offset."
+    },
+    {
+     "n": 2,
+     "code": "candidates = grasp_candidates(\"red_pen\")\nbest_candidate = None\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - 1.107) < 0.1:  # grasp with fingers along long axis\n        best_candidate = c\n        break\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[\"spots\"][0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.12)\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       8
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.0606,
+       0.1975
+      ],
+      "offset_along_across_zone_axis": [
+       0.2032,
+       -0.0372
+      ],
+      "zone_half_size": [
+       0.0763,
+       0.0221
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 19.9,
+      "object_long_axis_yaw": 1.107,
+      "zone_long_axis_yaw": 1.454,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 39.4,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 18,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": -0.464, \"score\": null, \"id\": 0, \"object\": \"red_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0.0115]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": 1.107, \"score\": null, \"id\": 1, \"object\": \"red_pen\", \"squeeze_width\": 0.1318, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0...."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 19,
+       "source": "<program>",
+       "line": 8
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.597,
+      "zone_reach": 0.507
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      3,
+      4
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 8).\n- After the program red_pen is offset [0.0606, 0.1975] m from the centre of green_case ([0.2032, -0.0372] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0763, 0.0221]); inside_zone=False, resting=True, gripper_holding=False.\n- red_pen's long axis is 19.9 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Grasp the red_pen with fingers aligned parallel to its observed long axis (yaw \u2248 -0.111 rad) at a height of 0.006 m, and place it on the green_case with the pen's long axis aligned to the case's long axis using a placement spot that matches the observed pen orientation."
+    },
+    {
+     "n": 3,
+     "code": "candidates = grasp_candidates(\"red_pen\")\nbest_candidate = None\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - (-0.111)) < 0.1:  # grasp with fingers parallel to long axis\n        best_candidate = c\n        break\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[\"spots\"][0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]  # desired yaw for the pen's long axis\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.12)\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       8
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.0606,
+       0.1975
+      ],
+      "offset_along_across_zone_axis": [
+       0.2032,
+       -0.0372
+      ],
+      "zone_half_size": [
+       0.0763,
+       0.0221
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 19.9,
+      "object_long_axis_yaw": 1.107,
+      "zone_long_axis_yaw": 1.454,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 40.1,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 20,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": -0.464, \"score\": null, \"id\": 0, \"object\": \"red_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0.0115]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": 0.0074, \"y\": 0.186, \"height\": 0.006, \"yaw\": 1.107, \"score\": null, \"id\": 1, \"object\": \"red_pen\", \"squeeze_width\": 0.1318, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.107, \"object_footprint\": [0.1384, 0...."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 21,
+       "source": "<program>",
+       "line": 8
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.597,
+      "zone_reach": 0.507
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      4,
+      5
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 8).\n- After the program red_pen is offset [0.0606, 0.1975] m from the centre of green_case ([0.2032, -0.0372] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0763, 0.0221]); inside_zone=False, resting=True, gripper_holding=False.\n- red_pen's long axis is 19.9 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Grasp the red_pen using a candidate with yaw close to the observed long axis (1.107 rad) at a height of 0.006 m, and place it on a spot within the green_case aligned to the observed pen orientation to ensure proper alignment and prevent offset."
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_pen",
+    "zone": "green_case",
+    "source": "instruction",
+    "evidence": "Put the red pen in the green pen case."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The green_case must be empty before placing the red_pen inside.",
+   "The red_pen must be picked up from its current location before being placed in the green_case.",
+   "The robot must verify that the red_pen is successfully placed inside the green_case."
+  ],
+  "refined_instruction": "The robot must first confirm that the green_case is empty. If it is occupied, the robot must clear the zone by removing any object currently inside. Then, the robot must locate and pick up the red_pen. Finally, the robot must place the red_pen into the green_case. Success is confirmed when the red_pen is fully inside the green_case and no other object is occupying the green_case.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_pen",
+   "zone": "green_case"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_pen",
+   "zone": "green_case"
+  }
+ ],
+ "final_perception": {
+  "red_pen": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.0606,
+    0.1975
+   ],
+   "offset_along_across_zone_axis": [
+    0.2032,
+    -0.0372
+   ],
+   "zone_half_size": [
+    0.0763,
+    0.0221
+   ],
+   "top_height_above_table": 0.0119,
+   "nominal_height": 0.012,
+   "object_axis_vs_zone_axis_deg": 19.9,
+   "object_long_axis_yaw": 1.107,
+   "zone_long_axis_yaw": 1.454,
+   "gripper_holding": false,
+   "satisfied": false
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "red_pen": {
+    "zone": "green_case",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0087,
+     0.1836,
+     0.8059
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820300340652466,
+   0.9945789575576782
+  ],
+  "rerendered": 3
+ },
+ "seconds": 202.3,
+ "llm_usage": {
+  "calls": 11,
+  "prompt_tokens": 14110,
+  "completion_tokens": 1313,
+  "seconds": 6.1,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}
