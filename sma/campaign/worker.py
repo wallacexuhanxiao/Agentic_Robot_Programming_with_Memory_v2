@@ -31,7 +31,8 @@ How to work (one action per reply):
    reusable pattern (trigger -> code -> evidence), then submit the version you choose.
 Budget: at most {max_runs} run_program calls and {max_turns} replies in total.
 
-Reply format: first ONE JSON object on its own, then (only for run_program / propose_skill) ONE ```python block.
+Reply format: first ONE JSON object on its own line, then (only for run_program / propose_skill) the program in
+ONE ```python block IN THE SAME REPLY. A run_program reply without the program is wasted.
   {{"thought": "<short reasoning>", "tool": "snapshot"}}
   {{"thought": "...", "tool": "run_program"}}   followed by ```python <the full program> ```
   {{"thought": "...", "tool": "inspect_run", "args": {{"version": 2, "seed": 101}}}}
@@ -105,6 +106,17 @@ def run_worker(llm, tools, *, library, max_runs=6, max_turns=24, verifier_propos
         action, code = parse_action(reply)
         tool = action.get("tool")
         args = action.get("args") or {}
+        code = code or args.get("code") or action.get("code")
+        if tool in ("run_program", "propose_skill") and not code:
+            # Two-step for open models: they often stop after the JSON. Ask for the code alone.
+            follow = llm.chat(messages + [{"role": "assistant", "content": reply},
+                                          {"role": "user", "content": "Now write the complete program for this action "
+                                           "in ONE ```python block, with nothing else."}],
+                              purpose="worker_code", max_tokens=3000)
+            _, code = parse_action(follow)
+            if code is None and "def " in follow or (code is None and "=" in follow):
+                code = follow.strip().strip("`")
+            reply = reply + "\n```python\n" + (code or "") + "\n```"
         log(f"    turn {turn + 1}: {tool} {json.dumps(args)[:120]}")
         images = []
         if tool == "snapshot":
