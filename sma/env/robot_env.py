@@ -306,11 +306,25 @@ class TabletopEnv:
         here = self._ee()
         self.move_to(here[0], here[1], max(here[2], table + .18))
         self.move_to(x, y, table + .18)
-        self.move_to(x, y, table + self._held_grasp_height + .006)
+        touched_early = None
+        try:
+            self.move_to(x, y, table + self._held_grasp_height + .006)
+        except RobotError as exc:  # compliant placing: resting on something slightly early is acceptable
+            if exc.reason != "motion_blocked" or exc.details["remaining_error_m"] > .015:
+                raise
+            touched_early = exc.details["remaining_error_m"]
         self.open_gripper()
         self.move_to(x, y, table + .18)
         self.go_home()
-        return {"released_at": [round(x, 4), round(y, 4)]}
+        return {"released_at": [round(x, 4), round(y, 4)], "touched_down_early_m": touched_early}
+
+    def release(self):
+        """Open the fingers where the arm is now, lift 10 cm and park the arm (recovery when stuck holding)."""
+        self.open_gripper()
+        here = self._ee()
+        self.move_to(here[0], here[1], min(here[2] + .10, 1.2))
+        self.go_home()
+        return self.gripper_state()
 
     def _zone_from_last_view(self, zone_name):
         # Zones are flat and static; the view from before the grasp is used if the arm hides one now.

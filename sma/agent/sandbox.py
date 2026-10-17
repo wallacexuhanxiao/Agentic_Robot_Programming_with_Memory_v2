@@ -24,7 +24,7 @@ import os
 # API level (see prompts.API_DOCS): "pose" = move_to + gripper, "task" = parameterized pick/place.
 API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
 API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
-             "task": ("observe", "pick", "place", "go_home", "wait")}[API_LEVEL]
+             "task": ("observe", "pick", "place", "release", "go_home", "wait")}[API_LEVEL]
 
 
 class ProgramRejected(ValueError):

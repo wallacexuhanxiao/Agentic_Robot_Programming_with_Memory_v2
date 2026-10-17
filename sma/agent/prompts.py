@@ -62,6 +62,8 @@ pick(object_name, grasp_height, yaw) -> {"holding_something": bool, ...}
 place(zone_name, dx=0.0, dy=0.0) carries the held object above the zone centre (dx, dy are small offsets
   from the zone centre, normally 0), lowers it
   to just above the table, releases it, lifts and parks the arm. Fails if nothing is held.
+release() opens the fingers where the arm is now, lifts and parks the arm (use it if something is
+  still held, e.g. after a failed place).
 go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
 The module math is available. A robot error stops the program and is reported back to you."""
 
