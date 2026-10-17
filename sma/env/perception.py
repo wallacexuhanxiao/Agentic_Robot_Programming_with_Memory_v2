@@ -9,7 +9,7 @@ import numpy as np
 
 KIND_HEIGHT = {"block": .04, "book": .025, "mug": .07, "pen": .012}
 ZONE_NAMES = {"orange": "orange_tray", "cyan": "cyan_tray", "purple": "purple_box",
-              "pink": "pink_case"}  # receptacle catalogue
+              "lime": "lime_case"}  # receptacle catalogue
 
 
 def back_project(depth_m, K, world_from_camera):
@@ -25,7 +25,7 @@ def back_project(depth_m, K, world_from_camera):
 # from a calibration render (scripts/calibrate_hues.py). Objects and zones are segmented in
 # separate height bands, so the two sets only need to be distinct within themselves.
 OBJECT_HUES = {"red": 1, "yellow": 30, "green": 62, "blue": 113}
-ZONE_HUES = {"orange": 23, "cyan": 90, "purple": 144, "pink": 161}
+ZONE_HUES = {"orange": 23, "cyan": 90, "purple": 144, "lime": 45}  # lime: pen case (calibrated by pen_gate)
 
 
 def _palette_label(rgb, hues, tolerance=9, min_saturation=80):
@@ -69,7 +69,7 @@ def classify_kind(height, long_side, short_side):
     return "block"
 
 
-def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25, masks_out=None):
+def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25, zone_min_pixels=150, masks_out=None):
     """masks_out (optional dict) receives each object's pixel mask and the back-projected point map."""
     xyz = back_project(depth_m, K, world_from_camera)
     if masks_out is not None:
@@ -106,7 +106,7 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25, masks_out=Non
         # All floor pixels of the colour (an object lying inside can split the floor into several parts).
         floor = cv2.morphologyEx(((labels == i) & valid & (np.abs(height) < .006)).astype(np.uint8), cv2.MORPH_OPEN,
                                  np.ones((2, 2), np.uint8)).astype(bool)
-        if floor.sum() < min_pixels:
+        if floor.sum() < zone_min_pixels:  # the smallest receptacle (pen case) shows ~340 floor pixels
             continue
         center_xy, long_side, short_side, yaw = _footprint(xyz[floor][:, :2])
         zones[ZONE_NAMES[color]] = {"name": ZONE_NAMES[color],

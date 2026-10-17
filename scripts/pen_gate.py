@@ -13,7 +13,7 @@ import numpy as np
 from sma.agent.loop import make_env
 from sma.agent.sandbox import Sandbox
 from sma.env.perception import ZONE_HUES
-from sma.env.scene import receptacle_half
+from sma.env.scene import RECEPTACLES, receptacle_half
 from sma.env.tasks import suite
 
 PROGRAM = '''
@@ -65,7 +65,7 @@ for task in suite("pen")[:4]:
                 seen_zone = scene["zones"].get(zone)
                 seen_pen = scene["objects"].get(obj)
                 pen_spec = task.layout.objects[0]
-                print(f"CALIB {task.task_id}: case floor rendered hue {hue} (constant {ZONE_HUES['pink']}), "
+                print(f"CALIB {task.task_id}: case floor rendered hue {hue} (constant {ZONE_HUES[spec.color]}), "
                       f"{int(floor.sum())} px", flush=True)
                 print(f"PERCEPTION {task.task_id}: objects {sorted(scene['objects'])} zones {sorted(scene['zones'])}", flush=True)
                 if seen_zone:

@@ -65,10 +65,10 @@ def make_pen_task(seed):
         ends = [xy + sgn * hx * np.array([np.cos(yaw), np.sin(yaw)]) for sgn in (-1, 1)]
         if all(np.linalg.norm(e - ROBOT_BASE_XY) < MAX_REACH - .03 for e in ends):
             break
-    case = ZoneSpec("pink", tuple(np.round(xy, 4)), round(yaw, 3))
+    case = ZoneSpec("lime", tuple(np.round(xy, 4)), round(yaw, 3))
     pen_xy = _sample_xy(rng, [(np.asarray(xy), radius)], _radius("pen"))
     pen = ObjectSpec(color, "pen", tuple(np.round(pen_xy, 4)), round(float(rng.uniform(-np.pi / 2, np.pi / 2)), 3))
-    instruction = f"Put the {color} pen in the pink pen case."
+    instruction = f"Put the {color} pen in the lime pen case."
     return Task(f"pen_{seed}", "pen", instruction, Layout([pen], [case]), {pen.name: case.name}, seed)
 
 

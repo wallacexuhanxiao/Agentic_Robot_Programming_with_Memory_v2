@@ -18,10 +18,10 @@ TABLE_Z = 0.8
 OBJECT_RGBA = {"red": [.85, .08, .06, 1], "green": [.08, .62, .12, 1], "blue": [.06, .18, .85, 1],
                "yellow": [.92, .78, .05, 1]}
 ZONE_RGBA = {"purple": [.55, .12, .70, 1], "cyan": [.05, .72, .78, 1], "orange": [.95, .45, .05, 1],
-             "pink": [.90, .10, .60, 1]}
+             "lime": [.55, .85, .10, 1]}  # pink rendered at hue 150, too close to the purple box (144)
 # Receptacle catalogue: base colour -> (style, name). Trays are shallow; the toy box has walls.
 RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"), "purple": ("box", "purple_box"),
-               "pink": ("case", "pink_case")}  # the pen case is long and narrow: a pen fits only when aligned
+               "lime": ("case", "lime_case")}  # the pen case is long and narrow: a pen fits only when aligned
 # Object half heights (m), used by the evaluator.
 KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035, "pen": .006}
 KIND_RADIUS = {"block": .028, "book": .047, "mug": .04, "pen": .072}
