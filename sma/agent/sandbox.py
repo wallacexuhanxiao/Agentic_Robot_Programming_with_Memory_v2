@@ -14,11 +14,18 @@ FORBIDDEN_NODES = (ast.Import, ast.ImportFrom, ast.Try, ast.With, ast.AsyncFunct
                    ast.Global, ast.Nonlocal, ast.ClassDef, ast.Lambda)
 FORBIDDEN_NAMES = {"eval", "exec", "compile", "open", "globals", "locals", "vars", "getattr",
                    "setattr", "delattr", "__import__", "input", "breakpoint", "help", "dir"}
+def _import_math_only(name, globals=None, locals=None, fromlist=(), level=0):
+    if name != "math":
+        raise ImportError("only the module math may be imported")
+    return math
+
+
 SAFE_BUILTINS = {name: getattr(__builtins__, name) if hasattr(__builtins__, name) else __builtins__[name]
                  for name in ("abs", "min", "max", "round", "len", "range", "list", "dict", "tuple",
                               "float", "int", "str", "bool", "enumerate", "zip", "sorted", "sum",
                               "any", "all", "print", "isinstance", "ValueError", "RuntimeError",
                               "KeyError", "Exception", "reversed", "set")}
+SAFE_BUILTINS["__import__"] = _import_math_only
 import os
 
 # API level (see prompts.API_DOCS): "pose" = move_to + gripper, "task" = parameterized pick/place.
@@ -48,6 +55,11 @@ def check_source(source):
     except SyntaxError as exc:
         raise ProgramRejected(f"syntax_error: {exc.msg} at line {exc.lineno}") from exc
     for node in ast.walk(tree):
+        # As in ASPIRE, the module math may be imported (it is also pre-injected); nothing else.
+        if isinstance(node, ast.Import) and all(a.name == "math" and a.asname in (None, "math") for a in node.names):
+            continue
+        if isinstance(node, ast.ImportFrom) and node.module == "math" and node.level == 0:
+            continue
         if isinstance(node, FORBIDDEN_NODES):
             raise ProgramRejected(f"forbidden_statement: {type(node).__name__} at line "
                                   f"{getattr(node, 'lineno', '?')} (no imports, try/except, classes, lambdas)")
