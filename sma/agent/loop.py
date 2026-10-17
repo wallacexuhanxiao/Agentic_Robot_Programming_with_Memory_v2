@@ -306,7 +306,8 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
     """Controlled scene variations: run the stored skill unchanged on new layouts (no LLM)."""
     results = []
     for seed in seeds:
-        task = make_task("place", seed, kinds=[kind])
+        # A pen only fits its case; other kinds are validated on single-object placements.
+        task = make_task("pen", seed) if kind == "pen" else make_task("place", seed, kinds=[kind])
         obj, zone = next(iter(task.goal.items()))
         env = make_env(task, video=video)
         try:
