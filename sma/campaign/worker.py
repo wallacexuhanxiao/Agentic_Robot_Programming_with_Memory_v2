@@ -15,8 +15,11 @@ Program rules (results are invalid otherwise):
 - Every task-dependent choice (which object, which container, grasp and target poses, sizes) must be derived at
   runtime from get_task_context().language and perception. Never copy observed coordinates, colours, sizes or
   seed-specific behaviour into constants. Generic relative offsets, tolerances and step limits are fine.
-- The instruction names objects as "<colour> <kind>" and containers as "<colour> tray" / "<colour> box";
-  perception names them "<colour>_<kind>" and "<colour>_tray" / "<colour>_box".
+- Instruction format (task interface, given to every worker): single object tasks read
+  "Put the <colour> <object words> on the <colour> tray." or "... in the <colour> box.", where <object words> is
+  "toy block", "mug" or "book"; multi-object tasks list their goals in sentences of the same kind.
+  Perception names objects "<colour>_<kind>" (kind: block, mug, book) and containers "<colour>_tray" /
+  "<colour>_box"; localize_object accepts queries like "red block" or "cyan tray".
 
 {api}
 
@@ -146,8 +149,16 @@ def run_worker(llm, tools, *, library, max_runs=6, max_turns=24, verifier_propos
             else:
                 text = "error: put the skill code in a ```python block after the JSON."
         elif tool == "submit":
-            submitted = args.get("version")
-            break
+            best = tools.best_version()
+            solved = best and all(x["camera_success"] for x in best["results"])
+            min_runs = min(4, max_runs)
+            if not solved and runs < min_runs and verifier_proposals is None:
+                text = (f"refused: no version succeeds on all development seeds yet and only {runs} of {max_runs} runs "
+                        f"are used. Keep debugging (at least {min_runs} runs): inspect a failing seed, read its error "
+                        "and keyframes, change one thing, run again.")
+            else:
+                submitted = args.get("version")
+                break
         else:
             text = ("error: could not read an action. Reply with ONE JSON object like "
                     '{"thought": "...", "tool": "snapshot"} and, for run_program, a ```python block.')
