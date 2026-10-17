@@ -35,6 +35,7 @@ def main():
     p.add_argument("--condition", choices=("none", "skill", "user", "both", "memory"), required=True)
     p.add_argument("--suites", default="train,heldout")
     p.add_argument("--base-url", required=True)
+    p.add_argument("--model", default="Qwen/Qwen3.5-9B", help="served name of the general model")
     p.add_argument("--coder-url", default=None, help="optional separate endpoint for code/extract calls")
     p.add_argument("--coder-model", default=None)
     p.add_argument("--out", type=Path, required=True)
@@ -55,7 +56,7 @@ def main():
     for suite_name in args.suites.split(","):
         for task in suite(suite_name):
             log(f"[{args.condition}] {suite_name} {task.task_id}: {task.instruction}")
-            llm = LLM(args.base_url, log_dir=args.out / task.task_id / "llm",
+            llm = LLM(args.base_url, model=args.model, log_dir=args.out / task.task_id / "llm",
                       coder_url=args.coder_url, coder_model=args.coder_model)
             try:
                 record = run_episode(task, llm, memory, args.out / task.task_id, user_memory=user_memory,
@@ -75,7 +76,7 @@ def main():
             log(f"  -> {row}")
             (args.out / "summary.json").write_text(json.dumps(
                 {"condition": args.condition, "api_level": os.environ.get("SMA_API_LEVEL", "task"),
-                 "coder_model": args.coder_model or "Qwen/Qwen3.5-9B", "tasks": rows,
+                 "general_model": args.model, "coder_model": args.coder_model or args.model, "tasks": rows,
                  "applicability_log": memory.applicability_log if memory else []}, indent=1))
 
 

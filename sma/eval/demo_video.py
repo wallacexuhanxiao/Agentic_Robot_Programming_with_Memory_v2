@@ -11,7 +11,7 @@ import imageio.v2 as imageio
 import numpy as np
 
 
-def card(text_lines, size=(240, 320), seconds=3.0, fps=20):
+def card(text_lines, size=(360, 480), seconds=3.0, fps=20):
     frame = np.full((size[0], size[1], 3), 25, np.uint8)
     for i, line in enumerate(text_lines):
         cv2.putText(frame, line, (8, 30 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, .42, (235, 235, 235), 1, cv2.LINE_AA)
@@ -26,7 +26,7 @@ def label(frame, text):
 
 
 LABELS = {"none": "no memory", "skill": "skill memory", "user": "user memory", "both": "user + skill memory",
-          "memory": "skill memory"}
+          "memory": "skill memory", "plumbing": "scripted program, no LLM"}
 
 
 def main(run_dir, out, items):

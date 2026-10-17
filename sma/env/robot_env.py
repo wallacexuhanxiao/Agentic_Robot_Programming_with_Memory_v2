@@ -158,7 +158,7 @@ class TabletopEnv:
         self.obs, _, _, _ = self.env.step(action)
         self.steps += 1
         if self.video and self.steps % self.video_every == 0:
-            self.frames.append(self.render("demo", 320, 240))
+            self.frames.append(self.render("demo", 480, 360))
 
     def render(self, camera, width, height, depth=False):
         out = self.env.sim.render(camera_name=camera, width=width, height=height, depth=depth)

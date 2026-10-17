@@ -40,9 +40,10 @@ if [[ "${SMA_MODE:-dev}" == dev || "${SMA_MODE:-dev}" == devsuite ]]; then
 fi
 
 PORT=$("$SIM_PY" -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
-MODEL=$(cat "$PROJECT/qwen35_checkpoint_path.txt")
+MODEL=${SMA_GENERAL_MODEL:-$(cat "$PROJECT/qwen35_checkpoint_path.txt")}
+GENERAL_NAME=${SMA_GENERAL_NAME:-Qwen/Qwen3.5-9B}
 "$PROJECT/vllm_qwen35_venv/bin/python" -m vllm.entrypoints.openai.api_server \
-  --model "$MODEL" --served-model-name Qwen/Qwen3.5-9B --host 127.0.0.1 --port "$PORT" \
+  --model "$MODEL" --served-model-name "$GENERAL_NAME" --host 127.0.0.1 --port "$PORT" \
   --dtype bfloat16 --max-model-len 16384 --gpu-memory-utilization ${SMA_GENERAL_GPU_UTIL:-.80} --max-num-seqs 2 \
   --generation-config vllm --reasoning-parser qwen3 --limit-mm-per-prompt '{"image":0,"video":0}' \
   > "$OUT/model.log" 2>&1 &
@@ -72,12 +73,12 @@ fi
 
 if [[ "${SMA_MODE:-dev}" == dev ]]; then
   "$SIM_PY" -m sma.eval.run_suite --condition memory --suites smoke \
-    --base-url "http://127.0.0.1:$PORT/v1" --out "$OUT/llm_smoke" > "$OUT/llm_smoke.log" 2>&1
+    --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" --out "$OUT/llm_smoke" > "$OUT/llm_smoke.log" 2>&1
 else
   # qsub -v splits on commas: lists use ':' (conditions) and '+' (suites).
   SUITES=${SMA_SUITES:-train+heldout}
   for condition in ${SMA_CONDITIONS//:/ }; do
     "$SIM_PY" -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
-      --base-url "http://127.0.0.1:$PORT/v1" "${CODER_ARGS[@]}" --out "$OUT/$condition" > "$OUT/$condition.log" 2>&1 || true
+      --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$OUT/$condition" > "$OUT/$condition.log" 2>&1 || true
   done
 fi
