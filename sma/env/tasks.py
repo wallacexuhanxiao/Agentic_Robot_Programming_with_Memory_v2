@@ -158,6 +158,12 @@ def suite(name):
     if name == "pen_teach":
         # The user teaches how pens go into the case once, then gives the ten plain pen requests.
         return [make_task("pen_teach", 1999)] + [make_task("pen", 2000 + i) for i in range(10)]
+    if name.startswith(("pen@", "pen_teach@")):
+        # Replication on other layout sets: "pen@3000" = pen_3000..pen_3009; "pen_teach@3000" adds the
+        # teaching task on layout 2999 first.
+        family, base = name.split("@")
+        tasks = [make_task("pen", int(base) + i) for i in range(10)]
+        return ([make_task("pen_teach", int(base) - 1)] if family == "pen_teach" else []) + tasks
     if name == "smoke":
         return [make_task("place", 7, kinds=["block"])]
     raise ValueError(name)
