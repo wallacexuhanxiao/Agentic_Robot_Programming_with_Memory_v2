@@ -11,7 +11,7 @@ from pathlib import Path
 from robosuite.models.objects import MujocoXMLObject
 from robosuite.utils.mjcf_utils import new_geom
 
-WOOD = [0.74, 0.66, 0.56, 1]
+WOOD = [0.80, 0.79, 0.77, 1]  # neutral light grey: unsaturated, so never segmented as a coloured object
 PAGES = [0.93, 0.91, 0.84, 1]
 CACHE = Path(tempfile.gettempdir()) / "sma_assets"
 
@@ -91,7 +91,7 @@ def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=0.065):
     base_h = .002
     _static(worldbody, f"{name}_base", [half, half, base_h], [xy[0], xy[1], table_z + base_h], base_rgba,
             [1.5, .005, .0001])
-    wall_half_h = .009 if style == "tray" else .025
+    wall_half_h = .004 if style == "tray" else .025  # 8 mm tray rim, 5 cm toy-box walls
     t = .004
     for i, (dx, dy, sx, sy) in enumerate(((half + t, 0, t, half + 2 * t), (-half - t, 0, t, half + 2 * t),
                                           (0, half + t, half, t), (0, -half - t, half, t))):

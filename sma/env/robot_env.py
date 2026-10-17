@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from .perception import object_on_zone, perceive
-from .scene import KIND_HALF_HEIGHT, TABLE_Z, TabletopOrganize, ZONE_HALF
+from .scene import KIND_HALF_HEIGHT, RECEPTACLE_HALF, RECEPTACLES, TABLE_Z, TabletopOrganize
 
 HOME = np.array([-0.20, 0.0, 1.08])
 WORKSPACE = np.array([[-0.32, 0.30], [-0.36, 0.36], [TABLE_Z + 0.004, 1.30]])
@@ -266,7 +266,11 @@ class TabletopEnv:
         table = scene["table_z"]
         self.open_gripper()
         self.move_to(x, y, max(obj["top_z"], table + grasp_height) + .10, yaw)
-        self.move_to(x, y, table + grasp_height, yaw)
+        try:
+            self.move_to(x, y, table + grasp_height, yaw)
+        except RobotError as exc:  # touching down slightly early is fine; holding is checked after closing
+            if exc.reason != "motion_blocked" or exc.details["remaining_error_m"] > .012:
+                raise
         state = self.close_gripper()
         self._held_grasp_height = grasp_height
         self.move_to(x, y, table + .18, yaw)
@@ -329,13 +333,14 @@ class TabletopEnv:
         """Ground-truth success of object -> zone goals. Never shown to the agent."""
         state = self.private_state()
         zones = {z.name: z.xy for z in self.task.layout.zones}
+        halves = {z.name: RECEPTACLE_HALF[RECEPTACLES[z.color][0]] for z in self.task.layout.zones}
         held = self.gripper_state()["holding_something"]
         details, ok_all = {}, True
         for name, zone in goal.items():
             pos = np.array(state[name]["position"])
             kind = name.split("_", 1)[1]
             half_h = KIND_HALF_HEIGHT[kind]
-            inside = bool(np.all(np.abs(pos[:2] - np.array(zones[zone])) <= ZONE_HALF - .005))
+            inside = bool(np.all(np.abs(pos[:2] - np.array(zones[zone])) <= halves[zone] - .005))
             resting = bool(pos[2] <= TABLE_Z + .004 + half_h + .01)  # receptacle base is 4 mm thick
             upright = bool(abs(state[name]["z_axis"][2]) > .9)
             ok = inside and resting and upright

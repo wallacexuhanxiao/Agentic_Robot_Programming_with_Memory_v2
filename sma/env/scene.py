@@ -23,7 +23,8 @@ RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"),
 # Object half heights (m), used by the evaluator.
 KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035}
 KIND_RADIUS = {"block": .028, "book": .054, "mug": .04}
-ZONE_HALF = .055
+ZONE_HALF = .055                               # default inner half width (toy box)
+RECEPTACLE_HALF = {"tray": .068, "box": .058}  # trays are larger so a rotated book still lies flat
 
 
 def look_at(eye, target):
@@ -86,8 +87,9 @@ class TabletopOrganize(Lift):
         arena.set_camera(camera_name="demo", pos=[1.0, -0.8, 1.5], quat=look_at([1.0, -0.8, 1.5], [0, 0, .82]))
         from .assets import add_receptacle, make_object
         for zone in self.layout.zones:
-            add_receptacle(arena.worldbody, zone.name, RECEPTACLES[zone.color][0], ZONE_RGBA[zone.color],
-                           zone.xy, TABLE_Z, half=ZONE_HALF)
+            style = RECEPTACLES[zone.color][0]
+            add_receptacle(arena.worldbody, zone.name, style, ZONE_RGBA[zone.color],
+                           zone.xy, TABLE_Z, half=RECEPTACLE_HALF[style])
         self.items = {}
         self.placement_initializer = SequentialCompositeSampler("LayoutSampler")
         for spec in self.layout.objects:

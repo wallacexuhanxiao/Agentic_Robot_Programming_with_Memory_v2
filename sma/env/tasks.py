@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .scene import KIND_RADIUS, Layout, ObjectSpec, RECEPTACLES, ZONE_HALF, ZoneSpec
+from .scene import KIND_RADIUS, Layout, ObjectSpec, RECEPTACLE_HALF, RECEPTACLES, ZoneSpec
 
 # Reachable top-down workspace for the Panda on this table (world frame, metres).
 OBJECT_X, OBJECT_Y = (-0.12, 0.20), (-0.26, 0.26)
@@ -77,7 +77,7 @@ def make_task(family, seed, *, kinds=None):
 
     zones, placed = [], []
     for color in zone_colors:
-        footprint = (ZONE_HALF + .008) * 1.15  # base + wall thickness, as a radius
+        footprint = (RECEPTACLE_HALF[RECEPTACLES[color][0]] + .008) * 1.15  # base + walls, as a radius
         xy = _sample_xy(rng, placed, footprint, x_range=(-0.12, 0.16), y_range=(-0.26, 0.26))
         placed.append((xy, footprint))
         zones.append(ZoneSpec(color, tuple(np.round(xy, 4))))
