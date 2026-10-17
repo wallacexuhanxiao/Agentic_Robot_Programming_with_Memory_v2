@@ -78,17 +78,23 @@ def make_object(kind, name, rgba):
                            obj_type="all", duplicate_collision_geoms=True)
 
 
+def _static(worldbody, name, size, pos, rgba, friction):
+    # Robosuite renders only the visual group (1); collision geoms (group 0) are invisible.
+    worldbody.append(new_geom(name=name, type="box", size=size, pos=pos, rgba=[0, 0, 0, 0], group=0,
+                              friction=friction))
+    worldbody.append(new_geom(name=name + "_visual", type="box", size=size, pos=pos, rgba=rgba, group=1,
+                              contype="0", conaffinity="0"))
+
+
 def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=0.065):
     """Static receptacle: a coloured base plate plus wooden rims (tray) or walls (toy box)."""
     base_h = .002
-    worldbody.append(new_geom(name=f"{name}_base", type="box", size=[half, half, base_h],
-                              pos=[xy[0], xy[1], table_z + base_h], rgba=base_rgba, group=0,
-                              friction=[1.5, .005, .0001]))
+    _static(worldbody, f"{name}_base", [half, half, base_h], [xy[0], xy[1], table_z + base_h], base_rgba,
+            [1.5, .005, .0001])
     wall_half_h = .009 if style == "tray" else .025
     t = .004
     for i, (dx, dy, sx, sy) in enumerate(((half + t, 0, t, half + 2 * t), (-half - t, 0, t, half + 2 * t),
                                           (0, half + t, half, t), (0, -half - t, half, t))):
-        worldbody.append(new_geom(name=f"{name}_wall_{i}", type="box", size=[sx, sy, wall_half_h],
-                                  pos=[xy[0] + dx, xy[1] + dy, table_z + wall_half_h], rgba=WOOD, group=0,
-                                  friction=[1.0, .005, .0001]))
+        _static(worldbody, f"{name}_wall_{i}", [sx, sy, wall_half_h],
+                [xy[0] + dx, xy[1] + dy, table_z + wall_half_h], WOOD, [1.0, .005, .0001])
     return table_z + 2 * base_h  # surface height inside the receptacle
