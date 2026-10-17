@@ -47,8 +47,12 @@ class TabletopEnv:
         from robosuite.utils.camera_utils import get_camera_extrinsic_matrix, get_camera_intrinsic_matrix
         if self.env is not None:
             self.close()
+        from robosuite.controllers import load_part_controller_config
         config = load_composite_controller_config(controller="BASIC")
-        config["body_parts"]["right"]["input_ref_frame"] = "world"
+        # Joint-position control: every motion is solved by IK, then tracked in joint space.
+        arm = load_part_controller_config(default_controller="JOINT_POSITION")
+        arm["kp"] = 150
+        config["body_parts"]["right"] = {**arm, "gripper": config["body_parts"]["right"]["gripper"]}
         self.env = suite.make("TabletopOrganize", robots="Panda", layout=self.task.layout,
                               controller_configs=config, has_renderer=False, has_offscreen_renderer=True,
                               use_camera_obs=False, use_object_obs=False, control_freq=20,
@@ -65,8 +69,9 @@ class TabletopEnv:
         # Finger closing axis at the reset orientation defines yaw = 0 offset.
         closing = self.down.as_matrix()[:, 0]  # Panda fingers slide along the grip-site x axis.
         self.yaw0 = float(np.arctan2(closing[1], closing[0]))
-        for _ in range(10):
-            self._step(np.zeros(3))
+        self._setup_ik()
+        self.q_rest = self._q()
+        self.wait(10)
         self.go_home()
         self.steps = 0
         return self.observe()
@@ -87,14 +92,52 @@ class TabletopEnv:
     def _target_rotation(self, yaw):
         return Rotation.from_euler("z", yaw - self.yaw0) * self.down
 
-    def _step(self, translation, rotation=None):
+    # Joint-space execution -------------------------------------------------
+    def _setup_ik(self):
+        import mujoco
+        self._mj = mujoco
+        model = self.env.sim.model._model
+        self._model = model
+        self._ik_data = mujoco.MjData(model)
+        joints = [model.joint(i).name for i in range(model.njnt) if model.joint(i).name.startswith("robot0_joint")]
+        ids = [model.joint(n).id for n in joints]
+        self.qadr = np.array([model.jnt_qposadr[i] for i in ids])
+        self.dadr = np.array([model.jnt_dofadr[i] for i in ids])
+        self.q_low, self.q_high = model.jnt_range[ids, 0] + .02, model.jnt_range[ids, 1] - .02
+        self.site_id = model.site("gripper0_right_grip_site").id
+
+    def _q(self):
+        return self.env.sim.data._data.qpos[self.qadr].copy()
+
+    def _ik(self, position, rotation, iterations=300):
+        """Damped least squares on the robot model, within joint limits, biased toward the rest posture."""
+        mj, model, d = self._mj, self._model, self._ik_data
+        d.qpos[:] = self.env.sim.data._data.qpos
+        q = self._q()
+        jacp, jacr = np.zeros((3, model.nv)), np.zeros((3, model.nv))
+        for _ in range(iterations):
+            d.qpos[self.qadr] = q
+            mj.mj_fwdPosition(model, d)
+            ep = position - d.site_xpos[self.site_id]
+            er = (rotation * Rotation.from_matrix(d.site_xmat[self.site_id].reshape(3, 3)).inv()).as_rotvec()
+            if np.linalg.norm(ep) < 5e-4 and np.linalg.norm(er) < 5e-3:
+                return q, 0.0
+            mj.mj_jacSite(model, d, jacp, jacr, self.site_id)
+            J = np.vstack([jacp[:, self.dadr], jacr[:, self.dadr]])
+            e = np.concatenate([ep, .5 * er])
+            JJt = J @ J.T + 1e-4 * np.eye(6)
+            dq = J.T @ np.linalg.solve(JJt, e)
+            null = np.eye(len(q)) - J.T @ np.linalg.solve(JJt, J)
+            dq += null @ (.05 * (self.q_rest - q))
+            q = np.clip(q + np.clip(dq, -.15, .15), self.q_low, self.q_high)
+        return q, float(np.linalg.norm(ep))
+
+    def _step(self, q_target):
         if self.steps >= self.step_budget:
             raise BudgetExceeded("control_step_budget_exhausted", budget=self.step_budget)
-        action = np.zeros(7)
-        action[:3] = np.clip(translation / .05, -.8, .8)
-        if rotation is not None:
-            action[3:6] = np.clip(rotation / .5, -.2, .2)
-        action[6] = self.grip
+        action = np.zeros(self.env.action_dim)
+        action[:7] = np.clip((np.asarray(q_target) - self._q()) / .05, -1, 1)
+        action[-1] = self.grip
         self.obs, _, _, _ = self.env.step(action)
         self.steps += 1
         if self.video and self.steps % self.video_every == 0:
@@ -128,7 +171,7 @@ class TabletopEnv:
         return {"width": round(width, 4), "closed_command": self.grip > 0,
                 "holding_something": bool(self.grip > 0 and width > .006)}
 
-    def move_to(self, x, y, z, yaw=None, tolerance=.004, max_steps=300):
+    def move_to(self, x, y, z, yaw=None, tolerance=.006, max_steps=60):
         """Move the grip point (between the fingertips) to (x, y, z), gripper pointing down."""
         target = np.array([x, y, z], float)
         if not np.all(np.isfinite(target)):
@@ -141,32 +184,29 @@ class TabletopEnv:
         # The two fingers are symmetric: yaw and yaw + pi are the same grasp. Use the
         # representative in [-pi/2, pi/2) so the wrist stays away from its joint limits.
         yaw = (yaw + np.pi / 2) % np.pi - np.pi / 2
-        goal = self._target_rotation(yaw)
-        start = self.steps
-        current = Rotation.from_quat(self.obs["robot0_eef_quat_site"])
-        if np.linalg.norm((goal * current.inv()).as_rotvec()) > .3:
-            # Large wrist turns: rotate in place first, then translate (OSC couples the two badly).
-            here = self._ee()
-            for _ in range(max_steps):
-                rot_err = (goal * Rotation.from_quat(self.obs["robot0_eef_quat_site"]).inv()).as_rotvec()
-                if np.linalg.norm(rot_err) < .03:
-                    break
-                self._step(here - self._ee(), rot_err)
+        q_goal, residual = self._ik(target, self._target_rotation(yaw))
+        if residual > .005:
+            raise RobotError("unreachable_pose", target=target.round(4).tolist(), yaw=round(yaw, 3),
+                             ik_residual_m=round(residual, 4))
+        start, q_start = self.steps, self._q()
+        n = int(np.max(np.abs(q_goal - q_start)) / .025) + 1  # at most 0.5 rad/s per joint
+        for i in range(1, n + 1):
+            self._step(q_start + (q_goal - q_start) * i / n)
         for _ in range(max_steps):
-            error = target - self._ee()
-            rot_err = (goal * Rotation.from_quat(self.obs["robot0_eef_quat_site"]).inv()).as_rotvec()
-            if np.linalg.norm(error) < tolerance and np.linalg.norm(rot_err) < .03:
+            if np.linalg.norm(target - self._ee()) < tolerance:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "steps": self.steps - start}
-            self._step(error, rot_err)
-        raise RobotError("motion_timeout", target=target.round(4).tolist(),
+            self._step(q_goal)
+            if self.steps - start > n + 40 and np.linalg.norm(self.obs.get("robot0_joint_vel", np.zeros(7))) < 1e-3:
+                break
+        raise RobotError("motion_blocked", target=target.round(4).tolist(),
                          reached=self._ee().round(4).tolist(),
                          remaining_error_m=round(float(np.linalg.norm(target - self._ee())), 4))
 
     def _gripper(self, command, steps=25):
         self.grip = command
-        hold = self._ee()
+        hold = self._q()
         for _ in range(steps):
-            self._step(hold - self._ee())
+            self._step(hold)
         return self.gripper_state()
 
     def open_gripper(self):
@@ -180,10 +220,10 @@ class TabletopEnv:
         try:
             if self._ee()[2] < HOME[2] - .03:
                 here = self._ee()
-                self.move_to(here[0], here[1], HOME[2], tolerance=.03, max_steps=250)
-            return self.move_to(*HOME, yaw=self.yaw0, tolerance=.03, max_steps=300)
+                self.move_to(here[0], here[1], HOME[2], tolerance=.03)
+            return self.move_to(*HOME, yaw=self.yaw0, tolerance=.03)
         except RobotError as exc:
-            if exc.reason == "motion_timeout" and exc.details["remaining_error_m"] < .06:
+            if exc.reason == "motion_blocked" and exc.details["remaining_error_m"] < .06:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "approximate": True}
             raise
 
@@ -240,9 +280,9 @@ class TabletopEnv:
         return zone
 
     def wait(self, steps=20):
-        hold = self._ee()
+        hold = self._q()
         for _ in range(int(steps)):
-            self._step(hold - self._ee())
+            self._step(hold)
 
     def check_on_zone(self, object_name, zone_name):
         """Perception-only subgoal check (robot moved home first so it does not occlude)."""
