@@ -41,9 +41,15 @@ def supported(message, subject, zone, scene):
         return False
     words = KIND_WORDS.get(subject, (subject.replace("_", " "), subject.split("_")[-1]))
     color = zone.split("_")[0]
-    # The colour must follow the object word closely ("my mugs on the cyan tray"), so a mug is not paired
-    # with a colour that the message attaches to a different object.
-    return any(_re.search(rf"\b{_re.escape(w)}\b[^,.;]{{0,40}}\b{color}\b", m) for w in words)
+    colors = {z.split("_")[0] for z in scene["zones"]} | {"orange", "cyan", "purple"}
+    # The first colour word after the object word must be this place's colour ("my mugs on the cyan
+    # tray"), so a mug is never paired with a colour the message attaches to a different object.
+    for w in words:
+        for hit in _re.finditer(rf"\b{_re.escape(w)}\b", m):
+            later = _re.search(r"\b(" + "|".join(sorted(colors)) + r")\b", m[hit.end():hit.end() + 60])
+            if later and later.group(1) == color:
+                return True
+    return False
 
 
 def _json(text):
