@@ -115,13 +115,14 @@ if [[ "${SMA_MODE:-dev}" == dev || "${SMA_MODE:-dev}" == devsuite ]]; then
 fi
 
 PORT=$("$SIM_PY" -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
+VLLM_EXTRA=${SMA_VLLM_EXTRA:-}  # optional extra vLLM flags, "@" for spaces
 MODEL=${SMA_GENERAL_MODEL:-$(cat "$PROJECT/qwen35_checkpoint_path.txt")}
 GENERAL_NAME=${SMA_GENERAL_NAME:-Qwen/Qwen3.5-9B}
 "$PROJECT/vllm_qwen35_venv/bin/python" -m vllm.entrypoints.openai.api_server \
   --model "$MODEL" --served-model-name "$GENERAL_NAME" --host 127.0.0.1 --port "$PORT" \
   --dtype bfloat16 --max-model-len ${SMA_MAX_LEN:-16384} --gpu-memory-utilization ${SMA_GENERAL_GPU_UTIL:-.80} --max-num-seqs 2 \
   --generation-config vllm --reasoning-parser qwen3 --limit-mm-per-prompt "{\"image\":${SMA_MM_IMAGES:-0},\"video\":0}" \
-  ${SMA_VLLM_EXTRA//@/ } > "$OUT/model.log" 2>&1 &
+  ${VLLM_EXTRA//@/ } > "$OUT/model.log" 2>&1 &
 PIDS+=("$!")
 for i in $(seq 1 240); do
   if curl -sf "http://127.0.0.1:$PORT/v1/models" > /dev/null; then break; fi
