@@ -20,10 +20,10 @@ from .worker import run_worker
 
 # Curriculum: simple single-object placements first, then a dependency (clear an occupied container first).
 TASKS = [
-    TaskSpec("place-block", "place", ["block"], [101, 102, 103], [126, 127], list(range(201, 209))),
-    TaskSpec("place-mug", "place", ["mug"], [104, 105, 106], [128, 129], list(range(211, 219))),
-    TaskSpec("place-book", "place", ["book"], [107, 108, 109], [130, 131], list(range(221, 229))),
-    TaskSpec("sort-two", "sort", None, [110, 112, 114], [132, 134], list(range(232, 248, 2))),
+    TaskSpec("place-block", "place", ["block"], [101, 102, 103], [126, 127], list(range(201, 206))),
+    TaskSpec("place-mug", "place", ["mug"], [104, 105, 106], [128, 129], list(range(211, 216))),
+    TaskSpec("place-book", "place", ["book"], [107, 108, 109], [130, 131], list(range(221, 226))),
+    TaskSpec("sort-two", "sort", None, [110, 112, 114], [132, 134], list(range(232, 242, 2))),
 ]
 
 
