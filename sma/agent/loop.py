@@ -63,10 +63,40 @@ def pick_args(entry):
     return args
 
 
+def _move_pose(entry):
+    """(position, yaw or None) commanded by a traced move_to call."""
+    args, kw = list(entry["args"]), entry.get("kwargs", {})
+    pos = [args[i] if len(args) > i else kw.get(k) for i, k in enumerate(("x", "y", "z"))]
+    yaw = args[3] if len(args) > 3 else kw.get("yaw")
+    return pos, yaw
+
+
+def pose_grasps(trace, scene, obj):
+    """Pose-level API: each close_gripper preceded by a move_to near obj counts as a grasp with
+    grasp_height = z - table_z and the commanded yaw (or the yaw in effect)."""
+    target = scene["objects"].get(obj)
+    out, last, yaw_now = [], None, None
+    for entry in trace:
+        if entry["call"] == "move_to":
+            pos, yaw = _move_pose(entry)
+            last, yaw_now = pos, (yaw if yaw is not None else yaw_now)
+        if entry["call"] == "close_gripper" and target and last and None not in last[:3]:
+            if math.hypot(last[0] - target["center"][0], last[1] - target["center"][1]) < .04 and yaw_now is not None:
+                out.append((entry, [obj, last[2] - scene["table_z"], yaw_now]))
+    return out
+
+
 def pick_records(trace, scene, obj):
-    """(kind, grasp_height, yaw relative to long axis, holding) for every pick of obj in a trace."""
+    """(kind, grasp_height, yaw relative to long axis, holding) for every grasp of obj in a trace."""
     target = scene["objects"].get(obj)
     out = []
+    for entry, args in pose_grasps(trace, scene, obj):
+        result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
+        out.append({"kind": target["kind"], "object_height": target["height"],
+                    "footprint": [target["footprint_long"], target["footprint_short"]],
+                    "grasp_height": round(float(args[1]), 4),
+                    "yaw_from_long_axis_deg": round(math.degrees(_angle_mod_pi(float(args[2]) - target["long_axis_yaw"]))),
+                    "holding": bool(result.get("holding_something")), "error": None})
     for entry in trace:
         args = pick_args(entry) if entry["call"] == "pick" else []
         if target and len(args) >= 3 and args[0] == obj:
@@ -100,6 +130,9 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
             facts += grasp_geometry_facts(pick_args(entry), target)
         if entry["call"] == "close_gripper" and isinstance(result, dict):
             closes += 1
+            pose = [a for e, a in pose_grasps(trace[:i + 1], scene_before, obj) if e is entry]
+            if pose and target:
+                facts += grasp_geometry_facts(pose[0], target)
             where = ""
             if last_pos and target:
                 where = (f" with the grip point at {last_pos}; {obj} was at xy {target['center'][:2]}"

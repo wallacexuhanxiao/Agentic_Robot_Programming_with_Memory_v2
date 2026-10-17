@@ -98,7 +98,7 @@ class TabletopEnv:
         self._mj = mujoco
         model = self.env.sim.model._model
         self._model = model
-        self._ik_data = mujoco.MjData(model)
+        self._ik_data = mujoco.MjData(model)  # private copy: only the robot's own joints are ever written
         joints = [model.joint(i).name for i in range(model.njnt) if model.joint(i).name.startswith("robot0_joint")]
         ids = [model.joint(n).id for n in joints]
         self.qadr = np.array([model.jnt_qposadr[i] for i in ids])
@@ -112,7 +112,7 @@ class TabletopEnv:
     def _ik(self, position, rotation, q0=None, iterations=150):
         """Damped least squares on the robot model, within joint limits, biased toward the rest posture."""
         mj, model, d = self._mj, self._model, self._ik_data
-        d.qpos[:] = self.env.sim.data._data.qpos
+        d.qpos[:] = model.qpos0  # default configuration; object poses are never copied into the IK model
         q = self._q() if q0 is None else np.array(q0, float)
         jacp, jacr = np.zeros((3, model.nv)), np.zeros((3, model.nv))
         for _ in range(iterations):

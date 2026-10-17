@@ -2,38 +2,40 @@
 import json
 import os
 
-POSE_API_DOC = """You control a Franka Panda arm above a table by writing Python. All units are metres and radians,
+POSE_API_DOC = """You control a Franka Panda arm above a table by writing short Python. Units: metres and radians;
 world frame: x away from the robot base, y to the left, z up. The table surface is at z = table_z.
 
-Functions already available (no imports, no try/except):
+Only these functions exist (they are already defined; do not import anything, do not use try/except):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
-   "objects": {name: {"kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float, "height": float,
-                      "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
-   "zones": {name: {"center": [x, y, z], "half_size": [hx, hy]}},
+   "objects": {name: {"name": str, "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float,
+                      "height": float, "footprint_long": float, "footprint_short": float,
+                      "long_axis_yaw": float, "short_axis_yaw": float}},
+   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a toy box)
    "gripper": {"width": float, "holding_something": bool},
    "end_effector": {"position": [x, y, z], "yaw": float}}
+  "height" is the object's height above the table; "top_z" is the absolute z of its top surface.
+  long_axis_yaw / short_axis_yaw: directions (angles in the xy plane) of the footprint's long and short
+  sides; the footprint measures footprint_long along long_axis_yaw and footprint_short along short_axis_yaw.
   The arm can hide objects from the camera; go_home() first for a clear view.
-move_to(x, y, z, yaw=None) moves the grip point (the midpoint between the two fingertips) to (x, y, z)
-  with the gripper pointing straight down. yaw is the direction (angle in the xy plane) along which the
-  fingers close; None keeps the current yaw. yaw and yaw + pi are the same grasp (symmetric fingers). Raises an error if the target is unreachable or blocked.
-  Moves in a straight line, without collision avoidance.
-open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}. Fingers open to 0.08 m.
-  The fingertips only touch what lies between table_z and the grip point's height, so an object is
-  grasped only if, when closing, the grip point is below the object's top_z and the object is between
-  the open fingers. holding_something tells whether something ended up between the fingers.
+move_to(x, y, z, yaw=None) moves the grip point (the midpoint between the two fingertips) to the ABSOLUTE
+  position (x, y, z) in a straight line, gripper pointing straight down. yaw is the direction of the line
+  between the two fingertips, i.e. the direction in which the fingers squeeze (yaw and yaw + pi are the
+  same); None keeps the current yaw. No collision avoidance. Raises an error if unreachable or blocked.
+open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}. The open fingers are 0.08 m
+  apart; an object is gripped only if its extent along yaw is smaller than that and it lies between the
+  fingertips below the grip point. holding_something tells whether something ended up between the fingers.
 go_home() moves the arm up and out of the camera view.   wait(steps) holds still (20 steps = 1 s).
-Math: the module math is available. Write plain top-level code; a robot error stops the program
-and is reported back to you.
+The module math is available. A robot error stops the program and is reported back to you.
 
 Generic pick-and-place sequencing (human-provided prior, the same for every task; it does NOT give
 object-specific grasp heights or orientations, you must choose those):
 1. Open the gripper before approaching an object.
 2. Approach from above: first move well above the object, then descend vertically to the grasp pose.
 3. After closing, check holding_something, then lift vertically before any sideways motion, and carry
-   the object high enough to clear other objects.
-4. To place: move above the target, descend vertically until the object is just above the table,
-   open the gripper, then lift vertically."""
+   the object high enough to clear other objects and the walls of containers.
+4. To place: move above the target, descend vertically until the object is just above the container
+   floor, open the gripper, then lift vertically."""
 
 TASK_API_DOC = """You control a Franka Panda arm above a table by writing short Python. Units: metres and radians;
 world frame: x away from the robot base, y to the left, z up. The table surface is at z = table_z.
