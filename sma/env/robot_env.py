@@ -261,12 +261,14 @@ class TabletopEnv:
         return self._gripper(1.0)
 
     def go_home(self):
-        """Raise the arm and park it at the table edge (out of the top camera's view). Best effort."""
+        """Raise the arm and park it at the table edge (out of the top camera's view). Best effort. While something
+        is held the gripper keeps its yaw, so parking (e.g. inside free_spots or check) never turns the object."""
+        yaw = None if self.gripper_state()["holding_something"] else self.yaw0
         try:
             if self._ee()[2] < HOME[2] - .03:
                 here = self._ee()
                 self.move_to(here[0], here[1], HOME[2], tolerance=.03)
-            return self.move_to(*HOME, yaw=self.yaw0, tolerance=.03)
+            return self.move_to(*HOME, yaw=yaw, tolerance=.03)
         except RobotError as exc:
             if exc.reason == "motion_blocked" and exc.details["remaining_error_m"] < .06:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "approximate": True}
