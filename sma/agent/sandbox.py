@@ -24,7 +24,8 @@ SAFE_BUILTINS = {name: getattr(__builtins__, name) if hasattr(__builtins__, name
                  for name in ("abs", "min", "max", "round", "len", "range", "list", "dict", "tuple",
                               "float", "int", "str", "bool", "enumerate", "zip", "sorted", "sum",
                               "any", "all", "print", "isinstance", "ValueError", "RuntimeError",
-                              "KeyError", "Exception", "reversed", "set")}
+                              "KeyError", "Exception", "reversed", "set",
+                              "next")}  # next: added for the pen-case run (models often write next(... for ...))
 SAFE_BUILTINS["__import__"] = _import_math_only
 import os
 
