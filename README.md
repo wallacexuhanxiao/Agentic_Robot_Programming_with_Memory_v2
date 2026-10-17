@@ -47,7 +47,7 @@ proprioception, and the results of its own commands. Simulator object poses are 
 ```bash
 # on Hopper, in /scratch/e0985859/agentic_robot_programming/skill_memory_agent
 SMA_RUN_NAME=dev_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=dev bash hpc/submit.sh
-SMA_RUN_NAME=suite_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=suite SMA_CONDITIONS="none memory" bash hpc/submit.sh
+SMA_RUN_NAME=suite_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=suite SMA_CONDITIONS=memory:none SMA_SUITES=train+heldout bash hpc/submit.sh
 ```
 
 Outputs go to `outputs/<run>/`. Each task directory holds `episode.json` (plan, every attempt's code, trace,

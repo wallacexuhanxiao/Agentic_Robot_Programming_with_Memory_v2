@@ -6,7 +6,7 @@
 #PBS -l walltime=01:30:00
 #PBS -j oe
 # Modes (SMA_MODE): dev = scripted plumbing test + one Qwen smoke episode;
-#                   suite = Qwen runs of SMA_CONDITIONS over SMA_SUITES.
+#   suite = Qwen runs of SMA_CONDITIONS (e.g. memory:none) over SMA_SUITES (e.g. train+heldout).
 set -euo pipefail
 PROJECT=/scratch/e0985859/agentic_robot_programming
 ROOT=$PROJECT/skill_memory_agent
@@ -52,8 +52,10 @@ if [[ "${SMA_MODE:-dev}" == dev ]]; then
   "$SIM_PY" -m sma.eval.run_suite --condition memory --suites smoke \
     --base-url "http://127.0.0.1:$PORT/v1" --out "$OUT/llm_smoke" > "$OUT/llm_smoke.log" 2>&1
 else
-  for condition in ${SMA_CONDITIONS:-none memory}; do
-    "$SIM_PY" -m sma.eval.run_suite --condition "$condition" --suites "${SMA_SUITES:-train,heldout}" \
+  # qsub -v splits on commas: lists use ':' (conditions) and '+' (suites).
+  SUITES=${SMA_SUITES:-train+heldout}
+  for condition in ${SMA_CONDITIONS//:/ }; do
+    "$SIM_PY" -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
       --base-url "http://127.0.0.1:$PORT/v1" --out "$OUT/$condition" > "$OUT/$condition.log" 2>&1 || true
   done
 fi
