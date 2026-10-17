@@ -91,11 +91,12 @@ def _source_location():
 
 
 class Sandbox:
-    def __init__(self, env, skills=None, on_call=None):
+    def __init__(self, env, skills=None, on_call=None, on_result=None):
         self.env = env
         self.trace = []
         self.skills = skills or {}
         self.on_call = on_call  # optional observer (used to annotate videos with the executing line)
+        self.on_result = on_result  # optional observer of (entry, raw result) after a call returns
 
     def _traced(self, name, fn):
         def call(*args, **kwargs):
@@ -113,6 +114,8 @@ class Sandbox:
                 raise
             if name != "observe":
                 entry["result"] = _short(result)
+            if self.on_result:
+                self.on_result(entry, result)
             return result
         return call
 

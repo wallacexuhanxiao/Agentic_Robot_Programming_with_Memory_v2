@@ -42,6 +42,29 @@ def legend_card(size, seconds=8.0, fps=20):
     return [frame] * int(seconds * fps)
 
 
+def api_card(size, seconds=10.0, fps=20):
+    """Card that explains the mid-level API the model programs against."""
+    h, w = size
+    frame = np.full((h, w, 3), 25, np.uint8)
+    rows = [
+        ("MID-LEVEL ROBOT API (what the LLM writes code against)", (120, 220, 235)),
+        ("Abstraction: below TidyBot-style pick_and_place, above ASPIRE-style poses/point clouds.", (235, 235, 235)),
+        ("The system does perception, grasp proposals and motion execution; the model decides the rest.", (235, 235, 235)),
+        ("  grasp_candidates(obj)      top-down grasp proposals measured from the RGB-D camera", (255, 220, 60)),
+        ("  grasp(candidate)           execute the chosen (possibly adjusted) grasp", (255, 220, 60)),
+        ("  free_spots(zone)           where the object fits in the container; who occupies it", (255, 220, 60)),
+        ("  carry_to(x, y, h, yaw)     rise, then move horizontally holding the object", (255, 220, 60)),
+        ("  lower_until_contact()      lower until the object touches down or is blocked", (255, 220, 60)),
+        ("  open_gripper() / retreat() / check(obj, zone) / observe()", (255, 220, 60)),
+        ("The model chooses: which grasp, where and how to put the object down, order, recovery.", (90, 220, 110)),
+        ("Same model in every clip: Qwen3-30B-A3B-Instruct (open weights, vLLM).", (150, 150, 150)),
+        ("Clips are deterministic replays of the recorded programs (no new model calls).", (150, 150, 150)),
+    ]
+    for i, (text, color) in enumerate(rows):
+        cv2.putText(frame, text, (24, 40 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, .5 if i else .7, color, 1, cv2.LINE_AA)
+    return [frame] * int(seconds * fps)
+
+
 def label(frame, text):
     frame = frame.copy()
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 18), (0, 0, 0), -1)
@@ -53,7 +76,7 @@ LABELS = {"none": "no memory", "skill": "skill memory", "user": "user memory", "
           "memory": "skill memory", "plumbing": "scripted program, no LLM"}
 
 
-def main(run_dir, out, items, legend=False):
+def main(run_dir, out, items, legend=False, level=None):
     frames = []
     for item in items:
         condition, task = item.split("/")
@@ -72,6 +95,8 @@ def main(run_dir, out, items, legend=False):
         clip = imageio.mimread(video, memtest=False)
         if legend and not frames:
             frames += legend_card(clip[0].shape[:2])
+            if level == "mid":
+                frames += api_card(clip[0].shape[:2])
         frames += card(lines, size=clip[0].shape[:2])  # cards match the clip size (encoders pad to x16)
         tag = f"{task} | {LABELS.get(condition, condition)} | GT {'ok' if gt else 'fail'}"
         frames += clip if legend else [label(f, tag) for f in clip]  # replay clips carry their own labels
@@ -82,5 +107,6 @@ def main(run_dir, out, items, legend=False):
 if __name__ == "__main__":
     args = sys.argv[1:]
     legend = "--legend" in args
-    args = [a for a in args if a != "--legend"]
-    main(args[0], args[1], args[2:], legend=legend)
+    level = "mid" if "--mid" in args else None
+    args = [a for a in args if a not in ("--legend", "--mid")]
+    main(args[0], args[1], args[2:], legend=legend, level=level)
