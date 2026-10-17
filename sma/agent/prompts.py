@@ -107,6 +107,13 @@ free_spots(zone_name, object_name=None) -> {"zone", "center", "half_size", "long
 carry_to(x, y, height=0.18, yaw=None) rises vertically to table_z + height (if lower), then moves
   horizontally to (x, y) at that height; whatever is held comes along. yaw is an ABSOLUTE gripper yaw
   (finger direction); yaw=None keeps the current yaw.
+  COMMON MISTAKE: yaw is the direction of the FINGERS, not of the held object. An object grasped across
+  its short side (fingers squeezing its width) has its long axis 90 degrees away from the finger
+  direction, so carry_to(..., yaw=<the direction the object should have>) leaves it crosswise. To give
+  a held object's long axis the direction d, either
+    (a) keep yaw=None and call rotate_by(d - <the object's current long-axis yaw>), or
+    (b) pass yaw = d + (<gripper yaw at the grasp> - <object's long-axis yaw at the grasp>)
+  (both angles at the grasp are in the candidate you grasped: "yaw" and "object_long_axis_yaw").
 rotate_by(delta) -> {"gripper_yaw_before", "gripper_yaw", "turned_by", "holding_something"}
   Turns the gripper, and the held object with it, by delta radians about the vertical axis, staying in
   place (positive = counter-clockwise seen from above). A held object's long axis changes by the same
