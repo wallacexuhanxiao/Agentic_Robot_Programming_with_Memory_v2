@@ -147,4 +147,5 @@ def object_on_zone(obj, zone, table_z, margin=.01):
     if obj["footprint_long"] - obj["footprint_short"] > .01 and "long_axis_yaw" in zone:
         diff = (obj["long_axis_yaw"] - zone["long_axis_yaw"] + np.pi / 2) % np.pi - np.pi / 2
         out["object_axis_vs_zone_axis_deg"] = round(float(np.degrees(abs(diff))), 1)
+        out["object_long_axis_yaw"], out["zone_long_axis_yaw"] = obj["long_axis_yaw"], round(float(zone["long_axis_yaw"]), 3)
     return out

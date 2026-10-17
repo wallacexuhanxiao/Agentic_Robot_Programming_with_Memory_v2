@@ -212,7 +212,7 @@ Program:
 What happened (measured by the robot and camera):
 {diagnosis}
 Object as seen by the camera: {object_view}
-
+{tried}
 In ONE sentence, state the concrete change to the pick/place arguments for a {kind} that would fix
 this (for example which grasp_height range, or which of long_axis_yaw / short_axis_yaw to use as yaw).
 Reply with JSON only:

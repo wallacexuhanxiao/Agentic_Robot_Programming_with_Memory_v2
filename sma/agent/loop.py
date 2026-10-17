@@ -122,6 +122,40 @@ def pick_records(trace, scene, obj):
     return out
 
 
+def _axis_deg(a):
+    """Angle between two undirected axes, in degrees (0..90)."""
+    return round(math.degrees(_angle_mod_pi(a)), 1)
+
+
+def orientation_facts(trace, scene, check, obj, zone):
+    """Measured orientations of an elongated object against the commanded gripper yaw (facts, no advice)."""
+    target = scene["objects"].get(obj)
+    if not target or target["footprint_long"] - target["footprint_short"] <= .01:
+        return []
+    facts, grasp_yaw = [], None
+    for entry in trace:
+        args = pick_args(entry) if entry["call"] in ("pick", "grasp") else []
+        result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
+        if len(args) >= 3 and args[0] == obj and None not in args and result.get("holding_something"):
+            grasp_yaw = float(args[2])
+            facts.append(f"At the grasp the gripper yaw (finger direction) was {grasp_yaw:.3f} rad while {obj}'s long "
+                         f"axis was {target['long_axis_yaw']:.3f} rad: {_axis_deg(grasp_yaw - target['long_axis_yaw'])} "
+                         f"degrees apart.")
+    carries = [e for e in trace if e["call"] == "carry_to" and not e.get("error")]
+    if grasp_yaw is not None and carries:
+        entry = carries[-1]
+        yaw = entry["args"][3] if len(entry["args"]) > 3 else entry.get("kwargs", {}).get("yaw")
+        yaw = grasp_yaw if yaw is None else float(yaw)
+        line = f"The last carry_to used gripper yaw {yaw:.3f} rad"
+        if check.get("object_long_axis_yaw") is not None:
+            line += (f"; after release the camera measured {obj}'s long axis at {check['object_long_axis_yaw']:.3f} rad, "
+                     f"{_axis_deg(check['object_long_axis_yaw'] - yaw)} degrees from that gripper yaw and "
+                     f"{_axis_deg(check['object_long_axis_yaw'] - check['zone_long_axis_yaw'])} degrees from {zone}'s long "
+                     f"axis ({check['zone_long_axis_yaw']:.3f} rad)")
+        facts.append(line + ".")
+    return facts
+
+
 def diagnose(trace, scene_before, check, obj, zone, error=None):
     """Plain-language facts derived from the trace and camera; identical for every condition."""
     facts = []
@@ -158,6 +192,7 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
             facts.append(f"close_gripper (call {i}) -> holding_something={result.get('holding_something')}{where}.")
     if closes == 0 and not (error and error.get("type") in ("rejected", "program_error")):
         facts.append("The program never grasped anything.")
+    facts += orientation_facts(trace, scene_before, check, obj, zone)
     if check.get("reason") == "not_visible":
         facts.append(f"After the program the camera could not see {obj} or {zone}.")
     elif "offset_from_zone_center" in check:
@@ -175,13 +210,14 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
     return "\n".join("- " + f for f in facts)
 
 
-def reflect(llm, obj, zone, code, diagnosis, scene):
+def reflect(llm, obj, zone, code, diagnosis, scene, tried=""):
     """One-sentence corrective lesson from the general model (every condition reflects within an episode)."""
     view = scene["objects"].get(obj)
     if view is None:
         return None
     messages = [{"role": "user", "content": prompts.REFLECT.format(
         object=obj, kind=view["kind"], zone=zone, code=code, diagnosis=diagnosis,
+        tried=("Lessons proposed earlier for this kind that did not help (do not repeat them):\n" + tried) if tried else "",
         object_view=json.dumps({k: view[k] for k in ("height", "top_z", "footprint_long", "footprint_short",
                                                      "long_axis_yaw", "short_axis_yaw")}))}]
     text = llm.chat(messages, purpose="reflect", max_tokens=6000, thinking=True)
@@ -203,19 +239,21 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
     attempts_text, attempts = "", []
     for n in range(1, MAX_ATTEMPTS + 1):
         scene = env.observe()
-        skills_text, retrieved = "", []
+        skills_text, retrieved, lesson_ids = "", [], []
         if memory is not None:
             retrieved = memory.retrieve(scene, obj, zone)
             if retrieved:
                 skills_text = prompts.SKILLS_HEADER + memory.describe(retrieved)
             skills_text += memory.grasp_experience_text()
             kind_now = scene["objects"].get(obj, {}).get("kind")
-            if kind_now and memory.lessons_text(kind_now):
-                skills_text += prompts.LESSONS_HEADER + memory.lessons_text(kind_now)
+            lessons, lesson_ids = memory.lessons_for(kind_now) if kind_now else ("", [])
+            if lessons:
+                skills_text += prompts.LESSONS_HEADER + lessons
         direct = (memory is not None and n == 1 and retrieved and retrieved[0][1]["verdict"] == "applicable")
         if direct:
             # Reuse policy: an applicable, validated skill is executed as is; no new code is generated.
             code = f'skills.{retrieved[0][0]["function"]}("{obj}", "{zone}")'
+            lesson_ids = []  # no prompt was written, so no lesson was shown
         else:
             shown = env.observe_base() if hasattr(env, "observe_base") else scene  # ASPIRE level: base frame
             prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction),
@@ -240,12 +278,16 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
         attempts.append(attempt)
         if memory is not None:
             memory.log_grasps(attempt["picks"], task.task_id)
+            memory.record_lesson_outcome(lesson_ids, check.get("satisfied", False))
+            attempt["lessons_shown"] = lesson_ids
         log(f"    attempt {n}{' (direct skill reuse)' if direct else ''}: program_ok={ok} check={check.get('satisfied')} skills={attempt['used_skills']} "
             f"error={error and (error.get('reason') or error.get('message'))}")
         if check.get("satisfied"):
             return True, attempts
         attempt["diagnosis"] = diagnose(sandbox.trace, scene, check, obj, zone, error)
-        attempt["lesson"] = reflect(llm, obj, zone, code, attempt["diagnosis"], scene)
+        kind = scene["objects"].get(obj, {}).get("kind")
+        tried = memory.refuted_text(kind) if memory is not None and kind else ""
+        attempt["lesson"] = reflect(llm, obj, zone, code, attempt["diagnosis"], scene, tried)
         if memory is not None and attempt["lesson"] and obj in scene["objects"]:
             memory.add_lesson(scene["objects"][obj]["kind"], attempt["lesson"], task.task_id)  # persists across tasks
         attempts_text = prompts.ATTEMPT.format(n=n, code=code, diagnosis=attempt["diagnosis"],

@@ -46,6 +46,8 @@ class SkillMemory:
         self.skills = data.get("skills", [])
         self.grasp_log = data.get("grasp_log", [])  # operation-level experience: how each kind was grasped
         self.lessons = data.get("lessons", [])      # reflections on failures, keyed by object kind
+        for i, lesson in enumerate(self.lessons):
+            lesson.setdefault("id", i + 1)
         self.applicability_log = []
 
     def save(self):
@@ -54,12 +56,42 @@ class SkillMemory:
                                          "lessons": self.lessons}, indent=1))
 
     def add_lesson(self, kind, lesson, task_id):
-        self.lessons.append({"kind": kind, "lesson": lesson, "task": task_id})
+        # shown_then: camera-check outcomes of the later attempts whose prompt showed this lesson.
+        self.lessons.append({"id": len(self.lessons) + 1, "kind": kind, "lesson": lesson, "task": task_id,
+                             "shown_then": []})
         self.save()
 
-    def lessons_text(self, kind, limit=3):
-        rows = [l for l in self.lessons if l["kind"] == kind][-limit:]
-        return "".join(f"- ({l['task']}) {l['lesson']}\n" for l in rows)
+    @staticmethod
+    def lesson_status(lesson):
+        outcomes = lesson.get("shown_then", [])
+        if any(outcomes):
+            return "an attempt that saw it succeeded"
+        if len(outcomes) >= 2:
+            return "refuted"
+        return "not yet tested" if not outcomes else f"{len(outcomes)} later attempt failed"
+
+    def lessons_for(self, kind, limit=3):
+        """Text for the coder and the ids it shows: recent lessons that are not refuted, plus refuted lessons as
+        lessons that did not help (shown in two or more later attempts that all failed)."""
+        rows = [l for l in self.lessons if l["kind"] == kind]
+        live = [l for l in rows if self.lesson_status(l) != "refuted"][-limit:]
+        text = "".join(f"- ({l['task']}; {self.lesson_status(l)}) {l['lesson']}\n" for l in live)
+        refuted = self.refuted_text(kind, limit)
+        if refuted:
+            text += ("Lessons that did NOT help (they were shown before two or more attempts that still failed):\n"
+                     + refuted)
+        return text, [l["id"] for l in live]
+
+    def refuted_text(self, kind, limit=3):
+        rows = [l for l in self.lessons if l["kind"] == kind and self.lesson_status(l) == "refuted"][-limit:]
+        return "".join(f"- {l['lesson']}\n" for l in rows)
+
+    def record_lesson_outcome(self, ids, success):
+        for lesson in self.lessons:
+            if lesson["id"] in ids:
+                lesson.setdefault("shown_then", []).append(bool(success))
+        if ids:
+            self.save()
 
     def log_grasps(self, picks, task_id):
         for p in picks:
