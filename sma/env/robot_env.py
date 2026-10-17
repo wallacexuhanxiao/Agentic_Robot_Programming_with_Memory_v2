@@ -3,7 +3,7 @@
 Agent-visible: top-down RGB-D perception, gripper/end-effector proprioception, and the
 results of its own commands. Private (evaluator only): simulator object poses.
 """
-import time
+import os
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -30,13 +30,13 @@ class BudgetExceeded(RobotError):
 
 class TabletopEnv:
     def __init__(self, task, *, image_size=256, video=True, video_every=3, step_budget=2400,
-                 render_gpu=-1):
+                 render_gpu=None):
         self.task = task
         self.image_size = image_size
         self.video = video
         self.video_every = video_every
         self.step_budget = step_budget
-        self.render_gpu = render_gpu
+        self.render_gpu = int(os.environ.get("MUJOCO_EGL_DEVICE_ID", -1)) if render_gpu is None else render_gpu
         self.frames = []
         self.env = None
 
@@ -127,7 +127,7 @@ class TabletopEnv:
         return {"width": round(width, 4), "closed_command": self.grip > 0,
                 "holding_something": bool(self.grip > 0 and width > .006)}
 
-    def move_to(self, x, y, z, yaw=None, tolerance=.004, max_steps=200):
+    def move_to(self, x, y, z, yaw=None, tolerance=.004, max_steps=300):
         """Move the grip point (between the fingertips) to (x, y, z), gripper pointing down."""
         target = np.array([x, y, z], float)
         if not np.all(np.isfinite(target)):
@@ -163,10 +163,16 @@ class TabletopEnv:
         return self._gripper(1.0)
 
     def go_home(self):
-        if self._ee()[2] < HOME[2] - .02:
-            here = self._ee()
-            self.move_to(here[0], here[1], HOME[2], max_steps=250)
-        return self.move_to(*HOME, yaw=self.yaw0, tolerance=.015, max_steps=300)
+        """Raise the arm and park it at the table edge (out of the top camera's view). Best effort."""
+        try:
+            if self._ee()[2] < HOME[2] - .03:
+                here = self._ee()
+                self.move_to(here[0], here[1], HOME[2], tolerance=.03, max_steps=250)
+            return self.move_to(*HOME, yaw=self.yaw0, tolerance=.03, max_steps=300)
+        except RobotError as exc:
+            if exc.reason == "motion_timeout" and exc.details["remaining_error_m"] < .06:
+                return {"ok": True, "position": self._ee().round(4).tolist(), "approximate": True}
+            raise
 
     def wait(self, steps=20):
         hold = self._ee()

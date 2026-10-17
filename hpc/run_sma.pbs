@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#PBS -P CFP04-CF-057
+#PBS -q interactive
+#PBS -N sma
+#PBS -l select=1:ncpus=8:mem=48gb:ngpus=1
+#PBS -l walltime=01:30:00
+#PBS -j oe
+# Modes (SMA_MODE): dev = scripted plumbing test + one Qwen smoke episode;
+#                   suite = Qwen runs of SMA_CONDITIONS over SMA_SUITES.
+set -euo pipefail
+PROJECT=/scratch/e0985859/agentic_robot_programming
+ROOT=$PROJECT/skill_memory_agent
+OUT=$ROOT/outputs/${SMA_RUN_NAME:?}
+mkdir -p "$OUT"
+cd "$ROOT"
+export PYTHONPATH=$ROOT PYTHONUNBUFFERED=1 OMP_NUM_THREADS=4
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export CUDA_VISIBLE_DEVICES=$(/usr/bin/python3 - <<'PY'
+import os,subprocess
+assigned=os.environ['CUDA_VISIBLE_DEVICES'].split(',')[0]
+rows=subprocess.check_output(['nvidia-smi','--query-gpu=index,uuid','--format=csv,noheader'],text=True)
+print(next(line.split(',')[0].strip() for line in rows.splitlines() if assigned in
+ (line.split(',')[0].strip(),line.split(',')[1].strip())))
+PY
+)
+export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl EGL_PLATFORM=device MUJOCO_EGL_DEVICE_ID=$CUDA_VISIBLE_DEVICES
+SIM_PY=$PROJECT/vision_venv/bin/python
+git rev-parse HEAD > "$OUT/code_commit.txt" 2>/dev/null || true
+sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
+PIDS=()
+trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
+
+if [[ "${SMA_MODE:-dev}" == dev ]]; then
+  "$SIM_PY" scripts/offline_plumbing.py "$OUT/plumbing" > "$OUT/plumbing.log" 2>&1 || echo "plumbing failed: $?" >> "$OUT/plumbing.log"
+fi
+
+PORT=$("$SIM_PY" -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
+MODEL=$(cat "$PROJECT/qwen35_checkpoint_path.txt")
+"$PROJECT/vllm_qwen35_venv/bin/python" -m vllm.entrypoints.openai.api_server \
+  --model "$MODEL" --served-model-name Qwen/Qwen3.5-9B --host 127.0.0.1 --port "$PORT" \
+  --dtype bfloat16 --max-model-len 16384 --gpu-memory-utilization .80 --max-num-seqs 2 \
+  --generation-config vllm --reasoning-parser qwen3 --limit-mm-per-prompt '{"image":0,"video":0}' \
+  > "$OUT/model.log" 2>&1 &
+PIDS+=("$!")
+for i in $(seq 1 240); do
+  if curl -sf "http://127.0.0.1:$PORT/v1/models" > /dev/null; then break; fi
+  kill -0 "${PIDS[0]}"; sleep 2
+done
+echo "model ready after $((i*2))s" >> "$OUT/model_ready.txt"
+
+if [[ "${SMA_MODE:-dev}" == dev ]]; then
+  "$SIM_PY" -m sma.eval.run_suite --condition memory --suites smoke \
+    --base-url "http://127.0.0.1:$PORT/v1" --out "$OUT/llm_smoke" > "$OUT/llm_smoke.log" 2>&1
+else
+  for condition in ${SMA_CONDITIONS:-none memory}; do
+    "$SIM_PY" -m sma.eval.run_suite --condition "$condition" --suites "${SMA_SUITES:-train,heldout}" \
+      --base-url "http://127.0.0.1:$PORT/v1" --out "$OUT/$condition" > "$OUT/$condition.log" 2>&1 || true
+  done
+fi
