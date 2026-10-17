@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from .perception import object_on_zone, perceive
-from .scene import KINDS, TABLE_Z, TabletopOrganize, ZONE_HALF
+from .scene import KIND_HALF_HEIGHT, TABLE_Z, TabletopOrganize, ZONE_HALF
 
 HOME = np.array([-0.20, 0.0, 1.08])
 WORKSPACE = np.array([[-0.32, 0.30], [-0.36, 0.36], [TABLE_Z + 0.004, 1.30]])
@@ -334,10 +334,9 @@ class TabletopEnv:
         for name, zone in goal.items():
             pos = np.array(state[name]["position"])
             kind = name.split("_", 1)[1]
-            shape, size = KINDS[kind]
-            half_h = size[2] if shape == "box" else size[1]
+            half_h = KIND_HALF_HEIGHT[kind]
             inside = bool(np.all(np.abs(pos[:2] - np.array(zones[zone])) <= ZONE_HALF - .005))
-            resting = bool(pos[2] <= TABLE_Z + half_h + .01)
+            resting = bool(pos[2] <= TABLE_Z + .004 + half_h + .01)  # receptacle base is 4 mm thick
             upright = bool(abs(state[name]["z_axis"][2]) > .9)
             ok = inside and resting and upright
             details[name] = {"zone": zone, "inside": inside, "resting": resting, "upright": upright,

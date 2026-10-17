@@ -7,11 +7,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .scene import KINDS, Layout, ObjectSpec, ZONE_HALF, ZoneSpec
+from .scene import KIND_RADIUS, Layout, ObjectSpec, RECEPTACLES, ZONE_HALF, ZoneSpec
 
 # Reachable top-down workspace for the Panda on this table (world frame, metres).
 OBJECT_X, OBJECT_Y = (-0.12, 0.20), (-0.26, 0.26)
-SORT_RULE = {"cube": "purple", "cup": "cyan", "book": "orange"}
+SORT_RULE = {"block": "purple", "mug": "cyan", "book": "orange"}  # the simulated user's preference (colour of base)
+KIND_WORDS = {"block": "toy block", "mug": "mug", "book": "book"}
+
+
+def receptacle(color):
+    return RECEPTACLES[color][1]
 
 
 @dataclass
@@ -25,12 +30,11 @@ class Task:
 
 
 def _radius(kind):
-    shape, size = KINDS[kind]
-    return float(np.hypot(size[0], size[1])) if shape == "box" else size[0]
+    return KIND_RADIUS[kind]
 
 
 ROBOT_BASE_XY = np.array([-0.56, 0.0])
-MAX_REACH = 0.68  # horizontal distance from the base that leaves margin for approach heights and wrist yaw
+MAX_REACH = 0.70  # horizontal distance from the base (IK-checked reachable up to ~0.71 m)
 
 
 def _sample_xy(rng, placed, radius, x_range=OBJECT_X, y_range=OBJECT_Y, tries=2000):
@@ -38,13 +42,13 @@ def _sample_xy(rng, placed, radius, x_range=OBJECT_X, y_range=OBJECT_Y, tries=20
         xy = np.array([rng.uniform(*x_range), rng.uniform(*y_range)])
         if np.linalg.norm(xy - ROBOT_BASE_XY) > MAX_REACH:
             continue
-        if all(np.linalg.norm(xy - p) > radius + r + .03 for p, r in placed):
+        if all(np.linalg.norm(xy - p) > radius + r + .02 for p, r in placed):
             return xy
     raise RuntimeError("Could not sample a collision-free layout")
 
 
-TEACH_INSTRUCTION = ("From now on, I always want cubes on the purple zone, cups on the cyan zone and books on the "
-                     "orange zone. Please tidy the table that way.")
+TEACH_INSTRUCTION = ("From now on, please always put my toy blocks in the purple toy box, my mugs on the cyan tray "
+                     "and my books on the orange tray. Tidy the desk that way now.")
 VAGUE_INSTRUCTIONS = ["Tidy up my desk, please.", "Could you clean up the table?", "Put my things where they belong."]
 
 
@@ -61,10 +65,10 @@ def make_task(family, seed, *, kinds=None):
     rng = np.random.default_rng(seed)
     colors = list(rng.permutation(["red", "green", "blue", "yellow"]))
     if family == "place":
-        kinds = kinds or [str(rng.choice(["cube", "cup", "book"]))]
+        kinds = kinds or [str(rng.choice(["block", "mug", "book"]))]
         zone_colors = list(rng.permutation(list(SORT_RULE.values())))[:2]
     elif family in ("sort", "clear"):
-        kinds = kinds or list(rng.permutation(["cube", "cup", "book"]))[:2 if family == "sort" else 2]
+        kinds = kinds or list(rng.permutation(["block", "mug", "book"]))[:2]
         zone_colors = sorted({SORT_RULE[k] for k in kinds})
         spare = [c for c in SORT_RULE.values() if c not in zone_colors]
         zone_colors += spare[:1]
@@ -73,8 +77,9 @@ def make_task(family, seed, *, kinds=None):
 
     zones, placed = [], []
     for color in zone_colors:
-        xy = _sample_xy(rng, placed, ZONE_HALF * 1.2, x_range=(-0.12, 0.18), y_range=(-0.24, 0.24))
-        placed.append((xy, ZONE_HALF * 1.2))
+        footprint = (ZONE_HALF + .008) * 1.15  # base + wall thickness, as a radius
+        xy = _sample_xy(rng, placed, footprint, x_range=(-0.12, 0.16), y_range=(-0.26, 0.26))
+        placed.append((xy, footprint))
         zones.append(ZoneSpec(color, tuple(np.round(xy, 4))))
     zone_xy = {z.name: np.array(z.xy) for z in zones}
 
@@ -82,10 +87,10 @@ def make_task(family, seed, *, kinds=None):
     goal = {}
     for i, kind in enumerate(kinds):
         spec_color = colors[i]
-        target_zone = f"{SORT_RULE[kind]}_zone" if family != "place" else zones[0].name
+        target_zone = receptacle(SORT_RULE[kind]) if family != "place" else zones[0].name
         if family == "clear" and i == 0:
             # Object 0 sits on the zone that object 1 needs; it belongs to its own zone.
-            blocked = f"{SORT_RULE[kinds[1]]}_zone"
+            blocked = receptacle(SORT_RULE[kinds[1]])
             xy = zone_xy[blocked] + rng.uniform(-.015, .015, 2)
         else:
             xy = _sample_xy(rng, placed, _radius(kind))
@@ -95,26 +100,27 @@ def make_task(family, seed, *, kinds=None):
         objects.append(spec)
         goal[spec.name] = target_zone
 
-    names = [o.name.replace("_", " ") for o in objects]
     if family == "place":
-        instruction = f"Put the {names[0]} on the {zones[0].name.replace('_', ' ')}."
+        target = zones[0].name.replace("_", " ")
+        word = "in" if zones[0].name.endswith("box") else "on"
+        instruction = f"Put the {objects[0].color} {KIND_WORDS[objects[0].kind]} {word} the {target}."
     else:
-        instruction = ("Organize this table: every cube belongs on the purple zone, every cup on the "
-                       "cyan zone and every book on the orange zone. Leave each object resting on its zone.")
+        instruction = ("Organize this desk: toy blocks go in the purple toy box, mugs on the cyan tray and "
+                       "books on the orange tray.")
     return Task(f"{family}_{seed}", family, instruction, Layout(objects, zones), goal, seed)
 
 
 def suite(name):
     """Fixed, reproducible task sequences. Seeds >= 1000 are held-out layouts."""
     if name == "train":
-        return [make_task("place", 1, kinds=["cube"]), make_task("place", 2, kinds=["book"]),
-                make_task("place", 3, kinds=["cup"]), make_task("sort", 4)]
+        return [make_task("place", 1, kinds=["block"]), make_task("place", 2, kinds=["book"]),
+                make_task("place", 3, kinds=["mug"]), make_task("sort", 4)]
     if name == "heldout":
         return [make_task("sort", 1000 + i) for i in range(3)] + [make_task("clear", 1100 + i) for i in range(3)]
     if name == "session":
         # One simulated user: teaches preferences once, then gives vague requests on new layouts.
-        return [make_task("teach", 4), make_task("place", 1, kinds=["cube"]), make_task("place", 2, kinds=["book"]),
-                make_task("place", 3, kinds=["cup"])] + [make_task("tidy", 1000 + i) for i in range(6)]
+        return [make_task("teach", 4), make_task("place", 1, kinds=["block"]), make_task("place", 2, kinds=["book"]),
+                make_task("place", 3, kinds=["mug"])] + [make_task("tidy", 1000 + i) for i in range(6)]
     if name == "smoke":
-        return [make_task("place", 7, kinds=["cube"])]
+        return [make_task("place", 7, kinds=["block"])]
     raise ValueError(name)

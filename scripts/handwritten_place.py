@@ -24,7 +24,7 @@ def place(env, obj_name, zone_name):
 
 out = sys.argv[1]
 results = []
-for kind, seed in (("cube", 11), ("book", 12), ("cup", 13)):
+for kind, seed in (("block", 11), ("book", 12), ("mug", 13)):
     task = make_task("place", seed, kinds=[kind])
     env = TabletopEnv(task)
     env.reset()

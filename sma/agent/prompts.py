@@ -8,7 +8,7 @@ world frame: x away from the robot base, y to the left, z up. The table surface 
 Functions already available (no imports, no try/except):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
-   "objects": {name: {"kind": "cube"|"book"|"cup", "center": [x, y, z], "top_z": float, "height": float,
+   "objects": {name: {"kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float, "height": float,
                       "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
    "zones": {name: {"center": [x, y, z], "half_size": [hx, hy]}},
    "gripper": {"width": float, "holding_something": bool},
@@ -42,9 +42,9 @@ Only these functions exist (they are already defined; do not import anything, do
 do not define helper names that are not used):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
-   "objects": {name: {"name": str, "kind": "cube"|"book"|"cup", "center": [x, y, z], "top_z": float,
+   "objects": {name: {"name": str, "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float,
                       "height": float, "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
-   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},
+   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a toy box)
    "gripper": {"width": float, "holding_something": bool}}
   "height" is the object's height above the table; "top_z" is the absolute z of its top surface.
 pick(object_name, grasp_height, yaw) -> {"holding_something": bool, ...}

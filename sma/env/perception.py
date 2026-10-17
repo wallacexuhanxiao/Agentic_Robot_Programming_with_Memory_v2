@@ -7,7 +7,8 @@ import cv2
 import numpy as np
 
 
-KIND_HEIGHT = {"cube": .04, "book": .025, "cup": .07}
+KIND_HEIGHT = {"block": .04, "book": .025, "mug": .07}
+ZONE_NAMES = {"orange": "orange_tray", "cyan": "cyan_tray", "purple": "purple_box"}  # receptacle catalogue
 
 
 def back_project(depth_m, K, world_from_camera):
@@ -59,10 +60,10 @@ def _footprint(points_xy):
 
 def classify_kind(height, long_side, short_side):
     if height > .055:
-        return "cup"
+        return "mug"
     if long_side > .065:
         return "book"
-    return "cube"
+    return "block"
 
 
 def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
@@ -97,7 +98,7 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
             continue
         pts = xyz[mask][:, :2]
         lo, hi = pts.min(0), pts.max(0)
-        zones[f"{color}_zone"] = {"name": f"{color}_zone", "center": [round(float((lo[0] + hi[0]) / 2), 4),
+        zones[ZONE_NAMES[color]] = {"name": ZONE_NAMES[color], "center": [round(float((lo[0] + hi[0]) / 2), 4),
                                              round(float((lo[1] + hi[1]) / 2), 4), round(table_z, 4)],
                                   "half_size": [round(float((hi[0] - lo[0]) / 2), 4),
                                                 round(float((hi[1] - lo[1]) / 2), 4)]}

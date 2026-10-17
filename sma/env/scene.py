@@ -1,4 +1,4 @@
-"""Robosuite tabletop with varied layouts: colored blocks, cups and books, plus flat target zones.
+"""Robosuite tabletop with varied layouts: toy blocks, mugs and books, plus trays and a toy box.
 
 The layout (which objects, where, which zones) is supplied by a Layout; the scene itself
 only builds MJCF. Object state is read back only by the private evaluator.
@@ -9,7 +9,6 @@ import numpy as np
 from robosuite.environments.manipulation.lift import Lift
 from robosuite.environments.manipulation.manipulation_env import ManipulationEnv
 from robosuite.models.arenas import TableArena
-from robosuite.models.objects import BoxObject, CylinderObject
 from robosuite.models.tasks import ManipulationTask
 from robosuite.utils.mjcf_utils import new_geom
 from robosuite.utils.placement_samplers import SequentialCompositeSampler, UniformRandomSampler
@@ -19,10 +18,12 @@ TABLE_Z = 0.8
 OBJECT_RGBA = {"red": [.85, .08, .06, 1], "green": [.08, .62, .12, 1], "blue": [.06, .18, .85, 1],
                "yellow": [.92, .78, .05, 1]}
 ZONE_RGBA = {"purple": [.55, .12, .70, 1], "cyan": [.05, .72, .78, 1], "orange": [.95, .45, .05, 1]}
-# Half sizes (m). Boxes: x, y, z; cylinders: radius, half height.
-KINDS = {"cube": ("box", [.02, .02, .02]), "book": ("box", [.045, .03, .0125]),
-         "cup": ("cylinder", [.024, .035])}
-ZONE_HALF = .06
+# Receptacle catalogue: base colour -> (style, name). Trays are shallow; the toy box has walls.
+RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"), "purple": ("box", "purple_box")}
+# Object half heights (m), used by the evaluator.
+KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035}
+KIND_RADIUS = {"block": .028, "book": .054, "mug": .04}
+ZONE_HALF = .055
 
 
 def look_at(eye, target):
@@ -55,7 +56,7 @@ class ZoneSpec:
 
     @property
     def name(self):
-        return f"{self.color}_zone"
+        return RECEPTACLES[self.color][1]
 
 
 @dataclass
@@ -83,18 +84,14 @@ class TabletopOrganize(Lift):
         # Perception camera straight above the table (image right = world +x, up = +y).
         arena.set_camera(camera_name="topdown", pos=[0.0, 0.0, 1.95], quat=[1, 0, 0, 0])
         arena.set_camera(camera_name="demo", pos=[1.0, -0.8, 1.5], quat=look_at([1.0, -0.8, 1.5], [0, 0, .82]))
+        from .assets import add_receptacle, make_object
         for zone in self.layout.zones:
-            arena.worldbody.append(new_geom(
-                name=zone.name, type="box", size=[ZONE_HALF, ZONE_HALF, .0005],
-                pos=[zone.xy[0], zone.xy[1], TABLE_Z + .0006], rgba=ZONE_RGBA[zone.color],
-                group=1, contype="0", conaffinity="0"))
+            add_receptacle(arena.worldbody, zone.name, RECEPTACLES[zone.color][0], ZONE_RGBA[zone.color],
+                           zone.xy, TABLE_Z, half=ZONE_HALF)
         self.items = {}
         self.placement_initializer = SequentialCompositeSampler("LayoutSampler")
         for spec in self.layout.objects:
-            shape, size = KINDS[spec.kind]
-            cls = BoxObject if shape == "box" else CylinderObject
-            obj = cls(name=spec.name, size=size, rgba=OBJECT_RGBA[spec.color],
-                      friction=[1.5, .005, .0001], density=400)
+            obj = make_object(spec.kind, spec.name, OBJECT_RGBA[spec.color])
             self.items[spec.name] = obj
             self.placement_initializer.append_sampler(UniformRandomSampler(
                 name=spec.name + "_sampler", mujoco_objects=obj,

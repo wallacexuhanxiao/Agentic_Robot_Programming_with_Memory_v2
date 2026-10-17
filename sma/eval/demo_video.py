@@ -38,7 +38,7 @@ def main(run_dir, out, items):
         gt = episode["private_eval"]["success"]
         gens = sum(len(s["attempts"]) for s in episode.get("subgoals", []))
         skills = sorted({f for s in episode.get("subgoals", []) for a in s["attempts"] for f in a["used_skills"]})
-        goals = [f"{s['object']}->{s['zone'].replace('_zone', '')}{' ok' if s['success'] else ' X'}"
+        goals = [f"{s['object']}->{s['zone']}{' ok' if s['success'] else ' X'}"
                  for s in episode.get("subgoals", [])]
         lines = [f"{task}  [{LABELS.get(condition, condition)}]",
                  episode["instruction"][:45], episode["instruction"][45:90],
