@@ -5,25 +5,37 @@ import urllib.request
 from pathlib import Path
 
 
+CODE_PURPOSES = ("code", "extract")
+
+
 class LLM:
-    def __init__(self, base_url, model="Qwen/Qwen3.5-9B", log_dir=None, temperature=0.2):
+    """Routes code-writing purposes to an optional coder endpoint; everything else to the general model."""
+
+    def __init__(self, base_url, model="Qwen/Qwen3.5-9B", log_dir=None, temperature=0.2,
+                 coder_url=None, coder_model=None):
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.coder_url = coder_url.rstrip("/") if coder_url else None
+        self.coder_model = coder_model
         self.temperature = temperature
         self.log_dir = Path(log_dir) if log_dir else None
         self.calls = []
 
     def chat(self, messages, *, purpose, max_tokens=2500):
-        body = {"model": self.model, "messages": messages, "max_tokens": max_tokens,
-                "temperature": self.temperature, "chat_template_kwargs": {"enable_thinking": False}}
+        use_coder = self.coder_url is not None and purpose in CODE_PURPOSES
+        url, model = (self.coder_url, self.coder_model) if use_coder else (self.base_url, self.model)
+        body = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": self.temperature}
+        if not use_coder:
+            body["chat_template_kwargs"] = {"enable_thinking": False}
         started = time.time()
-        request = urllib.request.Request(self.base_url + "/chat/completions", data=json.dumps(body).encode(),
+        request = urllib.request.Request(url + "/chat/completions", data=json.dumps(body).encode(),
                                          headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(request, timeout=600) as response:
             reply = json.loads(response.read())
         choice = reply["choices"][0]
         text = choice["message"].get("content") or ""
-        record = {"index": len(self.calls), "purpose": purpose, "seconds": round(time.time() - started, 2),
+        record = {"index": len(self.calls), "purpose": purpose, "model": model,
+                  "seconds": round(time.time() - started, 2),
                   "finish_reason": choice.get("finish_reason"), "usage": reply.get("usage"),
                   "messages": messages, "response": text}
         self.calls.append(record)
@@ -43,7 +55,8 @@ class LLM:
                 "completion_tokens": sum(t.get("completion_tokens", 0) for t in tokens),
                 "seconds": round(sum(c["seconds"] for c in self.calls), 1),
                 "by_purpose": {p: sum(1 for c in self.calls if c["purpose"] == p)
-                               for p in sorted({c["purpose"] for c in self.calls})}}
+                               for p in sorted({c["purpose"] for c in self.calls})},
+                "models": sorted({c.get("model") or "" for c in self.calls})}
 
 
 class ScriptedLLM(LLM):

@@ -6,6 +6,8 @@ PBS=/cm/shared/apps/pbspro/current/bin
 VARS="SMA_RUN_NAME=${SMA_RUN_NAME:?},SMA_MODE=${SMA_MODE:-dev}"
 [[ -n "${SMA_CONDITIONS:-}" ]] && VARS+=",SMA_CONDITIONS=$SMA_CONDITIONS"
 [[ -n "${SMA_SUITES:-}" ]] && VARS+=",SMA_SUITES=$SMA_SUITES"
+[[ -n "${SMA_CODER:-}" ]] && VARS+=",SMA_CODER=$SMA_CODER,SMA_GENERAL_GPU_UTIL=0.45"
+[[ -n "${SMA_API_LEVEL:-}" ]] && VARS+=",SMA_API_LEVEL=$SMA_API_LEVEL"
 mkdir -p "$ROOT/outputs"
 # Same pattern as the existing project: submit held, shrink the hook-expanded request, release.
 JOB_ID=$($PBS/qsub -h -q interactive -v "$VARS" -o "$ROOT/outputs/$SMA_RUN_NAME.pbs.log" "$ROOT/hpc/run_sma.pbs")
