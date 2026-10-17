@@ -61,17 +61,34 @@ def _short(value, limit=600):
     return value if len(text) <= limit else text[:limit] + "..."
 
 
+def _source_location():
+    """(filename, line) of the innermost frame executing generated code ('<program>' or '<skill ...>')."""
+    import sys
+    frame = sys._getframe(2)
+    while frame is not None:
+        name = frame.f_code.co_filename
+        if name == "<program>" or name.startswith("<skill"):
+            return name, frame.f_lineno
+        frame = frame.f_back
+    return None, None
+
+
 class Sandbox:
-    def __init__(self, env, skills=None):
+    def __init__(self, env, skills=None, on_call=None):
         self.env = env
         self.trace = []
         self.skills = skills or {}
+        self.on_call = on_call  # optional observer (used to annotate videos with the executing line)
 
     def _traced(self, name, fn):
         def call(*args, **kwargs):
             entry = {"call": name, "args": [round(a, 4) if isinstance(a, float) else a for a in args],
-                     "kwargs": kwargs}
+                     "kwargs": kwargs, "control_step": getattr(self.env, "steps", None),
+                     "frame": len(getattr(self.env, "frames", []))}
+            entry["source"], entry["line"] = _source_location()
             self.trace.append(entry)
+            if self.on_call:
+                self.on_call(entry)
             try:
                 result = fn(*args, **kwargs)
             except RobotError as exc:

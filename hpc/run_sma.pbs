@@ -31,6 +31,12 @@ sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
 PIDS=()
 trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 
+if [[ "${SMA_MODE:-dev}" == replay ]]; then
+  # Re-execute recorded programs (no LLM) with the code overlay; items are '+'-separated condition/task.
+  "$SIM_PY" -m sma.eval.replay "$ROOT/outputs/${SMA_REPLAY_RUN:?}" "$OUT" ${SMA_REPLAY_ITEMS//+/ } > "$OUT/replay.log" 2>&1
+  exit 0
+fi
+
 if [[ "${SMA_MODE:-dev}" == dev || "${SMA_MODE:-dev}" == devsuite ]]; then
   "$SIM_PY" scripts/offline_plumbing.py "$OUT/plumbing" > "$OUT/plumbing.log" 2>&1 || echo "plumbing failed: $?" >> "$OUT/plumbing.log"
   # devsuite: only spend model time if the scripted primitives worked on every plumbing task.
