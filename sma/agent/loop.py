@@ -333,6 +333,8 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
         env.go_home()
         record["final_perception"] = {k: env.check_on_zone(o, z) for o, z in task.goal.items() for k in [o]}
         record["private_eval"] = env.private_evaluate(task.goal)
+        record["depth_diagnostics"] = {"last_raw_range": getattr(env, "depth_raw_range", None),
+                                       "rerendered": getattr(env, "depth_rerendered", 0)}
     except RobotError as exc:
         record["harness_error"] = {"reason": exc.reason, "details": exc.details}
         record["private_eval"] = env.private_evaluate(task.goal)

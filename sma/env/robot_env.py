@@ -169,11 +169,13 @@ class TabletopEnv:
 
     # ---------------------------------------------------------------- agent API
     def observe(self):
-        from robosuite.utils.camera_utils import get_real_depth_map
         rgb, depth = self.render("topdown", self.image_size, self.image_size, depth=True)
-        depth_m = get_real_depth_map(self.env.sim, depth)
-        if depth_m.ndim == 3:
-            depth_m = depth_m[..., 0]
+        raw = np.asarray(depth, float)
+        self.depth_raw_range = [float(np.nanmin(raw)), float(np.nanmax(raw))]
+        if not (np.isfinite(raw).mean() > .5 and -1e-3 <= self.depth_raw_range[0] and self.depth_raw_range[1] <= 1.001):
+            rgb, depth = self.render("topdown", self.image_size, self.image_size, depth=True)  # re-render once
+            self.depth_rerendered = getattr(self, "depth_rerendered", 0) + 1
+        depth_m = self._metric_depth(depth)
         scene = perceive(rgb, depth_m, self.K, self.world_from_camera)
         scene["gripper"] = self.gripper_state()
         scene["end_effector"] = {"position": [round(float(v), 4) for v in self._ee()],
@@ -181,6 +183,22 @@ class TabletopEnv:
         self._zones_seen = {**getattr(self, "_zones_seen", {}), **scene["zones"]}
         self.last_rgb = rgb
         return scene
+
+    def _metric_depth(self, depth):
+        """MuJoCo's normalised depth buffer -> metres (same formula as robosuite), tolerant of values a
+        float epsilon outside [0, 1]; non-finite pixels become NaN instead of failing an assertion."""
+        d = np.asarray(depth, float)
+        if d.ndim == 3:
+            d = d[..., 0]
+        model = self.env.sim.model
+        extent = model.stat.extent
+        near, far = model.vis.map.znear * extent, model.vis.map.zfar * extent
+        bad = ~np.isfinite(d)
+        d = np.clip(np.where(bad, 1.0, d), 0.0, 1.0)
+        metres = near / (1.0 - d * (1.0 - near / far))
+        metres[bad] = np.nan
+        self.depth_out_of_range = int(bad.sum())
+        return metres
 
     def gripper_state(self):
         q = np.asarray(self.obs["robot0_gripper_qpos"], float)
