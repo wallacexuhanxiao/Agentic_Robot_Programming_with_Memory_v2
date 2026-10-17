@@ -84,6 +84,7 @@ class Overlay:
         self.code, self.code_title, self.line = "", "", None
         self.call, self.status, self.status_color = "", "", WHITE
         self.result = ""
+        self.changed = set()  # line numbers that differ from the previous attempt's program
         self.skill_codes = {}
         import os
         self.level = {"mid": "mid-level API", "task": "task-level API"}.get(os.environ.get("SMA_API_LEVEL", "task"), "")
@@ -110,7 +111,9 @@ class Overlay:
             y += 13
             if n == cur and self.line:
                 cv2.rectangle(panel, (4, y - 10), (PANEL_W - 4, y + 3), (70, 60, 10), -1)
-            put(panel, f"{n + 1:>2} {text[:82]}", (8, y), YELLOW if n == cur and self.line else WHITE, .34)
+            new = self.code is self.program and (n + 1) in self.changed
+            color = YELLOW if n == cur and self.line else CYAN if new else WHITE
+            put(panel, f"{n + 1:>2}{'*' if new else ' '}{text[:82]}", (8, y), color, .34)
         if self.result:
             put(panel, ("  returned: " + self.result)[:88], (8, h - 43), CYAN, .34)
         put(panel, ("> " + self.call)[:86], (8, h - 26), GREEN, .36)
@@ -136,6 +139,11 @@ class Overlay:
 
 
 def find_task(task_id):
+    import re
+    from ..env.tasks import make_task
+    m = re.fullmatch(r"pen(_teach)?_(\d+)", task_id)  # pen tasks are generated from their seed
+    if m:
+        return make_task("pen_teach" if m.group(1) else "pen", int(m.group(2)))
     for name in ("session", "train", "heldout", "smoke"):
         for task in suite(name):
             if task.task_id == task_id:
@@ -177,6 +185,18 @@ def replay(run_dir, out_dir, item):
                 if attempt.get("retrieved"):
                     v = attempt["retrieved"][0]
                     overlay.header.append((f"Memory: {v['function']} judged {v['verdict']['verdict'].upper()}", CYAN))
+                prev = sub["attempts"][attempt["n"] - 2] if attempt["n"] > 1 else None
+                overlay.changed = set()
+                if prev is not None:  # what the model was told after the previous attempt, and what it changed
+                    ch = prev["check"]
+                    if ch.get("object_axis_vs_zone_axis_deg") is not None:
+                        overlay.header.append((f"Attempt {prev['n']} failed: camera saw {obj} {ch['object_axis_vs_zone_axis_deg']:.0f} deg off the "
+                                               f"case axis, top {ch.get('top_height_above_table', 0):.3f} m", RED))
+                    if attempt.get("lessons_shown"):
+                        overlay.header.append((f"Memory: {len(attempt['lessons_shown'])} stored lesson(s) shown; lines marked * changed", CYAN))
+                    import difflib
+                    sm = difflib.SequenceMatcher(None, prev["code"].splitlines(), attempt["code"].splitlines())
+                    overlay.changed = {j + 1 for tag, _, _, j1, j2 in sm.get_opcodes() if tag != "equal" for j in range(j1, j2)}
                 overlay.program, overlay.program_title = attempt["code"], "Program being executed:"
                 overlay.code, overlay.code_title, overlay.line = attempt["code"], "Program being executed:", None
                 overlay.call, overlay.status, overlay.status_color, overlay.result = "", "running...", WHITE, ""
