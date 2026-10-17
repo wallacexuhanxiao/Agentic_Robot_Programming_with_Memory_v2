@@ -45,9 +45,10 @@ def main(run_dir, out, items):
                  f"code generations: {gens}", f"skills called: {', '.join(skills) or 'none'}",
                  "plan: " + ", ".join(goals)[:46],
                  f"ground truth: {'SUCCESS' if gt else 'FAIL'}"]
-        frames += card(lines)
+        clip = imageio.mimread(video, memtest=False)
+        frames += card(lines, size=clip[0].shape[:2])  # cards match the clip size (encoders pad to x16)
         tag = f"{task} | {LABELS.get(condition, condition)} | GT {'ok' if gt else 'fail'}"
-        frames += [label(f, tag) for f in imageio.mimread(video, memtest=False)]
+        frames += [label(f, tag) for f in clip]
     imageio.mimwrite(out, frames, fps=20)
     print(out, len(frames), "frames")
 
