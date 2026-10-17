@@ -27,6 +27,25 @@ def resolve_place(text, scene):
     return matches[0] if len(matches) == 1 else t
 
 
+KIND_WORDS = {"block": ("block", "blocks", "cube", "cubes"), "mug": ("mug", "mugs", "cup", "cups"),
+              "book": ("book", "books", "notebook", "notebooks")}
+LASTING = ("always", "from now on", "usually", "prefer", "every time", "in future", "in the future")
+
+
+def supported(message, subject, zone, scene):
+    """The message itself must name the object (kind word or exact name) and the place's colour word.
+    Wording may differ from the quote; a placement the message never mentions is rejected."""
+    import re as _re
+    m = message.lower()
+    if zone not in scene["zones"]:
+        return False
+    words = KIND_WORDS.get(subject, (subject.replace("_", " "), subject.split("_")[-1]))
+    color = zone.split("_")[0]
+    # The colour must follow the object word closely ("my mugs on the cyan tray"), so a mug is not paired
+    # with a colour that the message attaches to a different object.
+    return any(_re.search(rf"\b{_re.escape(w)}\b[^,.;]{{0,40}}\b{color}\b", m) for w in words)
+
+
 def _json(text):
     match = re.search(r"\{.*\}", text, re.S)
     return json.loads(match.group(0)) if match else {}
@@ -61,11 +80,10 @@ class UserMemory:
             subject = raw.rstrip("s") if raw in kinds else raw
             zone = resolve_place(str(u.get("zone", "")), scene)
             evidence = str(u.get("evidence", ""))
-            # The quote may elide words with "..."; every quoted fragment must appear in the message.
-            fragments = [f.strip(" .,'\"").lower() for f in evidence.split("...") if f.strip(" .,'\"")]
-            quoted = bool(fragments) and all(f in message.lower() for f in fragments)
             ok = (subject in {"block", "mug", "book"} or subject in scene["objects"]) and \
-                zone in scene["zones"] and quoted
+                supported(message, subject, zone, scene)
+            if ok and u.get("scope") == "long_term" and not any(w in message.lower() for w in LASTING):
+                u = {**u, "scope": "task_only"}  # no lasting wording in the message: not a long-term habit
             (accepted if ok else rejected).append({"subject": subject, "zone": zone,
                                                    "scope": u.get("scope"), "evidence": evidence})
         for u in accepted:

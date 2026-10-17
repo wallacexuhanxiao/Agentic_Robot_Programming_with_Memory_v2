@@ -72,15 +72,16 @@ def refine(llm, instruction, preferences, scene, _note=""):
         spec = {}
     pref_zone = {p["object"]: p["zone"] for p in preferences}
     goals, dropped = [], []
-    from ..memory.user import resolve_place
+    from ..memory.user import resolve_place, supported
     for g in spec.get("goals", []):
         g["zone"] = resolve_place(str(g.get("zone", "")), scene)
         obj, zone, source = g.get("object"), g.get("zone"), g.get("source")
         reason = None
         if obj not in scene["objects"] or zone not in scene["zones"]:
             reason = "unknown object or zone"
-        elif source == "instruction" and not _quoted(str(g.get("evidence", "")), instruction):
-            reason = "instruction evidence is not a quote from the request"
+        elif source == "instruction" and not supported(instruction, scene["objects"][obj]["kind"], zone, scene) \
+                and not _quoted(str(g.get("evidence", "")), instruction):
+            reason = "the request does not mention this object kind together with this place"
         elif source == "user_memory" and pref_zone.get(obj) != zone:
             reason = "no stored preference says this"
         elif source not in ("instruction", "user_memory", "assumption"):
