@@ -51,7 +51,7 @@ class TabletopEnv:
         config = load_composite_controller_config(controller="BASIC")
         # Joint-position control: every motion is solved by IK, then tracked in joint space.
         arm = load_part_controller_config(default_controller="JOINT_POSITION")
-        arm["kp"] = 150
+        arm["kp"] = 400
         config["body_parts"]["right"] = {**arm, "gripper": config["body_parts"]["right"]["gripper"]}
         self.env = suite.make("TabletopOrganize", robots="Panda", layout=self.task.layout,
                               controller_configs=config, has_renderer=False, has_offscreen_renderer=True,
@@ -205,8 +205,9 @@ class TabletopEnv:
         if path is None:
             raise RobotError("unreachable_pose", target=target.round(4).tolist(), yaw=round(yaw, 3), **failure)
         start = self.steps
-        for q in path:  # waypoints are ~2 cm apart: one control step (20 Hz) each, about 0.4 m/s
-            self._step(q)
+        for q in path:  # waypoints ~2 cm / 0.08 rad apart, 4 control steps each (~0.1 m/s): small tracking lag
+            for _ in range(4):
+                self._step(q)
         q_goal = path[-1]
         for _ in range(max_steps):
             if np.linalg.norm(target - self._ee()) < tolerance:

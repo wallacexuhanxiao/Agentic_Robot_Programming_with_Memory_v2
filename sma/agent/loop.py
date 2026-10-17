@@ -14,7 +14,7 @@ from .refine import refine
 from .sandbox import Sandbox, check_source, strip_code, ProgramRejected
 
 MAX_ATTEMPTS = 3
-ATTEMPT_STEPS = 900
+ATTEMPT_STEPS = 1500
 
 
 def parse_plan(text, scene):
