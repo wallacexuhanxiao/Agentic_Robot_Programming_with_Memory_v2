@@ -36,6 +36,11 @@ def _json(text):
     return json.loads(match.group(0)) if match else {}
 
 
+def _quoted(evidence, text):
+    fragments = [f.strip(" .,'\"").lower() for f in evidence.split("...") if f.strip(" .,'\"")]
+    return bool(fragments) and all(f in text.lower() for f in fragments)
+
+
 def scene_summary(scene):
     objects = []
     for name, obj in scene["objects"].items():
@@ -60,7 +65,7 @@ def refine(llm, instruction, preferences, scene):
         reason = None
         if obj not in scene["objects"] or zone not in scene["zones"]:
             reason = "unknown object or zone"
-        elif source == "instruction" and str(g.get("evidence", "")).lower() not in instruction.lower():
+        elif source == "instruction" and not _quoted(str(g.get("evidence", "")), instruction):
             reason = "instruction evidence is not a quote from the request"
         elif source == "user_memory" and pref_zone.get(obj) != zone:
             reason = "no stored preference says this"

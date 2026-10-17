@@ -52,8 +52,11 @@ class UserMemory:
             zone = str(u.get("zone", "")).lower().strip()
             zone = zone if zone.endswith("_zone") else zone.replace(" zone", "") + "_zone"
             evidence = str(u.get("evidence", ""))
+            # The quote may elide words with "..."; every quoted fragment must appear in the message.
+            fragments = [f.strip(" .,'\"").lower() for f in evidence.split("...") if f.strip(" .,'\"")]
+            quoted = bool(fragments) and all(f in message.lower() for f in fragments)
             ok = (subject in {"cube", "cup", "book"} or subject in scene["objects"]) and \
-                zone in scene["zones"] and evidence and evidence.lower() in message.lower()
+                zone in scene["zones"] and quoted
             (accepted if ok else rejected).append({"subject": subject, "zone": zone,
                                                    "scope": u.get("scope"), "evidence": evidence})
         for u in accepted:

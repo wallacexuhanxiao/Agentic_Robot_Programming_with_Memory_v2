@@ -252,7 +252,9 @@ class TabletopEnv:
         closing along yaw. Approaches from above, closes, lifts. Returns the gripper state."""
         grasp_height, yaw = float(grasp_height), float(yaw)
         if not .004 <= grasp_height <= .15:
-            raise RobotError("grasp_height_out_of_range", grasp_height=grasp_height, allowed=[.004, .15])
+            hint = ("grasp_height is the grip point's height ABOVE the table surface (table_z), not an absolute z"
+                    if grasp_height > .5 else "grasp_height must be between 0.004 and 0.15 m above the table")
+            raise RobotError("grasp_height_out_of_range", grasp_height=grasp_height, allowed=[.004, .15], hint=hint)
         if self.gripper_state()["holding_something"]:
             raise RobotError("already_holding_something")
         self.go_home()

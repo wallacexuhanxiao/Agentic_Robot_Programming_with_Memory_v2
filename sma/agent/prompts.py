@@ -42,17 +42,20 @@ Only these functions exist (they are already defined; do not import anything, do
 do not define helper names that are not used):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
-   "objects": {name: {"kind": "cube"|"book"|"cup", "center": [x, y, z], "top_z": float, "height": float,
-                      "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
-   "zones": {name: {"center": [x, y, z], "half_size": [hx, hy]}},
+   "objects": {name: {"name": str, "kind": "cube"|"book"|"cup", "center": [x, y, z], "top_z": float,
+                      "height": float, "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
+   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},
    "gripper": {"width": float, "holding_something": bool}}
+  "height" is the object's height above the table; "top_z" is the absolute z of its top surface.
 pick(object_name, grasp_height, yaw) -> {"holding_something": bool, ...}
   Top-down grasp: opens the fingers, comes down vertically over the object's centre until the grip
   point (midpoint between the fingertips) is at table_z + grasp_height, closes the fingers along the
   direction yaw (an angle in the xy plane; yaw and yaw + pi are the same), then lifts.
   The fingers open to 0.08 m and only grip what is between them below the grip point.
+  grasp_height is measured ABOVE THE TABLE SURFACE (0.02 means 2 cm above table_z), not an absolute z.
   YOU choose grasp_height and yaw for the object.
-place(zone_name, dx=0.0, dy=0.0) carries the held object above the zone centre (+ dx, dy), lowers it
+place(zone_name, dx=0.0, dy=0.0) carries the held object above the zone centre (dx, dy are small offsets
+  from the zone centre, normally 0), lowers it
   to just above the table, releases it, lifts and parks the arm. Fails if nothing is held.
 go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
 The module math is available. A robot error stops the program and is reported back to you."""
@@ -81,8 +84,10 @@ Write the Python program for this subgoal only, using only the functions listed 
 value from observe()). Keep it short with few comments. Reply with the code only."""
 
 SKILLS_HEADER = """
-Reusable skills from memory (each was extracted from a verified execution; call them as
-skills.<function>(...) or adapt their code). Applicability for THIS subgoal was checked:
+Reusable skills from memory (each was extracted from a verified execution). Applicability for THIS
+subgoal was checked. If a skill is APPLICABLE, your whole program should simply call it, e.g.
+skills.<function>("<object>", "<zone>"). If it is UNCERTAIN or NOT_APPLICABLE, adapt its code to the
+reason given instead of starting from scratch:
 """
 
 ATTEMPT = """

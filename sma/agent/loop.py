@@ -222,7 +222,13 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
                                       (a["error"] and (a["error"].get("reason") or a["error"].get("message"))) or "check_failed",
                                       repaired_by="later attempt" if repaired else None)
                 final = attempts[-1]
-                if ok and not final["used_skills"]:
+                kind = before["objects"][obj]["kind"] if obj in before["objects"] else None
+                covered = [sk["function"] for sk in memory.skills
+                           if any(h["outcome"] and h["features"]["kind"] == kind for h in sk["history"])]
+                if ok and not final["used_skills"] and covered:
+                    log(f"    extraction skipped: kind {kind} already covered by {covered}")
+                    entry["extraction_skipped_covered_by"] = covered
+                elif ok and not final["used_skills"]:
                     fn = extract_skill(llm, memory, task, obj, zone, final, before, log)
                     entry["extracted_skill"] = fn
                     if fn and validate:  # run after this episode's simulator is closed

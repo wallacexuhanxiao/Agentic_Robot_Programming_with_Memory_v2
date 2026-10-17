@@ -83,7 +83,7 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
         h = top_z - table_z
         kind = classify_kind(h, long_side, short_side)
         objects[f"{color}_{kind}"] = {
-            "kind": kind, "color": color,
+            "name": f"{color}_{kind}", "kind": kind, "color": color,
             "center": [round(center_xy[0], 4), round(center_xy[1], 4), round(table_z + h / 2, 4)],
             "top_z": round(top_z, 4), "height": round(h, 4),
             "footprint_long": round(long_side, 4), "footprint_short": round(short_side, 4),
@@ -97,7 +97,7 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
             continue
         pts = xyz[mask][:, :2]
         lo, hi = pts.min(0), pts.max(0)
-        zones[f"{color}_zone"] = {"center": [round(float((lo[0] + hi[0]) / 2), 4),
+        zones[f"{color}_zone"] = {"name": f"{color}_zone", "center": [round(float((lo[0] + hi[0]) / 2), 4),
                                              round(float((lo[1] + hi[1]) / 2), 4), round(table_z, 4)],
                                   "half_size": [round(float((hi[0] - lo[0]) / 2), 4),
                                                 round(float((hi[1] - lo[1]) / 2), 4)]}
