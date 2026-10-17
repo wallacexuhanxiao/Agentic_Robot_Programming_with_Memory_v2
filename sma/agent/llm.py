@@ -21,12 +21,12 @@ class LLM:
         self.log_dir = Path(log_dir) if log_dir else None
         self.calls = []
 
-    def chat(self, messages, *, purpose, max_tokens=2500):
+    def chat(self, messages, *, purpose, max_tokens=2500, thinking=False):
         use_coder = self.coder_url is not None and purpose in CODE_PURPOSES
         url, model = (self.coder_url, self.coder_model) if use_coder else (self.base_url, self.model)
         body = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": self.temperature}
         if not use_coder:
-            body["chat_template_kwargs"] = {"enable_thinking": False}
+            body["chat_template_kwargs"] = {"enable_thinking": bool(thinking)}
         started = time.time()
         request = urllib.request.Request(url + "/chat/completions", data=json.dumps(body).encode(),
                                          headers={"Content-Type": "application/json"})
@@ -66,8 +66,8 @@ class ScriptedLLM(LLM):
         super().__init__("http://offline", log_dir=log_dir)
         self.responses = responses
 
-    def chat(self, messages, *, purpose, max_tokens=2500):
-        queue = self.responses.get(purpose)
+    def chat(self, messages, *, purpose, max_tokens=2500, thinking=False):
+        queue = self.responses.get(purpose, "")
         text = queue.pop(0) if isinstance(queue, list) else queue
         if callable(text):
             text = text(messages)

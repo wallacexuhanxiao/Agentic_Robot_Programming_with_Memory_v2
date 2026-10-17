@@ -117,6 +117,23 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
     return "\n".join("- " + f for f in facts)
 
 
+def reflect(llm, obj, zone, code, diagnosis, scene):
+    """One-sentence corrective lesson from the general model (every condition reflects within an episode)."""
+    view = scene["objects"].get(obj)
+    if view is None:
+        return None
+    text = llm.chat([{"role": "user", "content": prompts.REFLECT.format(
+        object=obj, kind=view["kind"], zone=zone, code=code, diagnosis=diagnosis,
+        object_view=json.dumps({k: view[k] for k in ("height", "top_z", "footprint_long", "footprint_short",
+                                                     "long_axis_yaw")}))}],
+        purpose="reflect", max_tokens=3000, thinking=True)
+    match = re.search(r"\{.*\}", text, re.S)
+    try:
+        return json.loads(match.group(0)).get("lesson") if match else None
+    except json.JSONDecodeError:
+        return None
+
+
 def used_skills(trace):
     return sorted({t["call"][len("skills."):] for t in trace if t["call"].startswith("skills.")})
 
@@ -131,6 +148,9 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             if retrieved:
                 skills_text = prompts.SKILLS_HEADER + memory.describe(retrieved)
             skills_text += memory.grasp_experience_text()
+            kind_now = scene["objects"].get(obj, {}).get("kind")
+            if kind_now and memory.lessons_text(kind_now):
+                skills_text += prompts.LESSONS_HEADER + memory.lessons_text(kind_now)
         direct = (memory is not None and n == 1 and retrieved and retrieved[0][1]["verdict"] == "applicable")
         if direct:
             # Reuse policy: an applicable, validated skill is executed as is; no new code is generated.
@@ -163,7 +183,11 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
         if check.get("satisfied"):
             return True, attempts
         attempt["diagnosis"] = diagnose(sandbox.trace, scene, check, obj, zone, error)
+        attempt["lesson"] = reflect(llm, obj, zone, code, attempt["diagnosis"], scene)
+        if memory is not None and attempt["lesson"] and obj in scene["objects"]:
+            memory.add_lesson(scene["objects"][obj]["kind"], attempt["lesson"], task.task_id)  # persists across tasks
         attempts_text = prompts.ATTEMPT.format(n=n, code=code, diagnosis=attempt["diagnosis"],
+                                               lesson=attempt["lesson"] or "none",
                                                feedback=feedback_text(error, sandbox.trace, check))
     return False, attempts
 

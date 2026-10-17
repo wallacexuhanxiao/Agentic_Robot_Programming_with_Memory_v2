@@ -99,8 +99,26 @@ What happened (from the robot and camera):
 {diagnosis}
 Raw execution trace:
 {feedback}
+Lesson drawn from this failure: {lesson}
 Fix the cause and write a corrected program for the current scene shown above. Do not repeat a program
 that already failed."""
+
+REFLECT = """A robot program failed to move "{object}" (kind: {kind}) onto "{zone}".
+Program:
+```python
+{code}
+```
+What happened (measured by the robot and camera):
+{diagnosis}
+Object as seen by the camera: {object_view}
+
+In ONE sentence, state the concrete change to the pick/place arguments for a {kind} that would fix
+this (for example which grasp_height range or which yaw relative to long_axis_yaw). Reply with JSON only:
+{{"lesson": "<one sentence>"}}"""
+
+LESSONS_HEADER = """
+Lessons learned from earlier failures with this kind of object:
+"""
 
 EXTRACT = """A robot program just achieved this subgoal, verified by the camera:
   place object "{object}" (kind: {kind}) on zone "{zone}".

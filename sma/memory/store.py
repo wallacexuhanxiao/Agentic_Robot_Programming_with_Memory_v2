@@ -44,11 +44,21 @@ class SkillMemory:
         data = json.loads(self.path.read_text()) if self.path.exists() else {}
         self.skills = data.get("skills", [])
         self.grasp_log = data.get("grasp_log", [])  # operation-level experience: how each kind was grasped
+        self.lessons = data.get("lessons", [])      # reflections on failures, keyed by object kind
         self.applicability_log = []
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"skills": self.skills, "grasp_log": self.grasp_log}, indent=1))
+        self.path.write_text(json.dumps({"skills": self.skills, "grasp_log": self.grasp_log,
+                                         "lessons": self.lessons}, indent=1))
+
+    def add_lesson(self, kind, lesson, task_id):
+        self.lessons.append({"kind": kind, "lesson": lesson, "task": task_id})
+        self.save()
+
+    def lessons_text(self, kind, limit=3):
+        rows = [l for l in self.lessons if l["kind"] == kind][-limit:]
+        return "".join(f"- ({l['task']}) {l['lesson']}\n" for l in rows)
 
     def log_grasps(self, picks, task_id):
         for p in picks:
