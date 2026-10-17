@@ -1,0 +1,20 @@
+{
+ "index": 4,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 0.84,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 282,
+  "total_tokens": 457,
+  "completion_tokens": 175,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"yellow_mug\" (kind: mug) on zone \"cyan_tray\".\nProgram:\n```python\nobj = observe()[\"objects\"][\"yellow_mug\"]\nzone = observe()[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\ndx, dy = 0.0, 0.0\ngrasp_height = obj[\"height\"] / 2\nyaw = obj[\"long_axis_yaw\"] if obj[\"footprint_long\"] < 0.08 else obj[\"short_axis_yaw\"]\npick(obj[\"name\"], grasp_height, yaw)\nplace(zone[\"name\"], dx, dy)\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v1(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    dx, dy = 0.0, 0.0\n    grasp_height = obj[\"height\"] / 2\n    yaw = obj[\"long_axis_yaw\"] if obj[\"footprint_long\"] < 0.08 else obj[\"short_axis_yaw\"]\n    pick(obj_name, grasp_height, yaw)\n    place(zone_name, dx, dy)\n```\n\n{\"object_kinds\": [\"mug\"], \"requires_zone_free\": true, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the object and zone exist in the scene and the gripper is empty before calling pick.\"}"
+}

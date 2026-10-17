@@ -1,0 +1,20 @@
+{
+ "index": 3,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 1.42,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 425,
+  "total_tokens": 749,
+  "completion_tokens": 324,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"red_block\" (kind: block) on zone \"orange_tray\".\nProgram:\n```python\nobs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\ncenter = orange_tray[\"center\"]\nhalf_size = orange_tray[\"half_size\"]\n\n# Check if orange_tray is occupied\noccupied = False\nfor name, obj in obs[\"objects\"].items():\n    if name == \"red_block\":\n        continue\n    if (abs(obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(obj[\"center\"][1] - center[1]) < half_size[1] and\n        obj[\"top_z\"] > center[2] + 0.005):\n        # Move the occupying object to purple_box\n        place(\"purple_box\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Pick red_block\ngrasp_height = 0.02\nyaw = red_block[\"long_axis_yaw\"]\npick(\"red_block\", grasp_height, yaw)\nwait(20)\n\n# Place on orange_tray\nplace(\"orange_tray\")\nwait(20)\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v3(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v3(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n\n    # Check if the zone is occupied by any other object\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to purple_box\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\n    # Pick the target object\n    grasp_height = 0.02\n    yaw = obj[\"long_axis_yaw\"]\n    pick(obj_name, grasp_height, yaw)\n    wait(20)\n\n    # Place on the target zone\n    place(zone_name)\n    wait(20)\n```\n\n{\"object_kinds\": [\"block\"], \"requires_zone_free\": true, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the gripper is empty before calling and handles occupied zones by moving the interfering object to a designated safe location.\"}"
+}

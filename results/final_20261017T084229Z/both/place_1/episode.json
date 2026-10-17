@@ -1,0 +1,264 @@
+{
+ "task_id": "place_1",
+ "family": "place",
+ "instruction": "Put the red toy block on the orange tray.",
+ "skill_memory": true,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nobj = obs[\"objects\"][\"red_block\"]\nzone = obs[\"zones\"][\"orange_tray\"]\ncenter = zone[\"center\"]\ndx, dy = 0.0, 0.0\ngrasp_height = obj[\"height\"] / 2\nyaw = obj[\"long_axis_yaw\"] if obj[\"footprint_long\"] < 0.08 else obj[\"short_axis_yaw\"]\npick(\"red_block\", grasp_height, yaw)\nplace(\"orange_tray\", dx, dy)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.002,
+       0.0354
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0439,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 409,
+     "seconds": 2.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_block",
+        0.0199,
+        -0.695
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0392,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8399
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.0037,
+         0.2058
+        ],
+        "touched_down_early_m": null
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind block record 0 success / 0 failure"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind block record 0 success / 0 failure"
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "block",
+       "object_height": 0.0399,
+       "footprint": [
+        0.0396,
+        0.0381
+       ],
+       "grasp_height": 0.0199,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extracted_skill": "place_on_zone_v3"
+  }
+ ],
+ "validations": [
+  {
+   "seed": 5030,
+   "kind": "block",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  },
+  {
+   "seed": 5031,
+   "kind": "block",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  }
+ ],
+ "user_memory_write": {
+  "accepted": [
+   {
+    "subject": "red_block",
+    "zone": "orange_tray",
+    "scope": "task_only",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "red_block",
+   "zone": "purple_box",
+   "rule_subject": "block",
+   "evidence": "From now on, please always put my toy blocks in the purple toy box",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_block",
+    "zone": "orange_tray",
+    "source": "instruction",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The red_block must be moved from its current location (unknown, not on any zone) to the orange_tray.",
+   "The orange_tray must be clear before placing the red_block on it.",
+   "The purple_box is not the target zone for this request, despite the stored preference, because the current instruction overrides it.",
+   "The robot must verify the red_block is picked up before attempting to place it."
+  ],
+  "refined_instruction": "The robot must locate the red_block, which is currently not on any zone, pick it up, and place it on the orange_tray. Before placing, ensure the orange_tray is unoccupied. If the orange_tray is occupied, clear it first by moving any object currently on it to a safe, unoccupied zone (e.g., the purple_box). The stored preference to place blocks in the purple_box does not apply here, as the current instruction explicitly overrides it. Success is confirmed when the red_block is securely placed on the orange_tray and no other object is on the tray.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_block": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.002,
+    0.0354
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0649
+   ],
+   "top_height_above_table": 0.0439,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "red_block": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0041,
+     0.2054,
+     0.8239
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820038676261902,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 5.8,
+ "llm_usage": {
+  "calls": 5,
+  "prompt_tokens": 2921,
+  "completion_tokens": 634,
+  "seconds": 3.0,
+  "by_purpose": {
+   "code": 1,
+   "extract": 1,
+   "plan": 1,
+   "refine": 1,
+   "user_memory_write": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

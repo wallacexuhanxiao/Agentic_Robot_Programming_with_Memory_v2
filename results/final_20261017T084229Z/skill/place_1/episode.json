@@ -1,0 +1,257 @@
+{
+ "task_id": "place_1",
+ "family": "place",
+ "instruction": "Put the red toy block on the orange tray.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\ncenter = orange_tray[\"center\"]\nhalf_size = orange_tray[\"half_size\"]\n\n# Check if orange_tray is occupied\noccupied = False\nfor name, obj in obs[\"objects\"].items():\n    if name == \"red_block\":\n        continue\n    if (abs(obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(obj[\"center\"][1] - center[1]) < half_size[1] and\n        obj[\"top_z\"] > center[2] + 0.005):\n        # Move the occupying object to purple_box\n        place(\"purple_box\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Pick red_block\ngrasp_height = 0.02\nyaw = red_block[\"long_axis_yaw\"]\npick(\"red_block\", grasp_height, yaw)\nwait(20)\n\n# Place on orange_tray\nplace(\"orange_tray\")\nwait(20)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.002,
+       0.0354
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0439,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 449,
+     "seconds": 2.3,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_block",
+        0.02,
+        -0.695
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0392,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8399
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.0037,
+         0.2058
+        ],
+        "touched_down_early_m": null
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind block record 0 success / 0 failure"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind block record 0 success / 0 failure"
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "block",
+       "object_height": 0.0399,
+       "footprint": [
+        0.0396,
+        0.0381
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extracted_skill": "place_on_zone_v3"
+  }
+ ],
+ "validations": [
+  {
+   "seed": 5030,
+   "kind": "block",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  },
+  {
+   "seed": 5031,
+   "kind": "block",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  }
+ ],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_block",
+    "zone": "orange_tray",
+    "source": "instruction",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The red_block must be moved from its current location to the orange_tray.",
+   "The orange_tray must be free of other objects before placing the red_block on it.",
+   "If the orange_tray is occupied, the occupying object must be moved first."
+  ],
+  "refined_instruction": "Move the red_block from its current location to the orange_tray. First, check if the orange_tray is occupied. If it is, clear the tray by moving any object currently on it to a free zone (e.g., the purple_box). Once the orange_tray is free, place the red_block on it. Success is confirmed when the red_block is fully resting on the orange_tray with no other object on top of it.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_block": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.002,
+    0.0354
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0649
+   ],
+   "top_height_above_table": 0.0439,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "red_block": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0042,
+     0.2054,
+     0.8239
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820040464401245,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 6.7,
+ "llm_usage": {
+  "calls": 4,
+  "prompt_tokens": 3006,
+  "completion_tokens": 819,
+  "seconds": 3.7,
+  "by_purpose": {
+   "code": 1,
+   "extract": 1,
+   "plan": 1,
+   "refine": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

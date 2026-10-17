@@ -1,0 +1,245 @@
+{
+ "task_id": "place_2",
+ "family": "place",
+ "instruction": "Put the yellow book in the purple box.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "yellow_book",
+   "zone": "purple_box",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nobj = obs[\"objects\"][\"yellow_book\"]\nzone = obs[\"zones\"][\"purple_box\"]\ncenter = zone[\"center\"]\nhalf_size = zone[\"half_size\"]\n\n# Check if purple_box is occupied by another object\noccupied = False\nfor name, other_obj in obs[\"objects\"].items():\n    if name == \"yellow_book\":\n        continue\n    if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n        other_obj[\"top_z\"] > center[2] + 0.005):\n        # Clear the zone by placing the occupying object elsewhere\n        place(\"cyan_tray\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Pick up yellow_book with appropriate grasp parameters\ngrasp_height = 0.02\nyaw = obj[\"long_axis_yaw\"] + 1.17  # 67 degrees in radians\npick(\"yellow_book\", grasp_height, yaw)\nwait(20)\n\n# Place the book in the purple_box\nplace(\"purple_box\")\nwait(20)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.001,
+       0.0021
+      ],
+      "zone_half_size": [
+       0.0556,
+       0.0556
+      ],
+      "top_height_above_table": 0.0289,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 375,
+     "seconds": 2.0,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_book",
+        0.02,
+        1.669
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0643,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8249
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      },
+      {
+       "call": "place",
+       "args": [
+        "purple_box"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.0964,
+         0.0556
+        ],
+        "touched_down_early_m": null
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         3,
+         0
+        ],
+        "reasons": [
+         "goal: kind book record 3 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind book record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0546,
+      "object_reach": 0.47,
+      "zone_reach": 0.467
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.075,
+        0.0546
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 67,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extraction_skipped_covered_by": [
+    "place_on_zone_v1"
+   ]
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "yellow_book",
+    "zone": "purple_box",
+    "source": "instruction",
+    "evidence": "Put the yellow book in the purple box."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The purple_box must be empty before placing the yellow_book inside.",
+   "The yellow_book must be picked up from its current location before being placed in the purple_box.",
+   "The robot must verify that the yellow_book is fully inside the purple_box to confirm success."
+  ],
+  "refined_instruction": "The robot must first check if the purple_box is occupied. If it is, the robot must clear the zone by removing any object currently in it. Then, the robot must locate the yellow_book, which is currently not on any zone (i.e., it is free-standing or unplaced), pick it up, and place it inside the purple_box. The robot must confirm that the yellow_book is fully contained within the purple_box to complete the task successfully.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "yellow_book",
+   "zone": "purple_box"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "yellow_book",
+   "zone": "purple_box"
+  }
+ ],
+ "final_perception": {
+  "yellow_book": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.001,
+    0.0021
+   ],
+   "zone_half_size": [
+    0.0556,
+    0.0556
+   ],
+   "top_height_above_table": 0.0289,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "yellow_book": {
+    "zone": "purple_box",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0941,
+     0.0557,
+     0.8164
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820159673690796,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 5.0,
+ "llm_usage": {
+  "calls": 3,
+  "prompt_tokens": 2644,
+  "completion_tokens": 515,
+  "seconds": 2.3,
+  "by_purpose": {
+   "code": 1,
+   "plan": 1,
+   "refine": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "index": 3,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 1.68,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 485,
+  "total_tokens": 869,
+  "completion_tokens": 384,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"red_book\" (kind: book) on zone \"orange_tray\".\nProgram:\n```python\nobj = observe()[\"objects\"][\"red_book\"]\nzone = observe()[\"zones\"][\"orange_tray\"]\ncenter = zone[\"center\"]\nhalf_size = zone[\"half_size\"]\n# Check if orange_tray is occupied\noccupied = False\nfor name, obj in observe()[\"objects\"].items():\n    if obj[\"center\"][0] < center[0] + half_size[0] and obj[\"center\"][0] > center[0] - half_size[0] and \\\n       obj[\"center\"][1] < center[1] + half_size[1] and obj[\"center\"][1] > center[1] - half_size[1] and \\\n       obj[\"top_z\"] > center[2] + 0.005:  # object is on the tray\n        if name != \"red_book\":\n            # Move the occupying object to a temporary location (e.g., purple_box)\n            obs = observe()\n            box = obs[\"zones\"][\"purple_box\"]\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\nif not occupied:\n    # Pick up red_book\n    grasp_height = 0.02\n    yaw = obj[\"long_axis_yaw\"]\n    pick(\"red_book\", grasp_height, yaw)\n    wait(20)\n    # Place on orange_tray\n    place(\"orange_tray\")\n    wait(20)\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v1(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v1(obj_name, zone_name):\n    # Observe current state\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n    \n    # Check if the zone is occupied by any object other than the one to be placed\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        # Check if other_obj is within the horizontal bounds of the zone and above it\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to a temporary location (e.g., purple_box)\n            temp_zone = obs[\"zones\"][\"purple_box\"]\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n    \n    # If not occupied, proceed to pick and place\n    if not occupied:\n        grasp_height = 0.02\n        yaw = obj[\"long_axis_yaw\"]\n        pick(obj_name, grasp_height, yaw)\n        wait(20)\n    \n    # Place the object on the target zone\n    place(zone_name)\n    wait(20)\n```\n\n{\"object_kinds\": [\"book\"], \"requires_zone_free\": false, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the gripper is empty before calling and can handle minor occlusions by temporarily moving interfering objects.\"}"
+}

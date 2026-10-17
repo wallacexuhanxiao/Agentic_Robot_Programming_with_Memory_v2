@@ -1,0 +1,20 @@
+{
+ "index": 11,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 1.45,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 439,
+  "total_tokens": 770,
+  "completion_tokens": 331,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"yellow_mug\" (kind: mug) on zone \"cyan_tray\".\nProgram:\n```python\nobs = observe()\nobj = obs[\"objects\"][\"yellow_mug\"]\nzone = obs[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\nhalf_size = zone[\"half_size\"]\n\n# Check if cyan_tray is occupied by another object\noccupied = False\nfor name, other_obj in obs[\"objects\"].items():\n    if name == \"yellow_mug\":\n        continue\n    if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n        other_obj[\"top_z\"] > center[2] + 0.005):\n        # Move the occupying object to purple_box\n        place(\"purple_box\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Use grasp_height just above the mug's top surface and correct yaw\ngrasp_height = 0.075\nyaw = obj[\"long_axis_yaw\"]\npick(\"yellow_mug\", grasp_height, yaw)\nwait(20)\n\n# Place on cyan_tray\nplace(\"cyan_tray\")\nwait(20)\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v2(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v2(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n\n    # Check if the zone is occupied by another object\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to purple_box\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\n    # Use grasp height just above the mug's top surface and correct yaw\n    grasp_height = 0.075\n    yaw = obj[\"long_axis_yaw\"]\n    pick(obj_name, grasp_height, yaw)\n    wait(20)\n\n    # Place on the target zone\n    place(zone_name)\n    wait(20)\n```\n\n{\"object_kinds\": [\"mug\"], \"requires_zone_free\": false, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the gripper is empty and handles zone occupancy by moving obstructing objects to a predefined location.\"}"
+}

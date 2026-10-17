@@ -1,0 +1,200 @@
+{
+ "task_id": "place_1",
+ "family": "place",
+ "instruction": "Put the red toy block on the orange tray.",
+ "skill_memory": false,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\n\n# Determine grasp height and yaw for red_block\ngrasp_height = red_block[\"height\"] / 2  # Grasp from above center\nyaw = red_block[\"long_axis_yaw\"]  # Align fingers with long axis\n\n# Pick up red_block\npick(red_block[\"name\"], grasp_height, yaw)\n\n# Place on orange_tray with small offset to center\nplace(orange_tray[\"name\"], dx=0.0, dy=0.0)\n\n# Confirm success: red_block should now be on orange_tray and no other object on it\n# (no further action needed as the task is complete)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.002,
+       0.0354
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0439,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 409,
+     "seconds": 2.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_block",
+        0.0199,
+        -0.695
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0392,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8399
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray"
+       ],
+       "kwargs": {
+        "dx": 0.0,
+        "dy": 0.0
+       },
+       "result": {
+        "released_at": [
+         -0.0037,
+         0.2058
+        ],
+        "touched_down_early_m": null
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "block",
+       "object_height": 0.0399,
+       "footprint": [
+        0.0396,
+        0.0381
+       ],
+       "grasp_height": 0.0199,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_block",
+    "zone": "orange_tray",
+    "source": "instruction",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The orange_tray must be clear before placing the red_block on it.",
+   "The red_block must be picked up from its current location before being placed on the orange_tray.",
+   "The robot must confirm successful placement by detecting the red_block on the orange_tray."
+  ],
+  "refined_instruction": "The robot must first check if the orange_tray is occupied. If occupied, it must clear the tray by moving any object currently on it to a free zone (e.g., the purple_box). Then, the robot must pick up the red_block from its current location (which is not on any zone, so it must be detected in the environment). Finally, the robot must place the red_block onto the orange_tray. Success is confirmed when the red_block is detected on the orange_tray and no other object is on the tray.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_block": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.002,
+    0.0354
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0649
+   ],
+   "top_height_above_table": 0.0439,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "red_block": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0041,
+     0.2054,
+     0.8239
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820038676261902,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 4.8,
+ "llm_usage": {
+  "calls": 3,
+  "prompt_tokens": 1942,
+  "completion_tokens": 427,
+  "seconds": 2.0,
+  "by_purpose": {
+   "code": 1,
+   "plan": 1,
+   "refine": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

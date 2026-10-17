@@ -1,0 +1,545 @@
+{
+ "task_id": "tidy_1001",
+ "family": "tidy",
+ "instruction": "Put my things where they belong.",
+ "skill_memory": false,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Check if cyan_tray is empty\nif any(obj for obj in obs[\"objects\"].values() if obj[\"center\"][0] == cyan_tray[\"center\"][0] and obj[\"center\"][1] == cyan_tray[\"center\"][1]):\n    # Clear cyan_tray by moving its contents to orange_tray\n    for obj in obs[\"objects\"].values():\n        if obj[\"center\"][0] == cyan_tray[\"center\"][0] and obj[\"center\"][1] == cyan_tray[\"center\"][1]:\n            # Pick the object\n            pick(obj[\"name\"], 0.02, 0.0)\n            # Place it in orange_tray\n            place(\"orange_tray\")\n            break\n\n# Now move yellow_mug to cyan_tray\npick(\"yellow_mug\", 0.02, mug[\"long_axis_yaw\"])\nplace(\"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.0947,
+        -0.1711,
+        0.82
+       ],
+       "reached": [
+        -0.0864,
+        -0.1743,
+        0.8443
+       ],
+       "remaining_error_m": 0.0259
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0297,
+       -0.2417
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 261,
+     "seconds": 2.2,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_mug",
+        0.02,
+        1.557
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.0947,
+         -0.1711,
+         0.82
+        ],
+        "reached": [
+         -0.0864,
+         -0.1743,
+         0.8443
+        ],
+        "remaining_error_m": 0.0259
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0474,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.074,
+       "footprint": [
+        0.055,
+        0.0474
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "diagnosis": "- Call 1 pick('yellow_mug', 0.02, 1.557) failed: {'reason': 'motion_blocked', 'target': [-0.0947, -0.1711, 0.82], 'reached': [-0.0864, -0.1743, 0.8443], 'remaining_error_m': 0.0259}.\n- The program never grasped anything.\n- After the program yellow_mug is offset [-0.0297, -0.2417] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp_height of 0.82 and the long_axis_yaw (1.557) as the yaw for picking and placing the yellow_mug to ensure proper alignment and avoid motion blocking."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Check if cyan_tray is occupied\nfor obj in obs[\"objects\"].values():\n    if (abs(obj[\"center\"][0] - cyan_tray[\"center\"][0]) < 0.01 and\n        abs(obj[\"center\"][1] - cyan_tray[\"center\"][1]) < 0.01):\n        # Clear cyan_tray by moving object to orange_tray\n        pick(obj[\"name\"], 0.02, 0.0)\n        place(\"orange_tray\")\n        break\n\n# Pick and place yellow_mug to cyan_tray with correct grasp height and yaw\npick(\"yellow_mug\", 0.02, mug[\"long_axis_yaw\"])\nplace(\"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.0946,
+        -0.1712,
+        0.82
+       ],
+       "reached": [
+        -0.0863,
+        -0.1743,
+        0.8443
+       ],
+       "remaining_error_m": 0.0258
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0276,
+       -0.2436
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 261,
+     "seconds": 2.2,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_mug",
+        0.02,
+        1.563
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.0946,
+         -0.1712,
+         0.82
+        ],
+        "reached": [
+         -0.0863,
+         -0.1743,
+         0.8443
+        ],
+        "remaining_error_m": 0.0258
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0475,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.074,
+       "footprint": [
+        0.0553,
+        0.0475
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "diagnosis": "- Call 1 pick('yellow_mug', 0.02, 1.563) failed: {'reason': 'motion_blocked', 'target': [-0.0946, -0.1712, 0.82], 'reached': [-0.0863, -0.1743, 0.8443], 'remaining_error_m': 0.0258}.\n- The program never grasped anything.\n- After the program yellow_mug is offset [-0.0276, -0.2436] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp_height of 0.074 (the mug's height) and the long_axis_yaw (1.563) as the yaw for picking and placing the mug to ensure proper alignment and clearance."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Check if cyan_tray is occupied and clear it if needed\nfor obj in obs[\"objects\"].values():\n    if (abs(obj[\"center\"][0] - cyan_tray[\"center\"][0]) < 0.065 and\n        abs(obj[\"center\"][1] - cyan_tray[\"center\"][1]) < 0.067):\n        pick(obj[\"name\"], 0.02, 0.0)\n        place(\"orange_tray\")\n        break\n\n# Pick and place yellow_mug to cyan_tray with correct grasp height and yaw\npick(\"yellow_mug\", 0.074, mug[\"long_axis_yaw\"])\nplace(\"cyan_tray\")",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0002,
+       0.002
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 331,
+     "seconds": 2.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_mug",
+        0.074,
+        1.524
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0491,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.874,
+        "object_top_z_before": 0.874
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "cyan_tray"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.0649,
+         0.0705
+        ],
+        "touched_down_early_m": null
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0452,
+      "object_reach": 0.499,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.074,
+       "footprint": [
+        0.0581,
+        0.0452
+       ],
+       "grasp_height": 0.074,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nblue_book = obs[\"objects\"][\"blue_book\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\n\n# Ensure orange_tray is empty by moving yellow_mug to cyan_tray if needed\nif \"yellow_mug\" in obs[\"zones\"][\"orange_tray\"][\"center\"]:\n    yellow_mug = obs[\"objects\"][\"yellow_mug\"]\n    cyan_tray = obs[\"zones\"][\"cyan_tray\"]\n    pick(\"yellow_mug\", 0.02, yellow_mug[\"long_axis_yaw\"])\n    place(\"cyan_tray\")\n\n# Pick up blue_book with grasp height and yaw aligned to its long axis\npick(\"blue_book\", 0.02, blue_book[\"long_axis_yaw\"])\nplace(\"orange_tray\")",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.0013,
+       0.0004
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0668
+      ],
+      "top_height_above_table": 0.0289,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 453,
+     "seconds": 3.8,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.02,
+        0.5
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0757,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8249
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.0927,
+         -0.178
+        ],
+        "touched_down_early_m": null
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.646,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.0732,
+        0.0549
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_memory_write": {
+  "accepted": [],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray",
+   "rule_subject": "mug",
+   "evidence": "From now on, please always put my mugs on the cyan tray",
+   "source_task": "teach_4"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "rule_subject": "book",
+   "evidence": "From now on, please always put my books on the orange tray",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my mugs on the cyan tray"
+   },
+   {
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my books on the orange tray"
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The cyan_tray must be clear before placing the yellow_mug on it.",
+   "The orange_tray currently holds the yellow_mug, so it must be cleared before placing the blue_book on it.",
+   "Only one object can occupy a zone at a time.",
+   "The robot must not place any object on the purple_box unless instructed."
+  ],
+  "refined_instruction": "First, move the yellow_mug from the orange_tray to the cyan_tray. Before doing so, ensure the cyan_tray is empty; if not, clear it first. Then, move the blue_book from its current location (not on any zone) to the orange_tray. Before placing the blue_book, ensure the orange_tray is empty; if not, clear it by moving the yellow_mug to the cyan_tray first. Success is achieved when the yellow_mug is on the cyan_tray and the blue_book is on the orange_tray, with no other objects on those zones.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 2,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "yellow_mug": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0002,
+    0.002
+   ],
+   "zone_half_size": [
+    0.0649,
+    0.0668
+   ],
+   "top_height_above_table": 0.074,
+   "nominal_height": 0.07,
+   "gripper_holding": false,
+   "satisfied": true
+  },
+  "blue_book": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.0013,
+    0.0004
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0668
+   ],
+   "top_height_above_table": 0.0289,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "yellow_mug": {
+    "zone": "cyan_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0652,
+     0.0675,
+     0.839
+    ]
+   },
+   "blue_book": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0901,
+     -0.1809,
+     0.8164
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9821203947067261,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 18.1,
+ "llm_usage": {
+  "calls": 11,
+  "prompt_tokens": 10240,
+  "completion_tokens": 1319,
+  "seconds": 6.1,
+  "by_purpose": {
+   "code": 4,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 4,
+   "user_memory_write": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

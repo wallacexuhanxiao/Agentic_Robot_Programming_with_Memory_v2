@@ -1,0 +1,524 @@
+{
+ "task_id": "tidy_1000",
+ "family": "tidy",
+ "instruction": "Could you clean up the table?",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\nzone = obs[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\n\n# Use grasp height just above the mug's top surface and long_axis_yaw as yaw\ngrasp_height = 0.075\nyaw = mug[\"long_axis_yaw\"]\npick(\"red_mug\", grasp_height, yaw)\nwait(20)\n\n# Place on the cyan_tray\nplace(\"cyan_tray\")\nwait(20)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 364,
+     "seconds": 2.3,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_mug",
+        0.075,
+        -1.493
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0472,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.875,
+        "object_top_z_before": 0.87
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      },
+      {
+       "call": "place",
+       "args": [
+        "cyan_tray"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         -0.102,
+         0.0185
+        ],
+        "touched_down_early_m": null
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         4,
+         0
+        ],
+        "reasons": [
+         "goal: kind mug record 4 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind mug record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.648,
+      "zone_reach": 0.495
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.07,
+       "footprint": [
+        0.0528,
+        0.0467
+       ],
+       "grasp_height": 0.075,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "diagnosis": "- pick('red_mug', 0.075, -1.493) -> holding_something=True.\n- The grip point was +0.005 m relative to the object's top surface (grasp_height 0.075 vs object height 0.070); the fingers only grip what is below the grip point.\n- After the program the camera could not see red_mug or cyan_tray.",
+     "lesson": "Use a grasp_height of 0.070 m (equal to the mug's height) and set yaw to the short_axis_yaw (0.078) for a stable grasp and reliable placement."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\nzone = obs[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\n\n# Use grasp height equal to the mug's height and yaw along the short axis for stable grasp\ngrasp_height = mug[\"height\"]  # 0.070 m\nyaw = mug[\"short_axis_yaw\"]   # 0.078 rad\n\npick(\"red_mug\", grasp_height, yaw)\nwait(20)\n\n# Place on the cyan_tray\nplace(\"cyan_tray\")\nwait(20)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'red_mug'",
+      "location": [
+       "<program>",
+       2
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 0.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      }
+     ],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: 'red_mug' KeyError ('<program>', 2).\n- After the program the camera could not see red_mug or cyan_tray.",
+     "lesson": null
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\nzone = obs[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\n\n# Use grasp height 0.075 m (from successful mug grasps) and yaw along long axis (0 deg relative to long axis)\ngrasp_height = 0.075\nyaw = mug[\"long_axis_yaw\"]\n\npick(\"red_mug\", grasp_height, yaw)\nwait(20)\n\nplace(\"cyan_tray\")\nwait(20)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'red_mug'",
+      "location": [
+       "<program>",
+       2
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 0.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      }
+     ],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: 'red_mug' KeyError ('<program>', 2).\n- After the program the camera could not see red_mug or cyan_tray.",
+     "lesson": null
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "skills.place_on_zone_v1(\"blue_book\", \"orange_tray\")",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.002,
+       0.001
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0668
+      ],
+      "top_height_above_table": 0.0289,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [
+      "place_on_zone_v1"
+     ],
+     "control_steps": 453,
+     "seconds": 2.6,
+     "trace": [
+      {
+       "call": "skills.place_on_zone_v1",
+       "args": [
+        "blue_book",
+        "orange_tray"
+       ],
+       "kwargs": {},
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.02,
+        -1.133
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0757,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8249
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray"
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         0.0037,
+         -0.2503
+        ],
+        "touched_down_early_m": null
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "applicable",
+        "kind_record": [
+         3,
+         0
+        ],
+        "reasons": [
+         "goal: kind book succeeded 3/3",
+         "physical: object and zone inside the validated reach range"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "reasons": [
+         "goal: kind book record 0 success / 0 failure"
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "direct_reuse": true,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.075,
+        0.0547
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_mug",
+    "zone": "cyan_tray",
+    "source": "assumption",
+    "evidence": "The red_mug is not on any zone, and no explicit destination was given. The cyan_tray is a valid, unoccupied zone, so it is assumed to be the intended destination for cleaning."
+   },
+   {
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "source": "assumption",
+    "evidence": "The blue_book is not on any zone, and no explicit destination was given. The orange_tray is a valid, unoccupied zone, so it is assumed to be the intended destination for cleaning."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The robot must not place any object on a zone that is already occupied.",
+   "The robot must clear the table by moving all objects from their current undefined positions to designated zones.",
+   "The robot must verify that each object is successfully placed on its target zone before marking the task as complete."
+  ],
+  "refined_instruction": "Move the red_mug to the cyan_tray and the blue_book to the orange_tray. Both zones are currently unoccupied, so no clearing is needed. Perform the moves in any order. Success is confirmed when both objects are detected on their respective target zones.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 0,
+   "assumption": 2
+  }
+ },
+ "plan": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_mug": {
+   "satisfied": false,
+   "reason": "not_visible",
+   "object_visible": false,
+   "zone_visible": true
+  },
+  "blue_book": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.002,
+    0.001
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0668
+   ],
+   "top_height_above_table": 0.0289,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "red_mug": {
+    "zone": "cyan_tray",
+    "inside": false,
+    "resting": true,
+    "upright": false,
+    "position": [
+     0.0673,
+     0.012,
+     0.8241
+    ]
+   },
+   "blue_book": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0033,
+     -0.2507,
+     0.8164
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9819684028625488,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 9.8,
+ "llm_usage": {
+  "calls": 7,
+  "prompt_tokens": 8422,
+  "completion_tokens": 778,
+  "seconds": 3.7,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 2
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

@@ -1,0 +1,629 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    # Observe current state\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n    \n    # Check if the zone is occupied by any object other than the one to be placed\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        # Check if other_obj is within the horizontal bounds of the zone and above it\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to a temporary location (e.g., purple_box)\n            temp_zone = obs[\"zones\"][\"purple_box\"]\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n    \n    # If not occupied, proceed to pick and place\n    if not occupied:\n        grasp_height = 0.02\n        yaw = obj[\"long_axis_yaw\"]\n        pick(obj_name, grasp_height, yaw)\n        wait(20)\n    \n    # Place the object on the target zone\n    place(zone_name)\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "book"
+    ],
+    "notes": "The function assumes the gripper is empty before calling and can handle minor occlusions by temporarily moving interfering objects."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obj = observe()[\"objects\"][\"red_book\"]\nzone = observe()[\"zones\"][\"orange_tray\"]\ncenter = zone[\"center\"]\nhalf_size = zone[\"half_size\"]\n# Check if orange_tray is occupied\noccupied = False\nfor name, obj in observe()[\"objects\"].items():\n    if obj[\"center\"][0] < center[0] + half_size[0] and obj[\"center\"][0] > center[0] - half_size[0] and \\\n       obj[\"center\"][1] < center[1] + half_size[1] and obj[\"center\"][1] > center[1] - half_size[1] and \\\n       obj[\"top_z\"] > center[2] + 0.005:  # object is on the tray\n        if name != \"red_book\":\n            # Move the occupying object to a temporary location (e.g., purple_box)\n            obs = observe()\n            box = obs[\"zones\"][\"purple_box\"]\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\nif not occupied:\n    # Pick up red_book\n    grasp_height = 0.02\n    yaw = obj[\"long_axis_yaw\"]\n    pick(\"red_book\", grasp_height, yaw)\n    wait(20)\n    # Place on orange_tray\n    place(\"orange_tray\")\n    wait(20)"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0537,
+      "object_reach": 0.697,
+      "zone_reach": 0.581
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.503,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0545,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1000",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n\n    # Check if the zone is occupied by another object\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to purple_box\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\n    # Use grasp height just above the mug's top surface and correct yaw\n    grasp_height = 0.075\n    yaw = obj[\"long_axis_yaw\"]\n    pick(obj_name, grasp_height, yaw)\n    wait(20)\n\n    # Place on the target zone\n    place(zone_name)\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug"
+    ],
+    "notes": "The function assumes the gripper is empty and handles zone occupancy by moving obstructing objects to a predefined location."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 3,
+    "source_code": "obs = observe()\nobj = obs[\"objects\"][\"yellow_mug\"]\nzone = obs[\"zones\"][\"cyan_tray\"]\ncenter = zone[\"center\"]\nhalf_size = zone[\"half_size\"]\n\n# Check if cyan_tray is occupied by another object\noccupied = False\nfor name, other_obj in obs[\"objects\"].items():\n    if name == \"yellow_mug\":\n        continue\n    if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n        other_obj[\"top_z\"] > center[2] + 0.005):\n        # Move the occupying object to purple_box\n        place(\"purple_box\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Use grasp_height just above the mug's top surface and correct yaw\ngrasp_height = 0.075\nyaw = obj[\"long_axis_yaw\"]\npick(\"yellow_mug\", grasp_height, yaw)\nwait(20)\n\n# Place on cyan_tray\nplace(\"cyan_tray\")\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.694,
+      "zone_reach": 0.611
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.507,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_3",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.503,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.69,
+      "zone_reach": 0.555
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0456,
+      "object_reach": 0.513,
+      "zone_reach": 0.549
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v3",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v3(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    center = zone[\"center\"]\n    half_size = zone[\"half_size\"]\n\n    # Check if the zone is occupied by any other object\n    occupied = False\n    for name, other_obj in obs[\"objects\"].items():\n        if name == obj_name:\n            continue\n        if (abs(other_obj[\"center\"][0] - center[0]) < half_size[0] and\n            abs(other_obj[\"center\"][1] - center[1]) < half_size[1] and\n            other_obj[\"top_z\"] > center[2] + 0.005):\n            # Move the occupying object to purple_box\n            place(\"purple_box\", dx=0.02, dy=0.02)\n            wait(20)\n            occupied = True\n            break\n\n    # Pick the target object\n    grasp_height = 0.02\n    yaw = obj[\"long_axis_yaw\"]\n    pick(obj_name, grasp_height, yaw)\n    wait(20)\n\n    # Place on the target zone\n    place(zone_name)\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "block"
+    ],
+    "notes": "The function assumes the gripper is empty before calling and handles occupied zones by moving the interfering object to a designated safe location."
+   },
+   "origin": {
+    "task": "place_1",
+    "object": "red_block",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\ncenter = orange_tray[\"center\"]\nhalf_size = orange_tray[\"half_size\"]\n\n# Check if orange_tray is occupied\noccupied = False\nfor name, obj in obs[\"objects\"].items():\n    if name == \"red_block\":\n        continue\n    if (abs(obj[\"center\"][0] - center[0]) < half_size[0] and\n        abs(obj[\"center\"][1] - center[1]) < half_size[1] and\n        obj[\"top_z\"] > center[2] + 0.005):\n        # Move the occupying object to purple_box\n        place(\"purple_box\", dx=0.02, dy=0.02)\n        wait(20)\n        occupied = True\n        break\n\n# Pick red_block\ngrasp_height = 0.02\nyaw = red_block[\"long_axis_yaw\"]\npick(\"red_block\", grasp_height, yaw)\nwait(20)\n\n# Place on orange_tray\nplace(\"orange_tray\")\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "place_1",
+     "source": "origin",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5030",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.039,
+      "object_reach": 0.605,
+      "zone_reach": 0.656
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5031",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0399,
+      "object_reach": 0.473,
+      "zone_reach": 0.515
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1003",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0392,
+      "object_reach": 0.497,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0394,
+      "object_reach": 0.502,
+      "zone_reach": 0.607
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1005",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0395,
+      "object_reach": 0.524,
+      "zone_reach": 0.642
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0733,
+    0.0537
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 67,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0476
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0467
+   ],
+   "grasp_height": 0.09,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0467
+   ],
+   "grasp_height": 0.075,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0396,
+    0.0381
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "place_1"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0546
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 67,
+   "holding": true,
+   "error": null,
+   "task": "place_2"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0535,
+    0.047
+   ],
+   "grasp_height": 0.075,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0467
+   ],
+   "grasp_height": 0.075,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0547
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0732,
+    0.0549
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0538,
+    0.0471
+   ],
+   "grasp_height": 0.075,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.004,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0548
+   ],
+   "grasp_height": 0.004,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0289,
+   "footprint": [
+    0.0747,
+    0.0519
+   ],
+   "grasp_height": 0.004,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.073,
+    0.0519
+   ],
+   "grasp_height": 0.029,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.073,
+    0.0519
+   ],
+   "grasp_height": 0.8145,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "grasp_height_out_of_range",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0399,
+    0.0392
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.0394
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0456
+   ],
+   "grasp_height": 0.075,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0398,
+    0.0395
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1005"
+  }
+ ],
+ "lessons": [
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.085 to 0.105 and the long_axis_yaw (-1.506) as the yaw for picking the mug, ensuring the gripper aligns with the mug's long axis and reaches above its top surface to avoid motion blockage.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.07 to 0.08 (just above the object's top surface) and the long_axis_yaw (-1.512) as the yaw for picking and placing the mug.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.070 m (equal to the mug's height) and set yaw to the short_axis_yaw (0.078) for a stable grasp and reliable placement.",
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.070 m (equal to the mug's height) and set the yaw to long_axis_yaw (-1.014) for proper alignment during pick and place.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.004 m (just above the object's top surface) and set yaw to the long_axis_yaw (0.0) to ensure the fingers grip the book's full footprint without slipping below the top surface.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.012 and set yaw to the short_axis_yaw (-1.571) for the pick operation to align the gripper with the book's orientation and avoid motion blockage.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.004 m (just below the top surface) and set yaw to long_axis_yaw (0.0) to align the fingers along the long axis of the book for a proper grip.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.0125 m (midway up the book's height) and set yaw to the short_axis_yaw (0.742) to ensure the gripper spans the book's width securely and avoids collision during placement.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.0289 (equal to the book's height) and the short_axis_yaw (1.107) as yaw for picking to ensure the gripper aligns properly with the book's orientation and avoids motion blockage.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use the long_axis_yaw (-0.464) as the yaw argument in pick and set grasp_height to top_z (0.829) minus half the object height (0.0145), resulting in grasp_height = 0.8145, to ensure the gripper approaches from the correct orientation and height above the book.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use grasp_height = obj['top_z'] - obj['height'] / 2 - obs['table_z'] to set the grasp height relative to the table surface, and use long_axis_yaw for yaw in pick().",
+   "task": "tidy_1003"
+  }
+ ]
+}

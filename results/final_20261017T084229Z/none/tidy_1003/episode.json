@@ -1,0 +1,543 @@
+{
+ "task_id": "tidy_1003",
+ "family": "tidy",
+ "instruction": "Could you clean up the table?",
+ "skill_memory": false,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "blue_book",
+   "zone": "cyan_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nblue_book = obs[\"objects\"][\"blue_book\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Calculate grasp height and yaw for the book\ngrasp_height = blue_book[\"height\"] / 2  # Grasp at midpoint of book height\nyaw = blue_book[\"long_axis_yaw\"]  # Align gripper with long axis of the book\n\n# Pick up the blue book\npick(\"blue_book\", grasp_height, yaw)\n\n# Place the book on the cyan_tray with no offset\nplace(\"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        0.0689,
+        -0.0671,
+        0.8144
+       ],
+       "reached": [
+        0.0727,
+        -0.0667,
+        0.8555
+       ],
+       "remaining_error_m": 0.0412
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1783,
+       -0.3211
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0649
+      ],
+      "top_height_above_table": 0.029,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 287,
+     "seconds": 1.6,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.0144,
+        -0.464
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         0.0689,
+         -0.0671,
+         0.8144
+        ],
+        "reached": [
+         0.0727,
+         -0.0667,
+         0.8555
+        ],
+        "remaining_error_m": 0.0412
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.0289,
+      "footprint_short": 0.0519,
+      "object_reach": 0.632,
+      "zone_reach": 0.517
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.0289,
+       "footprint": [
+        0.0747,
+        0.0519
+       ],
+       "grasp_height": 0.0144,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "diagnosis": "- Call 1 pick('blue_book', 0.0144, -0.464) failed: {'reason': 'motion_blocked', 'target': [0.0689, -0.0671, 0.8144], 'reached': [0.0727, -0.0667, 0.8555], 'remaining_error_m': 0.0412}.\n- The program never grasped anything.\n- After the program blue_book is offset [0.1783, -0.3211] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use the short_axis_yaw (1.107) as the yaw for grasping since the book's long_axis_yaw (-0.464) is misaligned with the gripper's orientation, and adjust grasp_height to be slightly above the book's center (e.g., 0.0144 + 0.005) to avoid interference with the table."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\nblue_book = obs[\"objects\"][\"blue_book\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Use short_axis_yaw for better gripper alignment and adjust grasp height\ngrasp_height = blue_book[\"height\"] / 2 + 0.005\nyaw = blue_book[\"short_axis_yaw\"]\n\npick(\"blue_book\", grasp_height, yaw)\nplace(\"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        0.0689,
+        -0.0671,
+        0.8195
+       ],
+       "reached": [
+        0.0818,
+        -0.0505,
+        0.8578
+       ],
+       "remaining_error_m": 0.0436
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1783,
+       -0.3211
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0649
+      ],
+      "top_height_above_table": 0.029,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 290,
+     "seconds": 1.6,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.0195,
+        1.107
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         0.0689,
+         -0.0671,
+         0.8195
+        ],
+        "reached": [
+         0.0818,
+         -0.0505,
+         0.8578
+        ],
+        "remaining_error_m": 0.0436
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.029,
+      "footprint_short": 0.0519,
+      "object_reach": 0.632,
+      "zone_reach": 0.517
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.029,
+       "footprint": [
+        0.073,
+        0.0519
+       ],
+       "grasp_height": 0.0195,
+       "yaw_from_long_axis_deg": 90,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "diagnosis": "- Call 1 pick('blue_book', 0.0195, 1.107) failed: {'reason': 'motion_blocked', 'target': [0.0689, -0.0671, 0.8195], 'reached': [0.0818, -0.0505, 0.8578], 'remaining_error_m': 0.0436}.\n- The program never grasped anything.\n- After the program blue_book is offset [0.1783, -0.3211] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use long_axis_yaw (-0.464) instead of short_axis_yaw (1.107) for yaw and set grasp_height to be between 0.0145 and 0.0195 to ensure proper gripper alignment and avoid motion blockage."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\nblue_book = obs[\"objects\"][\"blue_book\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\ngrasp_height = 0.017\nyaw = blue_book[\"long_axis_yaw\"]\n\npick(\"blue_book\", grasp_height, yaw)\nplace(\"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        0.0689,
+        -0.0671,
+        0.817
+       ],
+       "reached": [
+        0.0725,
+        -0.0667,
+        0.8558
+       ],
+       "remaining_error_m": 0.039
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1783,
+       -0.3211
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0649
+      ],
+      "top_height_above_table": 0.029,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 287,
+     "seconds": 1.6,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.017,
+        -0.464
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         0.0689,
+         -0.0671,
+         0.817
+        ],
+        "reached": [
+         0.0725,
+         -0.0667,
+         0.8558
+        ],
+        "remaining_error_m": 0.039
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.029,
+      "footprint_short": 0.0519,
+      "object_reach": 0.632,
+      "zone_reach": 0.517
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.029,
+       "footprint": [
+        0.073,
+        0.0519
+       ],
+       "grasp_height": 0.017,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "diagnosis": "- Call 1 pick('blue_book', 0.017, -0.464) failed: {'reason': 'motion_blocked', 'target': [0.0689, -0.0671, 0.817], 'reached': [0.0725, -0.0667, 0.8558], 'remaining_error_m': 0.039}.\n- The program never grasped anything.\n- After the program blue_book is offset [0.1783, -0.3211] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp_height of 0.025 to 0.035 and the short_axis_yaw (1.107) as yaw for the pick operation to avoid motion blockage and ensure proper orientation."
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "yellow_block",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obj = observe()[\"objects\"][\"yellow_block\"]\nzone = observe()[\"zones\"][\"orange_tray\"]\ncenter = zone[\"center\"]\npick(\"yellow_block\", 0.02, obj[\"long_axis_yaw\"])\nplace(\"orange_tray\", 0, 0)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0009,
+       -0.0006
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0668
+      ],
+      "top_height_above_table": 0.0439,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 447,
+     "seconds": 2.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_block",
+        0.02,
+        0.245
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0392,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.82,
+        "object_top_z_before": 0.8399
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "orange_tray",
+        0,
+        0
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         0.063,
+         0.1335
+        ],
+        "touched_down_early_m": null
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0392,
+      "object_reach": 0.497,
+      "zone_reach": 0.637
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "block",
+       "object_height": 0.0399,
+       "footprint": [
+        0.0399,
+        0.0392
+       ],
+       "grasp_height": 0.02,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "blue_book",
+    "zone": "cyan_tray",
+    "source": "instruction",
+    "evidence": "Could you clean up the table?"
+   },
+   {
+    "object": "yellow_block",
+    "zone": "orange_tray",
+    "source": "assumption",
+    "evidence": "The request to clean up the table implies moving objects from non-designated zones to a tray; since the yellow_block is not on a zone, it should be placed on an available tray. The orange_tray is unoccupied and suitable for blocks."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The purple_box is occupied by the blue_book and must be cleared before placing other objects on it.",
+   "The cyan_tray and orange_tray are unoccupied and available for placement.",
+   "The yellow_block must be moved from its current undefined location to a tray.",
+   "The robot must not place objects on zones already occupied by other objects unless they are being cleared first."
+  ],
+  "refined_instruction": "The robot must first move the blue_book from the purple_box to the cyan_tray, as it is the only object explicitly on a zone and part of the cleanup. Then, the yellow_block must be moved from its current undefined location to the orange_tray, which is unoccupied and appropriate for blocks. Success is confirmed when both objects are placed on their respective trays and no objects remain on the purple_box or in undefined locations.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 1
+  }
+ },
+ "plan": [
+  {
+   "object": "blue_book",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "yellow_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "blue_book",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "yellow_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "blue_book": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.0059,
+    -0.2006
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0668
+   ],
+   "top_height_above_table": 0.0289,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": false
+  },
+  "yellow_block": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0195,
+    0.2145
+   ],
+   "zone_half_size": [
+    0.0556,
+    0.0556
+   ],
+   "top_height_above_table": 0.0439,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": false
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "blue_book": {
+    "zone": "orange_tray",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0704,
+     -0.0686,
+     0.8164
+    ]
+   },
+   "yellow_block": {
+    "zone": "purple_box",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0637,
+     0.1299,
+     0.8239
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820702075958252,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 13.3,
+ "llm_usage": {
+  "calls": 12,
+  "prompt_tokens": 10114,
+  "completion_tokens": 1064,
+  "seconds": 5.1,
+  "by_purpose": {
+   "code": 4,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

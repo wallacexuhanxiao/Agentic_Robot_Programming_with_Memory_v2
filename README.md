@@ -54,6 +54,17 @@ Outputs go to `outputs/<run>/`. Each task directory holds `episode.json` (plan, 
 verifier result, ground-truth evaluation), `video.mp4` and `llm/` (every prompt and response).
 Run `python -m sma.eval.report outputs/<run>` for a comparison table.
 
-## Status
+## Status (2026-10-17)
 
-See `results/` for runs that have been downloaded and checked.
+Midterm result: [`results/final_20261017T084229Z/README.md`](results/final_20261017T084229Z/README.md),
+video `results/demo/final_memory_comparison.mp4`. Qwen3-30B-A3B in the realistic scene:
+
+| | none | skill only | user only | both |
+|---|---|---|---|---|
+| tasks fully successful | 4/10 | 5/10 | 9/10 | 9/10 |
+| failed executions | 20 | 17 | 18 | 11 |
+| LLM calls | 87 | 66 | 95 | 70 |
+
+The flow also has a user long-term memory and a prompt refiner placed before the code agent
+(`sma/memory/user.py`, `sma/agent/refine.py`). The default API level is task (parameterized `pick`/`place`/`release`).
+The pose-level API (`SMA_API_LEVEL=pose`) remains, but Qwen3.5-9B could not use it reliably.
