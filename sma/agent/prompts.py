@@ -105,11 +105,17 @@ free_spots(zone_name, object_name=None) -> {"zone", "center", "half_size", "long
   occupants lists objects already in the zone. It does not turn anything: a held object turns with the
   gripper (changing the gripper yaw by d turns the object by d), so choosing the carry yaw is up to you.
 carry_to(x, y, height=0.18, yaw=None) rises vertically to table_z + height (if lower), then moves
-  horizontally to (x, y) at that height; whatever is held comes along. yaw=None keeps the current yaw.
+  horizontally to (x, y) at that height; whatever is held comes along. yaw is an ABSOLUTE gripper yaw
+  (finger direction); yaw=None keeps the current yaw.
+rotate_by(delta) -> {"gripper_yaw_before", "gripper_yaw", "turned_by", "holding_something"}
+  Turns the gripper, and the held object with it, by delta radians about the vertical axis, staying in
+  place (positive = counter-clockwise seen from above). A held object's long axis changes by the same
+  delta. The shorter of delta and delta -/+ pi is executed (same result for a pen or a book).
 lower_until_contact() -> {"stopped_by_contact": bool, "held_object_bottom_above_table": float, ...}
   Lowers straight down until the held object's bottom reaches table level, or until something stops it
   earlier (then stopped_by_contact is True, e.g. it landed on a wall or another object). Keeps holding.
-open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}: fingers only, no motion.
+open_gripper() / close_gripper() -> {"width": float, "holding_something": bool, ...}: fingers only, no
+  motion (open_gripper also reports the gripper_yaw at release).
 retreat(dz=0.12) moves straight up by dz.
 check(object_name, zone_name) -> {"satisfied": bool, "inside_zone": bool, "resting": bool,
   "offset_from_zone_center": [dx, dy], ...}: camera check after parking the arm.
@@ -118,7 +124,7 @@ The module math is available. A robot error stops the program and is reported ba
 
 Generic sequencing (human-provided prior, the same for every task; it gives no object-specific choice):
 grasp_candidates -> choose one -> grasp -> (check holding_something) -> free_spots -> carry_to above the
-chosen spot -> lower_until_contact -> open_gripper -> retreat -> check."""
+chosen spot -> (rotate_by if the object must be turned) -> lower_until_contact -> open_gripper -> retreat -> check."""
 
 ASPIRE_API_DOC = """You control a Franka Panda arm above a table by writing Python against the ASPIRE robot API.
 Positions are metres in the robot base frame "robot0_base" (x forward, y left, z up); quaternions are wxyz.

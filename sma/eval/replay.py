@@ -39,7 +39,7 @@ def brief_arg(v):
     return _num(v)
 
 
-RESULT_KEYS = ("holding_something", "finger_gap", "satisfied", "inside_zone", "resting", "stopped_by_contact",
+RESULT_KEYS = ("holding_something", "finger_gap", "gripper_yaw", "turned_by", "satisfied", "inside_zone", "resting", "stopped_by_contact",
                "held_object_bottom_above_table", "occupants", "spots")
 
 

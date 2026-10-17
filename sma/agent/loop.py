@@ -141,12 +141,18 @@ def orientation_facts(trace, scene, check, obj, zone):
             facts.append(f"At the grasp the gripper yaw (finger direction) was {grasp_yaw:.3f} rad while {obj}'s long "
                          f"axis was {target['long_axis_yaw']:.3f} rad: {_axis_deg(grasp_yaw - target['long_axis_yaw'])} "
                          f"degrees apart.")
+    releases = [e for e in trace if e["call"] == "open_gripper" and isinstance(e.get("result"), dict)
+                and e["result"].get("gripper_yaw") is not None]
     carries = [e for e in trace if e["call"] == "carry_to" and not e.get("error")]
-    if grasp_yaw is not None and carries:
-        entry = carries[-1]
-        yaw = entry["args"][3] if len(entry["args"]) > 3 else entry.get("kwargs", {}).get("yaw")
-        yaw = grasp_yaw if yaw is None else float(yaw)
-        line = f"The last carry_to used gripper yaw {yaw:.3f} rad"
+    if grasp_yaw is not None and (releases or carries):
+        if releases:  # the gripper yaw actually in effect when the object was let go
+            yaw = float(releases[-1]["result"]["gripper_yaw"])
+            line = f"When the fingers opened the gripper yaw was {yaw:.3f} rad"
+        else:
+            entry = carries[-1]
+            yaw = entry["args"][3] if len(entry["args"]) > 3 else entry.get("kwargs", {}).get("yaw")
+            yaw = grasp_yaw if yaw is None else float(yaw)
+            line = f"The last carry_to used gripper yaw {yaw:.3f} rad"
         if check.get("object_long_axis_yaw") is not None:
             line += (f"; after release the camera measured {obj}'s long axis at {check['object_long_axis_yaw']:.3f} rad, "
                      f"{_axis_deg(check['object_long_axis_yaw'] - yaw)} degrees from that gripper yaw and "

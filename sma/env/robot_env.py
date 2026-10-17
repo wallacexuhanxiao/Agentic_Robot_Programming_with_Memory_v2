@@ -255,7 +255,7 @@ class TabletopEnv:
         return self.gripper_state()
 
     def open_gripper(self):
-        return self._gripper(-1.0)
+        return {**self._gripper(-1.0), "gripper_yaw": round(self._yaw(), 3)}
 
     def close_gripper(self):
         return self._gripper(1.0)
@@ -552,6 +552,20 @@ class TabletopEnv:
         z = float(self._ee()[2]) - table
         return {"stopped_by_contact": bool(stopped is not None and stopped > .004), "grip_point_height": round(z, 4),
                 "held_object_bottom_above_table": round(z - grip, 4) if holding else None,
+                "holding_something": self.gripper_state()["holding_something"]}
+
+    def rotate_by(self, delta):
+        """Turn the gripper, and whatever it holds, by delta radians about the vertical axis without moving it
+        (positive = counter-clockwise seen from above). The finger line is symmetric, so the shorter of delta and
+        delta -/+ pi is executed; for a symmetric object (pen, book) both give the same orientation."""
+        delta = float(delta)
+        if not np.isfinite(delta):
+            raise RobotError("non_finite_rotation", delta=delta)
+        before, here = self._yaw(), self._ee()
+        self.move_to(here[0], here[1], here[2], before + delta, tolerance=.01)
+        after = self._yaw()
+        turned = (after - before + np.pi / 2) % np.pi - np.pi / 2
+        return {"gripper_yaw_before": round(before, 3), "gripper_yaw": round(after, 3), "turned_by": round(float(turned), 3),
                 "holding_something": self.gripper_state()["holding_something"]}
 
     def retreat(self, dz=.12):

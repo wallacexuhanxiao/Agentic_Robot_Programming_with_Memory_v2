@@ -31,12 +31,16 @@ if not spots["spots"]:
 s = spots["spots"][0]
 yaw = {yaw}
 carry_to(s["x"], s["y"], 0.18, yaw)
+{turn}
 lowered = lower_until_contact()
 open_gripper()
 retreat()
 result = check("{obj}", "{zone}")
 '''
-YAW = {"aligned": 's["object_long_axis_yaw"] + c["yaw"] - c["object_long_axis_yaw"]', "unturned": "None"}
+YAW = {"aligned": 's["object_long_axis_yaw"] + c["yaw"] - c["object_long_axis_yaw"]', "unturned": "None",
+       "rotate": "None"}
+# rotate: carry without turning, then rotate_by(target axis - current axis) above the spot.
+TURN = {"rotate": 'turned = rotate_by(s["object_long_axis_yaw"] - c["object_long_axis_yaw"])'}
 
 
 def angle_diff(a, b):
@@ -49,7 +53,7 @@ rows = []
 for task in suite("pen")[:4]:
     obj, zone = next(iter(task.goal.items()))
     spec = task.layout.zones[0]
-    for variant in ("aligned", "unturned"):
+    for variant in ("aligned", "unturned", "rotate"):
         env = make_env(task)
         try:
             scene = env.reset()
@@ -79,7 +83,7 @@ for task in suite("pen")[:4]:
                           flush=True)
             sandbox = Sandbox(env)
             env.steps, env.step_budget = 0, 3000
-            ok, error = sandbox.run(PROGRAM.format(obj=obj, zone=zone, yaw=YAW[variant]))
+            ok, error = sandbox.run(PROGRAM.format(obj=obj, zone=zone, yaw=YAW[variant], turn=TURN.get(variant, "")))
             env.step_budget = env.steps + 1500
             check = env.check_on_zone(obj, zone)
             gt = env.private_evaluate(task.goal)

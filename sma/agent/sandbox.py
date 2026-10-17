@@ -34,8 +34,8 @@ import os
 API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
 API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
              "task": ("observe", "pick", "place", "release", "go_home", "wait"),
-             "mid": ("observe", "grasp_candidates", "grasp", "free_spots", "carry_to", "lower_until_contact",
-                     "open_gripper", "close_gripper", "retreat", "check", "go_home", "wait"),
+             "mid": ("observe", "grasp_candidates", "grasp", "free_spots", "carry_to", "rotate_by",
+                     "lower_until_contact", "open_gripper", "close_gripper", "retreat", "check", "go_home", "wait"),
              "aspire": ()}[API_LEVEL]  # the ASPIRE level takes its functions from env.aspire_api()
 UNTRACED = ("Pose", "MotionStrategy")
 
