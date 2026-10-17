@@ -72,9 +72,18 @@ def make_pen_task(seed):
     return Task(f"pen_{seed}", "pen", instruction, Layout([pen], [case]), {pen.name: case.name}, seed)
 
 
+PEN_TEACH_INSTRUCTION = ("From now on, whenever you put a pen in my pen case, turn the pen so that it lines up with the "
+                         "long side of the case before you lower it. Please put the {color} pen in the green pen case now.")
+
+
 def make_task(family, seed, *, kinds=None):
     if family == "pen":
         return make_pen_task(seed)
+    if family == "pen_teach":  # same layout family; the user states how pens go into the case, once
+        task = make_pen_task(seed)
+        task.task_id, task.family = f"pen_teach_{seed}", "pen_teach"
+        task.instruction = PEN_TEACH_INSTRUCTION.format(color=task.layout.objects[0].color)
+        return task
     if family in ("teach", "tidy"):
         # Same layouts as sort/clear; the instruction no longer states where things go (teach states it once).
         base = make_task("clear" if seed % 2 else "sort", seed, kinds=kinds)
@@ -146,6 +155,9 @@ def suite(name):
     if name == "pen":
         # Ten pen-case placements on new layouts (explicit instructions, so user memory plays no role).
         return [make_task("pen", 2000 + i) for i in range(10)]
+    if name == "pen_teach":
+        # The user teaches how pens go into the case once, then gives the ten plain pen requests.
+        return [make_task("pen_teach", 1999)] + [make_task("pen", 2000 + i) for i in range(10)]
     if name == "smoke":
         return [make_task("place", 7, kinds=["block"])]
     raise ValueError(name)

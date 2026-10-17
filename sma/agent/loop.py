@@ -396,6 +396,12 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
         spec = refine(llm, task.instruction, preferences, scene)
         record["task_spec"] = spec
         task.spec_text = spec["refined_instruction"]
+        if user_memory is not None:  # how-to requests from earlier conversations go to the code agent verbatim
+            handling = user_memory.handling_for(scene)
+            record["user_handling_used"] = handling
+            if handling:
+                task.spec_text += "\nStanding requests of this user (from earlier conversations): " + "; ".join(
+                    f'for {h["object"]}: "{h["user_said"]}"' for h in handling)
         log(f"  spec: {[(g['object'], g['zone'], g['source']) for g in spec['goals']]} dropped={len(spec['dropped'])}")
         goals = [{"object": g["object"], "zone": g["zone"]} for g in spec["goals"]]
         plan_text = llm.chat([{"role": "user", "content": prompts.PLANNER.format(
