@@ -1,5 +1,6 @@
 """Online agent loop: plan -> per-subgoal code -> execute -> perception check -> repair; memory hooks."""
 import json
+import math
 import re
 import time
 from pathlib import Path
@@ -29,6 +30,54 @@ def feedback_text(error, trace, check):
     return json.dumps({"error": error, "last_calls": calls, "subgoal_check_after_program": check}, default=str)
 
 
+def _angle_mod_pi(a):
+    return abs((a + math.pi / 2) % math.pi - math.pi / 2)
+
+
+def grasp_geometry_facts(args, target):
+    """Geometric relation between a pick command and the observed object (no advice, just facts)."""
+    facts = []
+    if len(args) < 3:
+        return facts
+    grasp_height, yaw = float(args[1]), float(args[2])
+    h = target["height"]
+    facts.append(f"The grip point was {grasp_height - h:+.3f} m relative to the object's top surface "
+                 f"(grasp_height {grasp_height:.3f} vs object height {h:.3f}); the fingers only grip what is below "
+                 f"the grip point.")
+    if target["footprint_long"] - target["footprint_short"] > .01:
+        off = _angle_mod_pi(yaw - target["long_axis_yaw"])
+        side = target["footprint_long"] if off < math.pi / 4 else target["footprint_short"]
+        facts.append(f"The fingers closed at {math.degrees(off):.0f} degrees from the object's long axis, i.e. across a "
+                     f"{side:.3f} m wide extent (the open fingers span 0.08 m; footprint is "
+                     f"{target['footprint_long']:.3f} x {target['footprint_short']:.3f} m).")
+    return facts
+
+
+def pick_args(entry):
+    """Positional + keyword arguments of a traced pick call, as [object_name, grasp_height, yaw]."""
+    args = list(entry["args"])
+    for i, key in enumerate(("object_name", "grasp_height", "yaw")):
+        if len(args) <= i and key in entry.get("kwargs", {}):
+            args.append(entry["kwargs"][key])
+    return args
+
+
+def pick_records(trace, scene, obj):
+    """(kind, grasp_height, yaw relative to long axis, holding) for every pick of obj in a trace."""
+    target = scene["objects"].get(obj)
+    out = []
+    for entry in trace:
+        args = pick_args(entry) if entry["call"] == "pick" else []
+        if target and len(args) >= 3 and args[0] == obj:
+            result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
+            out.append({"kind": target["kind"], "object_height": target["height"],
+                        "footprint": [target["footprint_long"], target["footprint_short"]],
+                        "grasp_height": round(float(args[1]), 4),
+                        "yaw_from_long_axis_deg": round(math.degrees(_angle_mod_pi(float(args[2]) - target["long_axis_yaw"]))),
+                        "holding": bool(result.get("holding_something")), "error": (entry.get("error") or {}).get("reason")})
+    return out
+
+
 def diagnose(trace, scene_before, check, obj, zone, error=None):
     """Plain-language facts derived from the trace and camera; identical for every condition."""
     facts = []
@@ -46,10 +95,8 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
             last_pos = result.get("position")
         if entry["call"] == "pick" and isinstance(result, dict) and target:
             closes += 1
-            facts.append(f"pick{tuple(entry['args'])} -> holding_something={result.get('holding_something')}; "
-                         f"grip point z {result.get('grasp_point_z')} vs {obj} top_z {target['top_z']} "
-                         f"(height {target['height']}, footprint {target['footprint_long']} x "
-                         f"{target['footprint_short']}, long_axis_yaw {target['long_axis_yaw']}).")
+            facts.append(f"pick{tuple(entry['args'])} -> holding_something={result.get('holding_something')}.")
+            facts += grasp_geometry_facts(pick_args(entry), target)
         if entry["call"] == "close_gripper" and isinstance(result, dict):
             closes += 1
             where = ""
@@ -83,13 +130,20 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             retrieved = memory.retrieve(scene, obj, zone)
             if retrieved:
                 skills_text = prompts.SKILLS_HEADER + memory.describe(retrieved)
-        prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction), object=obj, zone=zone,
-                                      scene=prompts.scene_text(scene), skills=skills_text, attempts=attempts_text)
-        code = strip_code(llm.chat([{"role": "user", "content": prompt}], purpose="code"))
+            skills_text += memory.grasp_experience_text()
+        direct = (memory is not None and n == 1 and retrieved and retrieved[0][1]["verdict"] == "applicable")
+        if direct:
+            # Reuse policy: an applicable, validated skill is executed as is; no new code is generated.
+            code = f'skills.{retrieved[0][0]["function"]}("{obj}", "{zone}")'
+        else:
+            prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction),
+                                          object=obj, zone=zone, scene=prompts.scene_text(scene), skills=skills_text,
+                                          attempts=attempts_text)
+            code = strip_code(llm.chat([{"role": "user", "content": prompt}], purpose="code"))
         sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved})
         env.steps, env.step_budget = 0, ATTEMPT_STEPS
         started = time.time()
-        if llm.last_truncated():
+        if not direct and llm.last_truncated():
             ok, error = False, {"type": "rejected", "message": "program text was cut off at the output limit; write a shorter program"}
         else:
             ok, error = sandbox.run(code)
@@ -99,9 +153,12 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
                    "used_skills": used_skills(sandbox.trace), "control_steps": env.steps,
                    "seconds": round(time.time() - started, 1), "trace": sandbox.trace,
                    "retrieved": [{"function": s["function"], "verdict": v} for s, v in retrieved],
-                   "features": scene_features(scene, obj, zone)}
+                   "features": scene_features(scene, obj, zone), "direct_reuse": bool(direct),
+                   "picks": pick_records(sandbox.trace, scene, obj)}
         attempts.append(attempt)
-        log(f"    attempt {n}: program_ok={ok} check={check.get('satisfied')} skills={attempt['used_skills']} "
+        if memory is not None:
+            memory.log_grasps(attempt["picks"], task.task_id)
+        log(f"    attempt {n}{' (direct skill reuse)' if direct else ''}: program_ok={ok} check={check.get('satisfied')} skills={attempt['used_skills']} "
             f"error={error and (error.get('reason') or error.get('message'))}")
         if check.get("satisfied"):
             return True, attempts

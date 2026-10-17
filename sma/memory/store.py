@@ -41,12 +41,33 @@ def zone_occupants(scene, zone_name, exclude=None):
 class SkillMemory:
     def __init__(self, path):
         self.path = Path(path)
-        self.skills = json.loads(self.path.read_text())["skills"] if self.path.exists() else []
+        data = json.loads(self.path.read_text()) if self.path.exists() else {}
+        self.skills = data.get("skills", [])
+        self.grasp_log = data.get("grasp_log", [])  # operation-level experience: how each kind was grasped
         self.applicability_log = []
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"skills": self.skills}, indent=1))
+        self.path.write_text(json.dumps({"skills": self.skills, "grasp_log": self.grasp_log}, indent=1))
+
+    def log_grasps(self, picks, task_id):
+        for p in picks:
+            self.grasp_log.append({**p, "task": task_id})
+        if picks:
+            self.save()
+
+    def grasp_experience_text(self, per_kind=4):
+        """Operation-level memory shown to the coder: recent grasp parameters and outcomes per object kind."""
+        if not self.grasp_log:
+            return ""
+        lines = ["", "Grasp experience from earlier executions (grasp_height above table; yaw relative to the object's "
+                 "long axis; holding = whether the object ended up between the fingers):"]
+        for kind in sorted({g["kind"] for g in self.grasp_log}):
+            rows = [g for g in self.grasp_log if g["kind"] == kind][-per_kind:]
+            items = "; ".join(f"grasp_height {g['grasp_height']}, yaw {g['yaw_from_long_axis_deg']} deg -> "
+                              f"{'holding' if g['holding'] else 'NOT holding'}" for g in rows)
+            lines.append(f"- {kind} (height {rows[-1]['object_height']}, footprint {rows[-1]['footprint']}): {items}")
+        return "\n".join(lines) + "\n"
 
     def get(self, function):
         return next((s for s in self.skills if s["function"] == function), None)
