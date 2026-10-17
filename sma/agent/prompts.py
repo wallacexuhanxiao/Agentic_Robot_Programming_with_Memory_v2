@@ -43,15 +43,20 @@ do not define helper names that are not used):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
    "objects": {name: {"name": str, "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float,
-                      "height": float, "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
+                      "height": float, "footprint_long": float, "footprint_short": float,
+                      "long_axis_yaw": float, "short_axis_yaw": float}},
    "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a toy box)
    "gripper": {"width": float, "holding_something": bool}}
   "height" is the object's height above the table; "top_z" is the absolute z of its top surface.
+  long_axis_yaw / short_axis_yaw: directions (angles in the xy plane) of the footprint's long and short
+  sides; the footprint measures footprint_long along long_axis_yaw and footprint_short along short_axis_yaw.
 pick(object_name, grasp_height, yaw) -> {"holding_something": bool, ...}
   Top-down grasp: opens the fingers, comes down vertically over the object's centre until the grip
-  point (midpoint between the fingertips) is at table_z + grasp_height, closes the fingers along the
-  direction yaw (an angle in the xy plane; yaw and yaw + pi are the same), then lifts.
-  The fingers open to 0.08 m and only grip what is between them below the grip point.
+  point (midpoint between the fingertips) is at table_z + grasp_height, closes the fingers, then lifts.
+  yaw is the direction of the line between the two fingertips, i.e. the direction in which the fingers
+  squeeze (an angle in the xy plane; yaw and yaw + pi are the same). The open fingers are 0.08 m apart,
+  so the object's extent along yaw must be smaller than 0.08 m, and they only grip what is below the
+  grip point.
   grasp_height is measured ABOVE THE TABLE SURFACE (0.02 means 2 cm above table_z), not an absolute z.
   YOU choose grasp_height and yaw for the object.
 place(zone_name, dx=0.0, dy=0.0) carries the held object above the zone centre (dx, dy are small offsets
@@ -113,7 +118,8 @@ What happened (measured by the robot and camera):
 Object as seen by the camera: {object_view}
 
 In ONE sentence, state the concrete change to the pick/place arguments for a {kind} that would fix
-this (for example which grasp_height range or which yaw relative to long_axis_yaw). Reply with JSON only:
+this (for example which grasp_height range, or which of long_axis_yaw / short_axis_yaw to use as yaw).
+Reply with JSON only:
 {{"lesson": "<one sentence>"}}"""
 
 LESSONS_HEADER = """

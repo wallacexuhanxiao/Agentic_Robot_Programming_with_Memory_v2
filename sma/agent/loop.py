@@ -47,9 +47,10 @@ def grasp_geometry_facts(args, target):
     if target["footprint_long"] - target["footprint_short"] > .01:
         off = _angle_mod_pi(yaw - target["long_axis_yaw"])
         side = target["footprint_long"] if off < math.pi / 4 else target["footprint_short"]
-        facts.append(f"The fingers closed at {math.degrees(off):.0f} degrees from the object's long axis, i.e. across a "
-                     f"{side:.3f} m wide extent (the open fingers span 0.08 m; footprint is "
-                     f"{target['footprint_long']:.3f} x {target['footprint_short']:.3f} m).")
+        facts.append(f"The fingertip line (yaw) was {math.degrees(off):.0f} degrees from the object's long axis, so the "
+                     f"fingers squeezed across a {side:.3f} m extent of the object (the open fingers are 0.08 m apart; "
+                     f"footprint is {target['footprint_long']:.3f} along long_axis_yaw x {target['footprint_short']:.3f} "
+                     f"along short_axis_yaw).")
     return facts
 
 
@@ -125,7 +126,7 @@ def reflect(llm, obj, zone, code, diagnosis, scene):
     messages = [{"role": "user", "content": prompts.REFLECT.format(
         object=obj, kind=view["kind"], zone=zone, code=code, diagnosis=diagnosis,
         object_view=json.dumps({k: view[k] for k in ("height", "top_z", "footprint_long", "footprint_short",
-                                                     "long_axis_yaw")}))}]
+                                                     "long_axis_yaw", "short_axis_yaw")}))}]
     text = llm.chat(messages, purpose="reflect", max_tokens=6000, thinking=True)
     if llm.last_truncated() or not text.strip():
         # Thinking ran out of budget: ask once more without thinking rather than lose the lesson.

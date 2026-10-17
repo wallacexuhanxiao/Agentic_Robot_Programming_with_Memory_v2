@@ -88,7 +88,9 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
             "center": [round(center_xy[0], 4), round(center_xy[1], 4), round(table_z + h / 2, 4)],
             "top_z": round(top_z, 4), "height": round(h, 4),
             "footprint_long": round(long_side, 4), "footprint_short": round(short_side, 4),
-            "long_axis_yaw": round(yaw, 3), "visible_pixels": int(mask.sum())}
+            "long_axis_yaw": round(yaw, 3),
+            "short_axis_yaw": round((yaw + np.pi) % np.pi - np.pi / 2, 3),  # perpendicular, in [-pi/2, pi/2)
+            "visible_pixels": int(mask.sum())}
 
     zones = {}
     labels, names = _palette_label(rgb, ZONE_HUES)

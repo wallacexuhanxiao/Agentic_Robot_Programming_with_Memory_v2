@@ -70,8 +70,9 @@ class SkillMemory:
         """Operation-level memory shown to the coder: recent grasp parameters and outcomes per object kind."""
         if not self.grasp_log:
             return ""
-        lines = ["", "Grasp experience from earlier executions (grasp_height above table; yaw relative to the object's "
-                 "long axis; holding = whether the object ended up between the fingers):"]
+        lines = ["", "Grasp experience from earlier executions (grasp_height above table; yaw = fingertip line, given as "
+                 "degrees from the object's long axis, so 90 deg means yaw = short_axis_yaw; holding = whether the "
+                 "object ended up between the fingers):"]
         for kind in sorted({g["kind"] for g in self.grasp_log}):
             rows = [g for g in self.grasp_log if g["kind"] == kind][-per_kind:]
             items = "; ".join(f"grasp_height {g['grasp_height']}, yaw {g['yaw_from_long_axis_deg']} deg -> "
