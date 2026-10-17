@@ -66,8 +66,11 @@ def classify_kind(height, long_side, short_side):
     return "block"
 
 
-def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
+def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25, masks_out=None):
+    """masks_out (optional dict) receives each object's pixel mask and the back-projected point map."""
     xyz = back_project(depth_m, K, world_from_camera)
+    if masks_out is not None:
+        masks_out["_xyz"] = xyz
     valid = np.isfinite(xyz[..., 2])
     table_z = float(np.median(xyz[..., 2][valid]))
     height = xyz[..., 2] - table_z
@@ -79,6 +82,8 @@ def perceive(rgb, depth_m, K, world_from_camera, *, min_pixels=25):
         if mask is None:
             continue
         pts = xyz[mask]
+        if masks_out is not None:
+            masks_out[color] = mask
         top_z = float(np.quantile(pts[:, 2], .9))
         center_xy, long_side, short_side, yaw = _footprint(pts[:, :2])
         h = top_z - table_z

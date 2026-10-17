@@ -31,9 +31,9 @@ sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
 PIDS=()
 trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 
-# ASPIRE backends (SMA_API_LEVEL=aspire): Contact-GraspNet, cuRobo and PyRoki services from the existing
-# aspire_qwen provider environment, started exactly as in aspire_qwen/hpc/run_aspire_qwen.pbs.
-if [[ "${SMA_API_LEVEL:-task}" == aspire ]]; then
+# ASPIRE backends: Contact-GraspNet, cuRobo and PyRoki services from the existing aspire_qwen provider environment,
+# started exactly as in aspire_qwen/hpc/run_aspire_qwen.pbs. The mid level uses Contact-GraspNet only.
+if [[ "${SMA_API_LEVEL:-task}" == aspire || "${SMA_API_LEVEL:-task}" == mid ]]; then
   AQ=$PROJECT/aspire_qwen
   export PYTHONPATH="$ROOT:$AQ/client_deps:$AQ/ASPIRE/src"
   export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 XDG_CACHE_HOME=$AQ/cache CAP_HARNESS_VENDOR_ROOT=$AQ/ASPIRE/third_party
@@ -48,16 +48,26 @@ print(' '.join(str(x.getsockname()[1]) for x in s))")
   PROVIDER_PY=$AQ/provider_env/bin/python
   (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.graspnet.service --port "$GRASP_PORT") > "$OUT/grasp.log" 2>&1 &
   PIDS+=("$!")
-  (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.curobo.service --port "$CUROBO_PORT") > "$OUT/curobo.log" 2>&1 &
-  PIDS+=("$!")
-  (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" JAX_PLATFORMS=cpu "$PROVIDER_PY" -m cap_harness.providers.pyroki.service --port "$IK_PORT") > "$OUT/pyroki.log" 2>&1 &
-  PIDS+=("$!")
+  if [[ "$SMA_API_LEVEL" == aspire ]]; then
+    (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.curobo.service --port "$CUROBO_PORT") > "$OUT/curobo.log" 2>&1 &
+    PIDS+=("$!")
+    (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" JAX_PLATFORMS=cpu "$PROVIDER_PY" -m cap_harness.providers.pyroki.service --port "$IK_PORT") > "$OUT/pyroki.log" 2>&1 &
+    PIDS+=("$!")
+  fi
   for i in $(seq 1 150); do
-    if curl -sf "$CAP_HARNESS_GRASPNET_URL/healthz" >/dev/null && curl -sf "$CAP_HARNESS_CUROBO_URL/healthz" >/dev/null &&
-       curl -sf "$CAP_HARNESS_PYROKI_URL/healthz" >/dev/null; then break; fi
+    if curl -sf "$CAP_HARNESS_GRASPNET_URL/healthz" >/dev/null && { [[ "$SMA_API_LEVEL" == mid ]] ||
+       { curl -sf "$CAP_HARNESS_CUROBO_URL/healthz" >/dev/null && curl -sf "$CAP_HARNESS_PYROKI_URL/healthz" >/dev/null; }; }; then break; fi
     sleep 2
   done
-  echo "aspire services ready after $((i*2))s" >> "$OUT/model_ready.txt"
+  echo "$SMA_API_LEVEL services ready after $((i*2))s" >> "$OUT/model_ready.txt"
+  if [[ "$SMA_API_LEVEL" == mid && ( "${SMA_MODE:-dev}" == mid_gate || "${SMA_MODE:-dev}" == midsuite ) ]]; then
+    # Scripted mid-level pick-and-place (no LLM) first; the model run only starts if the primitives work.
+    "$SIM_PY" scripts/mid_gate.py "$OUT/mid_gate" > "$OUT/mid_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/mid_gate.log"
+    if [[ "${SMA_MODE}" == mid_gate || $(grep -c " GT True" "$OUT/mid_gate.log") -lt 3 ]]; then
+      echo "mid gate finished (suite skipped unless >=3 scripted successes)" >> "$OUT/mid_gate.log"; exit 0
+    fi
+    SMA_MODE=suite
+  fi
   if [[ "${SMA_MODE:-dev}" == aspire_gate || "${SMA_MODE:-dev}" == devsuite ]]; then
     "$SIM_PY" scripts/aspire_gate.py "$OUT/aspire_gate" > "$OUT/aspire_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/aspire_gate.log"
     if [[ "${SMA_MODE}" == aspire_gate || $(grep -c " GT True" "$OUT/aspire_gate.log") -lt 2 ]]; then

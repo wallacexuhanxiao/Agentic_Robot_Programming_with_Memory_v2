@@ -28,10 +28,13 @@ SAFE_BUILTINS = {name: getattr(__builtins__, name) if hasattr(__builtins__, name
 SAFE_BUILTINS["__import__"] = _import_math_only
 import os
 
-# API level (see prompts.API_DOCS): "pose" = move_to + gripper, "task" = parameterized pick/place.
+# API level (see prompts.API_DOC): "pose" = move_to + gripper, "task" = parameterized pick/place,
+# "mid" = object-centric primitives (grasp candidates, free spots, carry/lower/release), "aspire" = ASPIRE CapApi.
 API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
 API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
              "task": ("observe", "pick", "place", "release", "go_home", "wait"),
+             "mid": ("observe", "grasp_candidates", "grasp", "free_spots", "carry_to", "lower_until_contact",
+                     "open_gripper", "close_gripper", "retreat", "check", "go_home", "wait"),
              "aspire": ()}[API_LEVEL]  # the ASPIRE level takes its functions from env.aspire_api()
 UNTRACED = ("Pose", "MotionStrategy")
 

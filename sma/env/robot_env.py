@@ -184,7 +184,9 @@ class TabletopEnv:
             from .perception_gsam import perceive_gsam
             scene = perceive_gsam(rgb, depth_m, self.K, self.world_from_camera, os.environ["SMA_SEG_URL"])
         else:
-            scene = perceive(rgb, depth_m, self.K, self.world_from_camera)
+            self._masks = {}
+            scene = perceive(rgb, depth_m, self.K, self.world_from_camera, masks_out=self._masks)
+        self._table_z = scene["table_z"]
         scene["gripper"] = self.gripper_state()
         scene["end_effector"] = {"position": [round(float(v), 4) for v in self._ee()],
                                  "yaw": round(self._yaw(), 3)}
@@ -341,6 +343,218 @@ class TabletopEnv:
         if zone is None:
             raise RobotError("zone_not_visible", zone=zone_name, visible=sorted(scene["zones"]))
         return zone
+
+    # ---------------------------------------------------------------- mid-level API
+    # Object-centric primitives between the task level (pick/place) and the ASPIRE level (point clouds, poses):
+    # perception, grasp proposals and motion execution happen here; the caller chooses the grasp, where and in
+    # which orientation the object goes, how far to lower it, when to release, the order and the recovery.
+    SAFE_HEIGHT = .20
+
+    def _table(self):
+        if getattr(self, "_table_z", None) is None:
+            self.observe()
+        return self._table_z
+
+    def grasp_candidates(self, object_name, max_candidates=6):
+        """Top-down grasp proposals for a visible object: Contact-GraspNet (if the service is running) and
+        footprint geometry. Each candidate: {"id", "object", "source", "x", "y", "height", "yaw",
+        "squeeze_width", "fits_open_fingers", "score", ...}."""
+        self.go_home()
+        scene = self.observe()
+        obj = scene["objects"].get(object_name)
+        if obj is None:
+            raise RobotError("object_not_visible", object=object_name, visible=sorted(scene["objects"]))
+        table, h = scene["table_z"], obj["height"]
+        masks = getattr(self, "_masks", {})
+        points = masks["_xyz"][masks[obj["color"]]] if obj.get("color") in masks else None
+
+        def squeeze(x, y, yaw):  # object extent along the finger-closing direction, from its points
+            if points is None:
+                return None
+            d = (points[:, :2] - [x, y]) @ np.array([np.cos(yaw), np.sin(yaw)])
+            return round(float(np.quantile(d, .98) - np.quantile(d, .02)), 4)
+
+        out, note = [], None
+        try:
+            proposals, note = self._graspnet_proposals(obj, points, table)
+        except Exception as exc:  # the service is optional; its failure is reported, not hidden
+            proposals, note = [], f"contact-graspnet failed: {type(exc).__name__}: {str(exc)[:160]}"
+        for x, y, height, yaw, score in proposals[:max(0, max_candidates - 2)]:
+            out.append({"source": "contact-graspnet", "x": x, "y": y, "height": height, "yaw": yaw, "score": score})
+        axes = [("short", obj["short_axis_yaw"])]
+        if obj["footprint_long"] - obj["footprint_short"] > .01:
+            axes.append(("long", obj["long_axis_yaw"]))
+        heights = sorted({round(max(.006, .5 * h), 3), round(max(.006, .5 * h, h - .012), 3)})
+        for axis, yaw in axes:
+            for height in heights:
+                out.append({"source": f"geometry (fingers across the {axis} side)", "x": obj["center"][0],
+                            "y": obj["center"][1], "height": height, "yaw": yaw, "score": None})
+        for i, c in enumerate(out[:max_candidates]):
+            width = squeeze(c["x"], c["y"], c["yaw"])
+            if width is None:
+                width = obj["footprint_short"] if "short" in c["source"] else obj["footprint_long"] \
+                    if "long" in c["source"] else None
+            c.update({"id": i, "object": object_name, "x": round(float(c["x"]), 4), "y": round(float(c["y"]), 4),
+                      "height": round(float(c["height"]), 4), "yaw": round(float(c["yaw"]), 3),
+                      "squeeze_width": width, "fits_open_fingers": None if width is None else bool(width < .075),
+                      "object_height": h, "object_long_axis_yaw": obj["long_axis_yaw"],
+                      "object_footprint": [obj["footprint_long"], obj["footprint_short"]]})
+        self.last_grasp_note = note
+        return out[:max_candidates]
+
+    def _graspnet_proposals(self, obj, points, table, limit=4, max_tilt_deg=30):
+        """Contact-GraspNet grasps on the object's points, kept only if they approach from above; converted to
+        (x, y, height above table, yaw, score) of the grip point."""
+        url = os.environ.get("CAP_HARNESS_GRASPNET_URL")
+        if not url or points is None or len(points) < 30:
+            return [], "contact-graspnet not available (no service or no object points)"
+        from cap_harness.contracts import PointCloud
+        from cap_harness.providers.graspnet.client import ContactGraspNetProvider
+        from ..aspire_level.grasp_calibration import GripSiteGraspProvider
+        xyz = self._masks["_xyz"]
+        scene_pts = xyz[np.isfinite(xyz[..., 2])]
+        scene_pts = scene_pts[::max(1, len(scene_pts) // 20000)]
+        provider = GripSiteGraspProvider(ContactGraspNetProvider(base_url=url, max_retries=0))
+        result = provider.generate_grasps(PointCloud(points, "world"), scene_point_cloud=PointCloud(scene_pts, "world"),
+                                          max_candidates=40)
+        if not result.ok:
+            return [], f"contact-graspnet: {str(result.error)[:160]}"
+        down = self.down.as_matrix()[:, 2]
+        kept = []
+        for g in result.grasps:
+            m = g.pose.as_matrix()
+            if float(m[:3, 2] @ down) < np.cos(np.deg2rad(max_tilt_deg)):
+                continue
+            p = m[:3, 3]
+            kept.append((float(p[0]), float(p[1]), max(.004, float(p[2] - table)),
+                         float(np.arctan2(m[1, 0], m[0, 0])), round(float(g.score), 3)))
+            if len(kept) >= limit:
+                break
+        return kept, f"contact-graspnet: {len(result.grasps)} grasps, {len(kept)} approach from above"
+
+    def grasp(self, candidate):
+        """Execute one candidate (its x, y, height, yaw may be adjusted): open, move above at a safe height,
+        descend vertically, close, lift. Returns holding_something and the finger gap."""
+        c = dict(candidate)
+        try:
+            x, y, height, yaw = (float(c[k]) for k in ("x", "y", "height", "yaw"))
+        except (KeyError, TypeError, ValueError):
+            raise RobotError("invalid_candidate", hint="pass one dict from grasp_candidates (x, y, height, yaw may be changed)")
+        if not .004 <= height <= .15:
+            raise RobotError("grasp_height_out_of_range", height=height, allowed=[.004, .15],
+                             hint="height is the grip point's height ABOVE the table surface, not an absolute z")
+        if self.gripper_state()["holding_something"]:
+            raise RobotError("already_holding_something")
+        table = self._table()
+        self.open_gripper()
+        here = self._ee()
+        if here[2] < table + self.SAFE_HEIGHT - .005:
+            self.move_to(here[0], here[1], table + self.SAFE_HEIGHT)
+        self.move_to(x, y, table + self.SAFE_HEIGHT, yaw)
+        stopped = None
+        try:
+            self.move_to(x, y, table + height, yaw)
+        except RobotError as exc:  # touching down slightly early is fine; holding is checked after closing
+            if exc.reason != "motion_blocked" or exc.details["remaining_error_m"] > .012:
+                raise
+            stopped = exc.details["remaining_error_m"]
+        closed = self.close_gripper()
+        self._held_grasp_height = height
+        self._held = {"object": c.get("object"), "grasp_yaw": yaw, "object_long_axis_yaw": c.get("object_long_axis_yaw"),
+                      "footprint": c.get("object_footprint")}
+        self.move_to(x, y, table + .18, yaw)
+        after = self.gripper_state()
+        return {"holding_something": after["holding_something"], "finger_gap": after["width"],
+                "finger_gap_when_closed": closed["width"], "expected_squeeze_width": c.get("squeeze_width"),
+                "stopped_above_target_m": stopped}
+
+    def free_spots(self, zone_name, object_name=None, max_spots=5):
+        """Placement spots inside a zone for an object's footprint (object_name, or the held object), avoiding
+        other objects. Returns {"zone", "center", "half_size", "occupants", "spots": [{"x", "y",
+        "object_long_axis_yaw", "gripper_yaw", "clearance"}]}; spots is empty if nothing fits."""
+        self.go_home()
+        scene = self.observe()
+        zone = self._zone_from_last_view(zone_name)
+        held = getattr(self, "_held", None) if scene["gripper"]["holding_something"] else None
+        if object_name is not None and object_name in scene["objects"]:
+            o = scene["objects"][object_name]
+            long_side, short_side = o["footprint_long"], o["footprint_short"]
+        elif held and held.get("footprint"):
+            long_side, short_side = held["footprint"]
+            object_name = held["object"]
+        else:
+            raise RobotError("footprint_unknown", hint="pass a visible object_name, or call while holding an object")
+        colour = object_name.split("_")[0]  # the held object may be seen (and misnamed) hanging at the park pose
+        others = [o for n, o in scene["objects"].items() if n.split("_")[0] != colour]
+        cx, cy = zone["center"][:2]
+        hx, hy = zone["half_size"]
+        occupants = [o["name"] for o in others if abs(o["center"][0] - cx) <= hx and abs(o["center"][1] - cy) <= hy]
+        spots = []
+        for long_yaw, ex, ey in ((0.0, long_side / 2, short_side / 2), (np.pi / 2, short_side / 2, long_side / 2)):
+            ux, uy = hx - ex - .006, hy - ey - .006
+            if ux < 0 or uy < 0:
+                continue
+            for x in np.linspace(cx - ux, cx + ux, 5):
+                for y in np.linspace(cy - uy, cy + uy, 5):
+                    gaps = [np.hypot(x - o["center"][0], y - o["center"][1]) - o["footprint_long"] / 2
+                            - np.hypot(ex, ey) for o in others]
+                    clearance = min(gaps) if gaps else .1
+                    if clearance < .005:
+                        continue
+                    gripper_yaw = None
+                    if held and held.get("object_long_axis_yaw") is not None:
+                        gripper_yaw = round(float(long_yaw + held["grasp_yaw"] - held["object_long_axis_yaw"]), 3)
+                    spots.append({"x": round(float(x), 4), "y": round(float(y), 4), "object_long_axis_yaw": round(long_yaw, 3),
+                                  "gripper_yaw": gripper_yaw, "clearance": round(float(min(clearance, .1)), 4),
+                                  "_rank": (-min(clearance, .04), np.hypot(x - cx, y - cy))})
+        spots.sort(key=lambda s: s["_rank"])
+        for s in spots:
+            s.pop("_rank")
+        return {"zone": zone_name, "center": zone["center"], "half_size": zone["half_size"], "occupants": occupants,
+                "spots": spots[:max_spots]}
+
+    def carry_to(self, x, y, height=.18, yaw=None):
+        """Rise vertically to table_z + height (if lower), then move horizontally to (x, y) at that height,
+        fingers along yaw (None keeps the current yaw). Whatever is held comes along."""
+        height = float(height)
+        if not .05 <= height <= .30:
+            raise RobotError("carry_height_out_of_range", height=height, allowed=[.05, .30],
+                             hint="height is measured above the table surface")
+        z = self._table() + height
+        here = self._ee()
+        if here[2] < z - .005:
+            self.move_to(here[0], here[1], z)
+        self.move_to(float(x), float(y), z, yaw)
+        return {"position": self._ee().round(4).tolist(), "holding_something": self.gripper_state()["holding_something"]}
+
+    def lower_until_contact(self):
+        """Lower straight down until the held object's bottom reaches table level, or until something stops it
+        earlier (a wall, another object). Does not open the fingers."""
+        table = self._table()
+        holding = self.gripper_state()["holding_something"]
+        grip = getattr(self, "_held_grasp_height", .01) if holding else .01
+        here = self._ee()
+        stopped = None
+        try:
+            self.move_to(here[0], here[1], table + grip + .004, tolerance=.004)
+        except RobotError as exc:
+            if exc.reason != "motion_blocked":
+                raise
+            stopped = exc.details["remaining_error_m"]
+        z = float(self._ee()[2]) - table
+        return {"stopped_by_contact": bool(stopped is not None and stopped > .004), "grip_point_height": round(z, 4),
+                "held_object_bottom_above_table": round(z - grip, 4) if holding else None,
+                "holding_something": self.gripper_state()["holding_something"]}
+
+    def retreat(self, dz=.12):
+        """Move straight up by dz (fingers unchanged)."""
+        here = self._ee()
+        self.move_to(here[0], here[1], min(here[2] + float(dz), WORKSPACE[2, 1] - .01))
+        return {"position": self._ee().round(4).tolist(), "holding_something": self.gripper_state()["holding_something"]}
+
+    def check(self, object_name, zone_name):
+        """Camera check (arm parked first): is the object inside the zone and resting, with the gripper empty?"""
+        return self.check_on_zone(object_name, zone_name)
 
     def wait(self, steps=20):
         hold = self._q()

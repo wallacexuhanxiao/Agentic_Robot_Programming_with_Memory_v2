@@ -64,7 +64,11 @@ def grasp_geometry_facts(args, target):
 
 
 def pick_args(entry):
-    """Positional + keyword arguments of a traced pick call, as [object_name, grasp_height, yaw]."""
+    """Positional + keyword arguments of a traced pick call, as [object_name, grasp_height, yaw]. A mid-level
+    grasp(candidate) call is read the same way from its candidate."""
+    if entry["call"] == "grasp":
+        cand = entry["args"][0] if entry["args"] else entry.get("kwargs", {}).get("candidate")
+        return [cand.get("object"), cand.get("height"), cand.get("yaw")] if isinstance(cand, dict) else []
     args = list(entry["args"])
     for i, key in enumerate(("object_name", "grasp_height", "yaw")):
         if len(args) <= i and key in entry.get("kwargs", {}):
@@ -107,7 +111,7 @@ def pick_records(trace, scene, obj):
                     "yaw_from_long_axis_deg": round(math.degrees(_angle_mod_pi(float(args[2]) - target["long_axis_yaw"]))),
                     "holding": bool(result.get("holding_something")), "error": None})
     for entry in trace:
-        args = pick_args(entry) if entry["call"] == "pick" else []
+        args = pick_args(entry) if entry["call"] in ("pick", "grasp") else []
         if target and len(args) >= 3 and args[0] == obj:
             result = entry.get("result") if isinstance(entry.get("result"), dict) else {}
             out.append({"kind": target["kind"], "object_height": target["height"],
@@ -133,10 +137,14 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
         result = entry.get("result")
         if entry["call"] == "move_to" and isinstance(result, dict):
             last_pos = result.get("position")
-        if entry["call"] == "pick" and isinstance(result, dict) and target:
+        if entry["call"] in ("pick", "grasp") and isinstance(result, dict) and target:
             closes += 1
-            facts.append(f"pick{tuple(entry['args'])} -> holding_something={result.get('holding_something')}.")
-            facts += grasp_geometry_facts(pick_args(entry), target)
+            args = pick_args(entry)
+            if args and args[0] not in (None, obj):
+                facts.append(f"Call {i} grasped {args[0]}, not {obj}.")
+            facts.append(f"{entry['call']}{tuple(entry['args'])} -> holding_something={result.get('holding_something')}.")
+            if args and None not in args:
+                facts += grasp_geometry_facts(args, target)
         if entry["call"] == "close_gripper" and isinstance(result, dict):
             closes += 1
             pose = [a for e, a in pose_grasps(trace[:i + 1], scene_before, obj) if e is entry]

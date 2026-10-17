@@ -69,6 +69,54 @@ release() opens the fingers where the arm is now, lifts and parks the arm (use i
 go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
 The module math is available. A robot error stops the program and is reported back to you."""
 
+MID_API_DOC = """You control a Franka Panda arm above a table by writing short Python. Units: metres and radians;
+world frame: x away from the robot base, y to the left, z up. The table surface is at z = table_z.
+"yaw" is always an angle in the xy plane; for the gripper it is the direction in which the two fingers
+squeeze (yaw and yaw + pi are the same). The open fingers are 0.08 m apart.
+
+Only these functions exist (they are already defined; do not import anything, do not use try/except):
+observe() -> dict from the top-down RGB-D camera:
+  {"table_z": float,
+   "objects": {name: {"name": str, "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float,
+                      "height": float, "footprint_long": float, "footprint_short": float,
+                      "long_axis_yaw": float, "short_axis_yaw": float}},
+   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a toy box)
+   "gripper": {"width": float, "holding_something": bool}}
+  "height" is the object's height above the table. The arm can hide objects; go_home() first for a clear view.
+
+grasp_candidates(object_name) -> list of top-down grasp proposals for a visible object, each a dict
+  {"id", "object", "source", "x", "y", "height", "yaw", "squeeze_width", "fits_open_fingers", "score", ...}
+  (x, y): where the grip point (midpoint between the fingertips) goes; height: grip point height ABOVE the
+  table; yaw: finger direction; squeeze_width: the object's measured extent between the fingers;
+  source: "contact-graspnet" (learned grasp detector, with a score) or "geometry" (from the footprint).
+  The list is not ranked for your task: YOU choose which candidate to use (you may also adjust its
+  height or yaw).
+grasp(candidate) -> {"holding_something": bool, "finger_gap": float, "expected_squeeze_width": float, ...}
+  Opens the fingers, moves above (x, y) at a safe height, descends vertically to the candidate's
+  height, closes the fingers and lifts to 0.18 m above the table. finger_gap is the measured gap after
+  closing (close to 0 means nothing was caught).
+free_spots(zone_name, object_name=None) -> {"zone", "center", "half_size", "occupants": [names],
+  "spots": [{"x", "y", "object_long_axis_yaw", "gripper_yaw", "clearance"}]}
+  Positions inside the zone where the object's footprint fits without touching other objects (for the
+  held object if object_name is None). object_long_axis_yaw: the object's long axis direction for that
+  spot; gripper_yaw: the gripper yaw that gives this orientation for the object currently held (None if
+  nothing is held). spots is empty if nothing fits; occupants lists objects already in the zone.
+carry_to(x, y, height=0.18, yaw=None) rises vertically to table_z + height (if lower), then moves
+  horizontally to (x, y) at that height; whatever is held comes along. yaw=None keeps the current yaw.
+lower_until_contact() -> {"stopped_by_contact": bool, "held_object_bottom_above_table": float, ...}
+  Lowers straight down until the held object's bottom reaches table level, or until something stops it
+  earlier (then stopped_by_contact is True, e.g. it landed on a wall or another object). Keeps holding.
+open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}: fingers only, no motion.
+retreat(dz=0.12) moves straight up by dz.
+check(object_name, zone_name) -> {"satisfied": bool, "inside_zone": bool, "resting": bool,
+  "offset_from_zone_center": [dx, dy], ...}: camera check after parking the arm.
+go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
+The module math is available. A robot error stops the program and is reported back to you.
+
+Generic sequencing (human-provided prior, the same for every task; it gives no object-specific choice):
+grasp_candidates -> choose one -> grasp -> (check holding_something) -> free_spots -> carry_to above the
+chosen spot -> lower_until_contact -> open_gripper -> retreat -> check."""
+
 ASPIRE_API_DOC = """You control a Franka Panda arm above a table by writing Python against the ASPIRE robot API.
 Positions are metres in the robot base frame "robot0_base" (x forward, y left, z up); quaternions are wxyz.
 These names are already defined (no imports, no try/except):
@@ -110,7 +158,7 @@ def aspire_skill_notes():
 
 
 _LEVEL = os.environ.get("SMA_API_LEVEL", "task")
-API_DOC = {"task": TASK_API_DOC, "pose": POSE_API_DOC}.get(_LEVEL) or (ASPIRE_API_DOC + aspire_skill_notes())
+API_DOC = {"task": TASK_API_DOC, "pose": POSE_API_DOC, "mid": MID_API_DOC}.get(_LEVEL) or (ASPIRE_API_DOC + aspire_skill_notes())
 
 PLANNER = """You are the planning module of a tabletop robot. Task specification: {instruction}
 Goals: {goals}
@@ -166,6 +214,13 @@ In ONE sentence, state the concrete change to the pick/place arguments for a {ki
 this (for example which grasp_height range, or which of long_axis_yaw / short_axis_yaw to use as yaw).
 Reply with JSON only:
 {{"lesson": "<one sentence>"}}"""
+
+if _LEVEL == "mid":
+    REFLECT = REFLECT.replace(
+        "the concrete change to the pick/place arguments for a {kind} that would fix\nthis (for example which "
+        "grasp_height range, or which of long_axis_yaw / short_axis_yaw to use as yaw).",
+        "the concrete change for a {kind} that would fix this (for example which kind of grasp\ncandidate, "
+        "grasp height or finger direction, or how to choose and approach the placement spot).")
 
 LESSONS_HEADER = """
 Lessons learned from earlier failures with this kind of object:
