@@ -92,7 +92,9 @@ class TabletopSegmentation:
     def segment_text(self, observation, query):
         q = query.lower()
         color = next((c for c in self.COLORS if c in q), None)
-        place = any(w in q for w in ("tray", "box", "bin", "basket"))
+        # Container colours (orange, cyan, purple) and object colours (red, yellow, green, blue) are disjoint, so a
+        # container colour alone identifies a container even when the query omits "tray"/"box".
+        place = any(w in q for w in ("tray", "box", "bin", "basket")) or color in ZONE_HUES
         mask = None
         if os.environ.get("SMA_PERCEPTION") == "gsam" and os.environ.get("SMA_SEG_URL"):
             mask = self._gsam_mask(observation, q, color, place)
