@@ -4,112 +4,127 @@
 
 Our agent keeps two persistent memories:
 
-- **User memory** stores what a user has asked for over time, such as preferences and standing requests, each with verbatim evidence.
-- **Skill memory** stores executable skills extracted from verified executions, together with applicability conditions and execution history.
+- **User memory** stores what a user has asked for, such as preferences and standing requests, each with verbatim evidence.
+- **Skill memory** stores executable skills extracted from verified executions, with applicability conditions and execution history, plus verified failure lessons.
 
-The main experiment asks whether each memory helps on its own, and whether the two are complementary. The setting is a task where a correct program is hard to write from scratch but easy to reuse once found.
+The main experiment asks how each memory, and their combination, affects success and cost on a task where a correct program is hard to write from scratch but easy to reuse once found.
 
 ## 2. Task
 
 The task is to put a pen into a narrow pen case. The scene is a Robosuite/MuJoCo tabletop with a Franka Panda.
 
 - **Objects.** The pen measures 14 × 1.2 × 1.2 cm. The case is 15.5 × 4.5 cm inside, has 1.5 cm walls and a random yaw. The pen also starts at a random yaw.
-- **Why it is hard.** The pen fits only if its long axis is within about 13° of the case's long axis; otherwise it lands across the walls. The pen must be grasped across its short side, so its long axis is 90° away from the finger direction. A correct program therefore has to turn the held pen relative to the gripper. Writing `carry_to(..., yaw=<case axis>)` is the natural mistake, and it leaves the pen crosswise.
-- **Perception.** The agent sees only a top-down RGB-D camera (colour segmentation plus depth), proprioception, and the results of its own calls. Simulator ground truth (GT) is used only for offline scoring and is never shown to the model.
+- **Why it is hard.** The pen fits only if its long axis is within about 13° of the case axis; otherwise it lands across the walls. The pen is grasped across its short side, so its long axis is 90° from the finger direction. A correct program must therefore turn the held pen relative to the gripper. Writing `carry_to(..., yaw=<case axis>)` is the natural mistake, and it leaves the pen crosswise.
+- **Perception.** The agent sees only a top-down RGB-D camera (colour segmentation plus depth), proprioception, and the results of its own calls. Simulator ground truth (GT) is used only for offline scoring.
 - **API.** The agent writes Python against a mid-level, object-centric API:
   - `grasp_candidates`, `grasp`, `free_spots`, `carry_to`, `rotate_by`, `lower_until_contact`, `open_gripper`, `retreat`, `check`.
-  - The system performs perception, grasp proposal and motion execution. The model chooses the grasp, the placement pose and orientation, the order of actions, and how to recover.
-- **Scripted sanity check (no LLM).** On 4 layouts, turning the pen to the case axis succeeds 4/4, and placing it without turning fails 0/4. The primitives can solve the task, and alignment is the deciding step.
-- **Model.** Qwen3-30B-A3B-Instruct-2507 (open weights, served with vLLM) plays every role: refiner, planner, coder and reflection. Each subgoal gets up to 3 attempts. Every attempt is followed by a camera check, measured diagnostic facts and a one-sentence reflection.
+  - The system does perception, grasp proposal and motion execution. The model chooses the grasp, the placement pose and orientation, the order of actions, and how to recover.
+- **Scripted check (no LLM).** On 4 layouts, turning the pen to the case axis succeeds 4/4, and placing it without turning fails 0/4.
+- **Model.** Qwen3-30B-A3B-Instruct-2507 (open weights, vLLM, temperature 0.2) plays every role. Each subgoal gets up to 3 attempts. Every attempt is followed by a camera check, measured diagnostic facts and a one-sentence reflection.
 
-## 3. Conditions
+## 3. Design
 
-All conditions use the same 10 pen layouts (`pen_2000`–`pen_2009`), each with the plain instruction *"Put the ⟨colour⟩ pen in the green pen case."*
-
-| Condition | User memory | Skill memory | Sequence |
-|---|---|---|---|
-| No memory | – | – | 10 pen tasks |
-| Skill only | – | ✓ | 10 pen tasks (run twice) |
-| User only | ✓ | – | 1 teaching task + 10 pen tasks |
-| User + skill | ✓ | ✓ | 1 teaching task + 10 pen tasks |
-
-In the teaching task the user says once: *"From now on, whenever you put a pen in my pen case, turn the pen so that it lines up with the long side of the case before you lower it. Please put the blue pen in the green pen case now."*
-
-- **User memory** accepts this as a long-term handling request for pens, because the quote is verbatim and the message contains lasting wording. Later tasks pass the request to the code agent verbatim.
-- **Skill memory** extracts a parameterized skill from a camera-verified success. It validates the skill on two new layouts and stores it with its conditions and history. For a new subgoal it runs a three-level applicability check (goal, state, physical):
-  - *applicable*: the stored skill is executed directly, with no new code;
-  - *uncertain*: the skill's code is shown to the coder to adapt.
-
-  Skill memory also keeps failure lessons, which are flagged as not helpful after two later failed attempts.
+- **Same sequence for every condition.** Each run is one *teaching task* followed by 10 pen tasks with the plain instruction *"Put the ⟨colour⟩ pen in the green pen case."*
+- **The teaching task.** In it the user says once: *"From now on, whenever you put a pen in my pen case, turn the pen so that it lines up with the long side of the case before you lower it. Please put the ⟨colour⟩ pen in the green pen case now."*
+  - Every condition sees this instruction in that task.
+  - Only user memory carries it to later tasks, as a stored long-term handling request with a verbatim quote.
+  - Skill memory can only learn from a verified success, in any task.
+- **Conditions.**
+  - none;
+  - skill (skill memory);
+  - user (user memory);
+  - both.
+- **Layout sets.** A (`pen_2000`–`2009`), B (`pen_3000`–`3009`) and C (`pen_4000`–`4009`), each with its own teaching layout. On set A, user and both were each run twice.
+- **Total.** 14 runs; 140 scored pen tasks. Teaching tasks are not scored.
 
 ## 4. Results
 
-All numbers below cover the same 10 pen tasks; the teaching task is excluded.
+![replication](pen_memory_replication.png)
 
-![results](pen_memory_results.png)
+Means over runs (± sd, min–max); 10 pen tasks per run.
 
-| Metric (10 pen tasks) | No memory | Skill only (run 1 / run 2) | User only | **User + skill** |
+| Metric | No memory (n=3) | Skill memory (n=3) | User memory (n=4) | User + skill (n=4) |
 |---|---|---|---|---|
-| Task success (GT) | 0/10 | 2/10 / 0/10 | 4/10 | **7/10** |
-| Solved at the first attempt | 0 | 1 / 0 | 2 | **7** |
-| Execution attempts | 30 | 27 / 30 | 25 | **16** |
-| Failed executions | 30 | 25 / 30 | 21 | **9** |
-| Skill executed directly (succeeded) | – | 2 (1) / 0 | – | 5 (4) |
-| LLM calls | 110 | 96 / 110 | 97 | **59** |
-| Generated tokens | 11,697 | 12,753 / 13,042 | 12,328 | **7,153** |
+| Tasks solved | 2.7 ± 0.6 (2–3) | **7.3 ± 2.5 (5–10)** | 4.2 ± 1.3 (3–6) | 6.0 ± 4.2 (0–10) |
+| Solved at first attempt | 2.3 | **7.0** | 3.2 | 6.0 |
+| Failed executions | 22.7 | **8.3** | 18.5 | 12.0 |
+| Execution attempts | 25.3 | **15.7** | 22.8 | 18.0 |
+| LLM calls | 90.7 | **47.7** | 89.8 | 68.0 |
+| Generated tokens | 9,964 | **7,371** | 10,754 | 8,924 |
 
-Additional results for the proposal's metrics:
+Per layout set (tasks solved; set A user and both have two runs each):
 
-- **Skill transfer to new scenes.** In *user + skill*, the skill extracted from the teaching task passed validation on 2/2 unseen layouts. It was then executed directly 5 times and succeeded 4 times. Five more times its code was adapted by the coder, and 3 of those succeeded at the first attempt. In *skill only, run 1*, the first success came only at the 7th task (`pen_2006`); its skill validated 2/2 and succeeded on direct reuse in `pen_2007`.
-- **Applicability-check accuracy.** Over executed skill calls, the verdict matched the outcome 4/5 times (*user + skill*) and 1/2 times (*skill only, run 1*). The one wrong *applicable* verdict in each run came from a failed grasp during reuse, and from a scene-specific angle hard-coded in the skill.
-- **Task completion time.** Wall time is not comparable across conditions, because jobs ran on different cluster nodes (seconds per task ranged from 12 to 205 for similar work). We therefore report attempts and LLM calls as the cost measures.
+| Set | No memory | Skill memory | User memory | User + skill |
+|---|---|---|---|---|
+| A | 2 | 7 | 4, 4 | 7, 7 |
+| B | 3 | 10 | 6 | 10 |
+| C | 3 | 5 | 3 | 0 |
+
+### Skill transfer and applicability, pooled over runs
+
+| | Skill memory | User + skill |
+|---|---|---|
+| Skills validated on unseen layouts | 6/6 | 6/6 |
+| Direct reuse (skill judged *applicable*) succeeded | 14/16 | 14/16 |
+| Skill judged *uncertain*; its code adapted by the coder; first attempt succeeded | 6/12 | 10/14 |
+| Applicability verdict matched the outcome | 15/18 | 14/16 |
+| Success rate on the tasks after the run's first success | 20/28 (71%) | 24/30 (80%) |
+
+For comparison, the success rate after the first success was 6/28 (21%) with no memory and 16/37 (43%) with user memory only.
+
+**Cost.** Wall time is not comparable across conditions, because runs landed on cluster nodes of very different speeds. Attempts and LLM calls are the cost measures.
 
 ## 5. Findings
 
-1. **Each memory helps on its own, on a different part of the problem.**
-   - *User memory supplies the "what": the requirement to align the pen.* Without it the model rarely succeeded: 2 of 30 pen tasks across the three runs without user memory. Its typical program passed the case direction as the gripper yaw. With the stored request, the model started calling `rotate_by(case axis − pen axis)`, and success rose from 0/10 to 4/10.
-   - *Skill memory supplies the "how" once it has been found.* A verified success becomes an executable skill that later tasks run directly or adapt.
-2. **Together they are more than additive.** User memory alone gives 4/10. Skill memory alone gives 2/10 and 0/10, because it can only store a success the agent has already achieved, and alone the agent rarely achieves one. Together they give 7/10, with all 7 solved at the first attempt, and 57% fewer failed executions and 39% fewer LLM calls than user memory alone.
-   - The mechanism: user memory makes the first success happen early (the teaching task succeeded at its second attempt); skill memory then turns that one success into a validated, reusable program.
-3. **Skills help even when not judged directly applicable.** In *user + skill*, the reach-based physical check marked the skill *uncertain* in 5 tasks. Showing its code to the coder for adaptation still solved 3 of them at the first attempt.
-4. **Failure lessons need verification.** Without a correct example, the model's own reflections mostly blamed the grasp, for example "grasp along the pen's long axis", which is infeasible for an 8 cm gripper. They did not identify the missing rotation. Unverified lessons propagated into later tasks; our verification marks lessons that preceded two further failures as not helpful. Correct lessons, however, only appeared once a success existed.
+1. **Skill memory gives the largest and most consistent gain.**
+   - It beats no memory on every layout set (7 vs 2, 10 vs 3, 5 vs 3): +4.7 tasks on average, with 63% fewer failed executions and 47% fewer LLM calls.
+   - The mechanism: one verified success becomes a validated skill (6/6 validations) that later tasks run directly (14/16 succeeded) or adapt. After its first success, a run with skill memory solved 71–80% of the remaining tasks, against 21% without memory.
+2. **User memory gives a smaller, inconsistent gain on this task.**
+   - Carrying the user's handling request forward raised success on sets A and B (4 vs 2, 6 vs 3) but not on C (3 vs 3).
+   - Knowing that the pen must be aligned does not reliably produce code that aligns it.
+   - User memory's main contribution in our system is deciding *what* to do under vague instructions, shown in our tidy-up session: 4/10 → 9/10 task success with the task-level API, and 5/10 → 8/10 with the mid-level API. It is not the *how* of this manipulation.
+3. **The combination is not superadditive.**
+   - User + skill matched skill memory on sets A and B, and collapsed on set C (0/10).
+   - On C, the teaching task failed in all three attempts, so no skill existed. The only stored experience was the model's own failure lessons, which blamed the grasp ("grasp along the long axis", "pick another height"). Later programs followed them and failed to pick up the pen.
+   - The same layouts gave 5/10 with skill memory alone, whose teaching task happened to succeed at the first attempt.
+4. **The deciding event is the first verified success.** All runs with skill memory that reached an early success went on to reuse it. The one run that never succeeded did worse than no memory. Failure lessons without a verified success can be harmful, even with our verification that flags lessons followed by two further failures.
 
-## 6. Limitations
+## 6. Pilot run and why it was revised
 
-- **Single runs.** Each condition was run once, and skill only twice; *skill only* is highly variable (2/10 versus 0/10). The two user-memory conditions include one extra teaching episode, which also gives skill memory an earlier chance to learn.
-- **Remaining failures in user + skill.**
-  - Twice the skill was judged *uncertain* and the newly written code was misaligned by 24°–32°.
-  - Once a direct reuse did not pick the pen up.
-- **Known extraction weakness.** One extracted skill (*skill only, run 1*) hard-coded a scene-specific yaw. The extraction check currently rejects hard-coded coordinates but not hard-coded angles.
-- **Experimental setup.**
-  - Perception is colour-based segmentation, not SAM-family segmentation.
-  - There is a single simulated user and a single object family.
-  - The model is a 30B open-weight model; larger models were out of scope.
-- **Harness fixes made before the reported runs.** All are in the git history:
-  - parking the arm no longer turns a held object;
+Our first, single-run comparison reported:
+
+- no memory 0/10;
+- skill memory 2/10 and 0/10;
+- user memory 4/10;
+- user + skill 7/10.
+
+That looked like a superadditive effect. In that pilot, however, no memory and skill memory ran without the teaching task, so they never saw the alignment instruction even once.
+
+With the teaching task given to every condition (Section 3), skill memory alone reached 7/10 on the same layouts (set A), equal to user + skill. The pilot's apparent synergy came from that difference in sequences, not from user memory.
+
+## 7. Limitations
+
+- **Sample size.** Three layout sets and 14 runs, with one run per condition and set (two for user and user + skill on A). The spread is large (user + skill: 0–10). Repeated runs on the same layouts agreed closely for user memory and user + skill (4 and 4; 7 and 7). The two pilot runs of skill memory differed (2 vs 0), so sampling still matters when everything hinges on one early success. Most of the variance comes from layouts and from whether that first success happens.
+- **Scope.** Single task family, single simulated user, colour-based perception, one 30B open-weight model.
+- **Known weaknesses.**
+  - Skill extraction does not reject hard-coded scene angles (seen once in the pilot).
+  - The reach-based physical check is conservative (many *uncertain* verdicts).
+  - Failure lessons can mislead when no success exists.
+- **Harness changes before these runs.** All are in the git history:
+  - parking no longer turns a held object;
   - motions wait for the wrist yaw to settle;
-  - the API documentation states explicitly that `carry_to`'s yaw is the finger direction;
-  - the sandbox allows the builtin `next`.
+  - the API documentation states that `carry_to`'s yaw is the finger direction;
+  - the sandbox allows `next`.
 
-  All reported conditions use the same final code (`60f5dab`).
+  All replication runs use the same code (`468e8d2`, which differs from `60f5dab` only by layout-set suite names).
 
-## 7. Reproducibility
+## 8. Reproducibility
 
-- **Hopper PBS jobs (1 GPU each).**
-  - `672709`: no memory, skill only run 2 (interactive queue)
-  - `672803`: skill only run 1 (small queue)
-  - `672844`: user only (small queue)
-  - `672845`: user + skill (small queue)
-- **Code.** `skill_memory_agent` at `60f5dab` (mid-level API, `SMA_API_LEVEL=mid`).
-- **Results.** Under `results/`:
-  - `pen30b_20261017T152702Z/{none,skill}`
-  - `pen30b_skill_20261017T155808Z/skill`
-  - `penteach30b_user_20261017T162704Z/user`
-  - `penteach30b_both_20261017T162704Z/both`
-
-  Each task directory holds `episode.json` (programs, call traces, diagnoses, lessons) and `video.mp4`. Memory files are `memory.json` (skills, lessons) and `user_memory.json` (rules, handling requests).
-- **Example videos.**
-  - `penteach30b_both_.../both/pen_2001/video.mp4`: direct skill reuse, solved in one attempt.
-  - `penteach30b_user_.../user/pen_2002/video.mp4`: the user's request leads to `rotate_by` alignment.
-  - `pen30b_skill_.../skill/pen_2006/video.mp4`: failure, then repair, then skill extraction.
-  - `pen30b_20261017T152702Z/none/pen_2000/video.mp4`: the typical crosswise failure.
+- **Runs.** Listed in `runs.json`, with per-run metrics in `REPLICATION.md`.
+  - Set A: `penteach30b_{user,both}_20261017T162704Z` and `penrep_A*_20261017T172651Z`.
+  - Sets B and C: `penrep_{B,C}_*_20261017T172651Z`.
+  - Pilot: `pen30b_20261017T152702Z`, `pen30b_skill_20261017T155808Z`.
+- **Hopper PBS jobs.** 672844–672845 and 672916–672927.
+- **Per task.** Each task directory holds `episode.json` (programs, call traces, diagnoses, lessons) and `video.mp4`.
+- **Memory files.** `memory.json` (skills, lessons) and `user_memory.json` (rules, handling requests).
+- **Aggregation.** `python scripts/aggregate_pen_memory.py results results/main_experiment/runs.json results/main_experiment/REPLICATION.md`.

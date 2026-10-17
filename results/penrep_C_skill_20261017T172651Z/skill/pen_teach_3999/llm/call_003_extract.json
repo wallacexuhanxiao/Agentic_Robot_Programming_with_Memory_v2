@@ -1,0 +1,20 @@
+{
+ "index": 3,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 1.63,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 335,
+  "total_tokens": 708,
+  "completion_tokens": 373,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"red_pen\" (kind: pen) on zone \"green_case\".\nProgram:\n```python\ncandidates = grasp_candidates(\"red_pen\")\ncandidate = candidates[0]  # Use the first grasp candidate\ngrasp(candidate)\nspots = free_spots(\"green_case\", \"red_pen\")\nspot = spots[\"spots\"][0]\ntarget_yaw = spot[\"object_long_axis_yaw\"]  # Align object long axis with case\ngripper_yaw_at_grasp = candidate[\"yaw\"]\nobject_long_axis_at_grasp = candidate[\"object_long_axis_yaw\"]\ndelta_yaw = target_yaw - object_long_axis_at_grasp + gripper_yaw_at_grasp\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=delta_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_pen\", \"green_case\")\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v1(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v1(obj_name, zone_name):\n    # Observe the scene to get grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise ValueError(f\"No grasp candidates found for {obj_name}\")\n    \n    candidate = candidates[0]  # Use the first grasp candidate\n    grasp(candidate)\n    \n    # Observe free spots on the target zone for the object\n    spots = free_spots(zone_name, obj_name)\n    if not spots or not spots[\"spots\"]:\n        raise ValueError(f\"No free spots found on {zone_name} for {obj_name}\")\n    \n    spot = spots[\"spots\"][0]\n    target_yaw = spot[\"object_long_axis_yaw\"]  # Desired orientation of object\n    gripper_yaw_at_grasp = candidate[\"yaw\"]\n    object_long_axis_at_grasp = candidate[\"object_long_axis_yaw\"]\n    \n    # Compute the required yaw adjustment for the gripper during carry\n    delta_yaw = target_yaw - object_long_axis_at_grasp + gripper_yaw_at_grasp\n    \n    # Carry to the target spot with computed yaw\n    carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=delta_yaw)\n    \n    # Lower until contact is made\n    lower_until_contact()\n    \n    # Release the object\n    open_gripper()\n    \n    # Retreat from the zone\n    retreat()\n    \n    # Verify placement\n    check(obj_name, zone_name)\n```\n\n{\"object_kinds\": [\"pen\"], \"requires_zone_free\": true, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the object can be grasped and placed with a single candidate, and relies on the zone having at least one free spot aligned with the object's long axis.\"}"
+}

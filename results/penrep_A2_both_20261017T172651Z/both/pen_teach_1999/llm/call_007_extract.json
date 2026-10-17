@@ -1,0 +1,20 @@
+{
+ "index": 7,
+ "purpose": "extract",
+ "model": "qwen3-30b-a3b",
+ "seconds": 1.69,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 491,
+  "total_tokens": 874,
+  "completion_tokens": 383,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"blue_pen\" (kind: pen) on zone \"green_case\".\nProgram:\n```python\ngo_home()\nobs = observe()\npen = obs[\"objects\"][\"blue_pen\"]\ncase = obs[\"zones\"][\"green_case\"]\n\n# Check if green_case is occupied and remove the object if so\ncase_spots = free_spots(\"green_case\", \"blue_pen\")\nif case_spots[\"occupants\"]:\n    obj_in_case = case_spots[\"occupants\"][0]\n    candidates = grasp_candidates(obj_in_case)\n    if candidates:\n        grasp(candidates[0])\n        carry_to(0.2, 0.2, 0.2)\n        open_gripper()\n        retreat()\n\n# Grasp the blue pen with a candidate that ensures proper orientation\ncandidates = grasp_candidates(\"blue_pen\")\n# Choose a candidate with height near the pen's center of mass and grasp from perpendicular\ncandidate = candidates[0]\ngrasp(candidate)\n\n# Find a free spot in the green_case for the pen\ncase_spots = free_spots(\"green_case\", \"blue_pen\")\nspot = case_spots[\"spots\"][0]\nx, y = spot[\"x\"], spot[\"y\"]\n\n# Carry to the spot with correct yaw alignment\ndelta_yaw = case[\"long_axis_yaw\"] - pen[\"long_axis_yaw\"]  # 0.045 rad\ncarry_to(x, y, height=0.18, yaw=None)\nrotate_by(delta_yaw)\n\n# Lower until contact\nlower_until_contact()\n\n# Release\nopen_gripper()\nretreat()\n\n# Check\ncheck(\"blue_pen\", \"green_case\")\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v1(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v1(obj_name, zone_name):\n    go_home()\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n\n    # Check if the zone is occupied and remove the object if so\n    case_spots = free_spots(zone_name, obj_name)\n    if case_spots[\"occupants\"]:\n        obj_in_case = case_spots[\"occupants\"][0]\n        candidates = grasp_candidates(obj_in_case)\n        if candidates:\n            grasp(candidates[0])\n            carry_to(0.2, 0.2, 0.2)\n            open_gripper()\n            retreat()\n\n    # Grasp the target object with a candidate ensuring proper orientation\n    candidates = grasp_candidates(obj_name)\n    candidate = candidates[0]  # Assume first candidate is valid (e.g., height near CoM, perpendicular grasp)\n    grasp(candidate)\n\n    # Find a free spot in the zone\n    case_spots = free_spots(zone_name, obj_name)\n    spot = case_spots[\"spots\"][0]\n    x, y = spot[\"x\"], spot[\"y\"]\n\n    # Carry to the spot with correct yaw alignment\n    delta_yaw = zone[\"long_axis_yaw\"] - obj[\"long_axis_yaw\"]\n    carry_to(x, y, height=0.18, yaw=None)\n    rotate_by(delta_yaw)\n\n    # Lower until contact\n    lower_until_contact()\n\n    # Release and retreat\n    open_gripper()\n    retreat()\n\n    # Final verification\n    check(obj_name, zone_name)\n```\n\n{\"object_kinds\": [\"pen\"], \"requires_zone_free\": false, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the gripper is empty before calling and can handle occupied zones by removing the existing object.\"}"
+}

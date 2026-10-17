@@ -1,0 +1,507 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    # Observe the scene to get grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise ValueError(f\"No grasp candidates found for {obj_name}\")\n    \n    candidate = candidates[0]  # Use the first grasp candidate\n    grasp(candidate)\n    \n    # Observe free spots on the target zone for the object\n    spots = free_spots(zone_name, obj_name)\n    if not spots or not spots[\"spots\"]:\n        raise ValueError(f\"No free spots found on {zone_name} for {obj_name}\")\n    \n    spot = spots[\"spots\"][0]\n    target_yaw = spot[\"object_long_axis_yaw\"]  # Desired orientation of object\n    gripper_yaw_at_grasp = candidate[\"yaw\"]\n    object_long_axis_at_grasp = candidate[\"object_long_axis_yaw\"]\n    \n    # Compute the required yaw adjustment for the gripper during carry\n    delta_yaw = target_yaw - object_long_axis_at_grasp + gripper_yaw_at_grasp\n    \n    # Carry to the target spot with computed yaw\n    carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=delta_yaw)\n    \n    # Lower until contact is made\n    lower_until_contact()\n    \n    # Release the object\n    open_gripper()\n    \n    # Retreat from the zone\n    retreat()\n    \n    # Verify placement\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen"
+    ],
+    "notes": "The function assumes the object can be grasped and placed with a single candidate, and relies on the zone having at least one free spot aligned with the object's long axis."
+   },
+   "origin": {
+    "task": "pen_teach_3999",
+    "object": "red_pen",
+    "zone": "green_case",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"red_pen\")\ncandidate = candidates[0]  # Use the first grasp candidate\ngrasp(candidate)\nspots = free_spots(\"green_case\", \"red_pen\")\nspot = spots[\"spots\"][0]\ntarget_yaw = spot[\"object_long_axis_yaw\"]  # Align object long axis with case\ngripper_yaw_at_grasp = candidate[\"yaw\"]\nobject_long_axis_at_grasp = candidate[\"object_long_axis_yaw\"]\ndelta_yaw = target_yaw - object_long_axis_at_grasp + gripper_yaw_at_grasp\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=delta_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_pen\", \"green_case\")"
+   },
+   "history": [
+    {
+     "task": "pen_teach_3999",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.641,
+      "zone_reach": 0.564
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0117,
+      "object_reach": 0.682,
+      "zone_reach": 0.476
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0113,
+      "object_reach": 0.559,
+      "zone_reach": 0.535
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_4002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0113,
+      "object_reach": 0.679,
+      "zone_reach": 0.485
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_4003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0118,
+      "object_reach": 0.616,
+      "zone_reach": 0.531
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_4007",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.591,
+      "zone_reach": 0.515
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "pen_4009",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0112,
+      "object_reach": 0.668,
+      "zone_reach": 0.584
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1384,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_teach_3999"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1387,
+    0.0106
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_4000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1384,
+    0.0115
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "pen_4001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1385,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1376,
+    0.0113
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_4002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1366,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_4003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.0074
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.0074
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.138,
+    0.0104
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1354,
+    0.0104
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1354,
+    0.0078
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1383,
+    0.0116
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_4006"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1378,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "pen_4007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1375,
+    0.0103
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0103
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1394,
+    0.0103
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "pen_4008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1382,
+    0.0112
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_4009"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw = -1.107) at a grasp height of approximately 0.006 m above the table, ensuring the fingers grip the pen's full height and maintain proper orientation during placement.",
+   "task": "pen_4001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw = object_long_axis_yaw) and grasp at a height closer to the center of the pen (e.g., 0.006 m above the table, but ensure the grip point is at or near the pen's midpoint to avoid partial gripping and ensure stable orientation during placement).",
+   "task": "pen_4001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m, and ensure the gripper yaw at grasp matches the object's long axis yaw to prevent rotational misalignment during placement.",
+   "task": "pen_4001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw = object_long_axis_yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and maintain correct orientation during carry and placement.",
+   "task": "pen_4004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's midpoint to fully engage the pen's height and prevent partial gripping, while also matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and prevent partial gripping and rotational misalignment during placement.",
+   "task": "pen_4004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 7,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 8,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and prevent partial gripping, while also matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4005",
+   "shown_then": [
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 9,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's midpoint to fully engage the pen's height and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4005",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 10,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen's height and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4007",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 11,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.406) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's midpoint to fully engage the pen's height and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4007",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 12,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and prevent partial gripping, and explicitly verify the grasp success before proceeding to placement.",
+   "task": "pen_4007",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 13,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 14,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.107) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's center to fully engage the pen's height and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4008",
+   "shown_then": [
+    false
+   ]
+  },
+  {
+   "id": 15,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with fingers aligned along the pen's long axis (yaw \u2248 -1.406) at a grasp height of 0.006 m above the table, ensuring the grip point is at the pen's midpoint to fully engage the pen's height and prevent partial gripping, while matching the gripper yaw to the object's long axis yaw to maintain correct orientation during placement.",
+   "task": "pen_4008",
+   "shown_then": []
+  }
+ ]
+}

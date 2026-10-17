@@ -1,0 +1,301 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n\n    # Check if the zone is free for the object\n    zone_free = free_spots(zone[\"name\"], obj_name)\n    if not zone_free[\"spots\"]:\n        raise RuntimeError(f\"{zone_name} is occupied or no valid spot for {obj_name}.\")\n\n    # Get grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise RuntimeError(f\"No valid grasp candidates for {obj_name}.\")\n\n    candidate = candidates[0]  # Use the first valid candidate\n\n    # Grasp the object\n    grasp_result = grasp(candidate)\n    if not grasp_result[\"holding_something\"]:\n        raise RuntimeError(f\"Failed to grasp {obj_name}.\")\n\n    # Select the first free spot in the zone\n    spot = zone_free[\"spots\"][0]\n\n    # Compute required gripper yaw to align object's long axis with zone's long axis\n    target_long_axis_yaw = zone[\"long_axis_yaw\"]\n    current_obj_long_axis_yaw = candidate[\"object_long_axis_yaw\"]\n    gripper_yaw_at_grasp = candidate[\"yaw\"]\n    required_gripper_yaw = target_long_axis_yaw + (gripper_yaw_at_grasp - current_obj_long_axis_yaw)\n\n    # Carry to the spot with correct orientation\n    carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=required_gripper_yaw)\n\n    # Lower until contact\n    lower_until_contact()\n\n    # Release the object\n    open_gripper()\n\n    # Retreat and verify placement\n    retreat()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen"
+    ],
+    "notes": "The function assumes the object and zone are present in the scene and that the zone has at least one valid free spot for the object."
+   },
+   "origin": {
+    "task": "pen_teach_2999",
+    "object": "yellow_pen",
+    "zone": "green_case",
+    "attempt": 2,
+    "source_code": "obs = observe()\npen = obs[\"objects\"][\"yellow_pen\"]\ncase = obs[\"zones\"][\"green_case\"]\n\n# Verify green_case is unoccupied by checking with the pen as the object\ncase_free = free_spots(case[\"name\"], \"yellow_pen\")\nif not case_free[\"spots\"]:\n    raise RuntimeError(\"Green pen case is occupied or no valid spot for the pen.\")\n\n# Get grasp candidates for yellow_pen\ncandidates = grasp_candidates(\"yellow_pen\")\ncandidate = candidates[0]  # Use the first valid candidate\n\n# Grasp the pen\ngrasp_result = grasp(candidate)\nif not grasp_result[\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp yellow pen.\")\n\n# Find a free spot in the green_case\nspot = case_free[\"spots\"][0]\n\n# Compute required gripper yaw to align pen's long axis with case's long axis\ntarget_long_axis_yaw = case[\"long_axis_yaw\"]\ncurrent_pen_long_axis_yaw = candidate[\"object_long_axis_yaw\"]\ngripper_yaw_at_grasp = candidate[\"yaw\"]\nrequired_gripper_yaw = target_long_axis_yaw + (gripper_yaw_at_grasp - current_pen_long_axis_yaw)\n\n# Carry to spot with correct orientation\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=required_gripper_yaw)\n\n# Lower until contact\nlower_until_contact()\n\n# Release the pen\nopen_gripper()\n\n# Retreat and verify\nretreat()\ncheck(\"yellow_pen\", \"green_case\")"
+   },
+   "history": [
+    {
+     "task": "pen_teach_2999",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0108,
+      "object_reach": 0.59,
+      "zone_reach": 0.478
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0117,
+      "object_reach": 0.682,
+      "zone_reach": 0.476
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0113,
+      "object_reach": 0.559,
+      "zone_reach": 0.535
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3000",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.667,
+      "zone_reach": 0.535
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0112,
+      "object_reach": 0.614,
+      "zone_reach": 0.483
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.615,
+      "zone_reach": 0.505
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0111,
+      "object_reach": 0.668,
+      "zone_reach": 0.539
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3007",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0105,
+      "object_reach": 0.625,
+      "zone_reach": 0.552
+     },
+     "outcome": true
+    },
+    {
+     "task": "pen_3009",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.543,
+      "zone_reach": 0.535
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1389,
+    0.0108
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_teach_2999"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1385,
+    0.012
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0112
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0111
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1327,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.0074
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3006"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0105
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1391,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "pen_3009"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "Use a grasp candidate with a known and stable orientation relative to the pen's long axis, and ensure the gripper yaw is adjusted to align the pen's long axis with the green_case's long axis during placement, while verifying the footprint of the green_case before attempting to place the pen.",
+   "task": "pen_teach_2999",
+   "shown_then": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  }
+ ]
+}
