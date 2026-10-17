@@ -33,7 +33,7 @@ trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 if [[ "${SMA_MODE:-dev}" == dev || "${SMA_MODE:-dev}" == devsuite ]]; then
   "$SIM_PY" scripts/offline_plumbing.py "$OUT/plumbing" > "$OUT/plumbing.log" 2>&1 || echo "plumbing failed: $?" >> "$OUT/plumbing.log"
   # devsuite: only spend model time if the scripted primitives worked on every plumbing task.
-  if [[ "${SMA_MODE}" == devsuite && $(grep -c " GT True" "$OUT/plumbing.log") -lt 3 ]]; then
+  if [[ "${SMA_MODE}" == devsuite && $(grep -c " GT True" "$OUT/plumbing.log") -lt 4 ]]; then
     echo "plumbing did not pass; suite skipped" >> "$OUT/plumbing.log"; exit 0
   fi
 fi

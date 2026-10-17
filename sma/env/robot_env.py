@@ -143,6 +143,15 @@ class TabletopEnv:
         yaw = (yaw + np.pi / 2) % np.pi - np.pi / 2
         goal = self._target_rotation(yaw)
         start = self.steps
+        current = Rotation.from_quat(self.obs["robot0_eef_quat_site"])
+        if np.linalg.norm((goal * current.inv()).as_rotvec()) > .3:
+            # Large wrist turns: rotate in place first, then translate (OSC couples the two badly).
+            here = self._ee()
+            for _ in range(max_steps):
+                rot_err = (goal * Rotation.from_quat(self.obs["robot0_eef_quat_site"]).inv()).as_rotvec()
+                if np.linalg.norm(rot_err) < .03:
+                    break
+                self._step(here - self._ee(), rot_err)
         for _ in range(max_steps):
             error = target - self._ee()
             rot_err = (goal * Rotation.from_quat(self.obs["robot0_eef_quat_site"]).inv()).as_rotvec()

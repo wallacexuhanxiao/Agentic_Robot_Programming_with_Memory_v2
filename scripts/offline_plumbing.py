@@ -40,7 +40,7 @@ def code(messages):
 
 out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
 memory = SkillMemory(out / "memory.json")
-for task in (make_task("place", 21, kinds=["cube"]), make_task("place", 22, kinds=["book"]), make_task("clear", 1100)):
+for task in (make_task("place", 21, kinds=["cube"]), make_task("place", 22, kinds=["book"]), make_task("place", 23, kinds=["book"]), make_task("place", 24, kinds=["cup"]), make_task("clear", 1100)):
     llm = ScriptedLLM({"plan": plan, "code": code, "extract": SKILL})
     rec = run_episode(task, llm, memory, out / task.task_id)
     print(task.task_id, "GT", rec["private_eval"]["success"], "llm", llm.usage()["by_purpose"],

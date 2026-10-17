@@ -29,9 +29,15 @@ def _radius(kind):
     return float(np.hypot(size[0], size[1])) if shape == "box" else size[0]
 
 
-def _sample_xy(rng, placed, radius, x_range=OBJECT_X, y_range=OBJECT_Y, tries=400):
+ROBOT_BASE_XY = np.array([-0.56, 0.0])
+MAX_REACH = 0.68  # horizontal distance from the base that leaves margin for approach heights and wrist yaw
+
+
+def _sample_xy(rng, placed, radius, x_range=OBJECT_X, y_range=OBJECT_Y, tries=2000):
     for _ in range(tries):
         xy = np.array([rng.uniform(*x_range), rng.uniform(*y_range)])
+        if np.linalg.norm(xy - ROBOT_BASE_XY) > MAX_REACH:
+            continue
         if all(np.linalg.norm(xy - p) > radius + r + .03 for p, r in placed):
             return xy
     raise RuntimeError("Could not sample a collision-free layout")
