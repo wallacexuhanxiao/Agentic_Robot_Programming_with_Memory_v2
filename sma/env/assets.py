@@ -1,5 +1,5 @@
-"""Procedural MJCF for the realistic objects (mug with handle, book with covers and pages) and the
-static receptacles (shallow trays and a walled toy box).
+"""Procedural MJCF for the realistic objects (mug with handle, book with covers and pages, pen) and the
+static receptacles (shallow trays, a walled toy box and a narrow pen case).
 
 Colors: object bodies use the object palette; receptacle *bases* use the receptacle palette while
 rims and walls are an unsaturated wood tone, so perception never mistakes a rim for an object.
@@ -19,6 +19,7 @@ CACHE = Path(tempfile.gettempdir()) / "sma_assets"
 BOOK_HALF = (0.0375, 0.0275, 0.0125)        # 7.5 x 5.5 x 2.5 cm pocket notebook (fits the 8 cm gripper either way)
 MUG_RADIUS, MUG_HALF_HEIGHT = 0.024, 0.035  # 4.8 cm wide, 7 cm tall (+ handle)
 BLOCK_HALF = 0.02                            # 4 cm toy block
+PEN_HALF = (0.07, 0.006, 0.006)              # 14 cm pen with a square 1.2 cm section (does not roll, like a hex pencil)
 
 
 def _geom(name, type_, size, pos, rgba, mass, quat=None, solref="0.01 1"):
@@ -68,9 +69,15 @@ def block_xml(rgba):
     return _xml("block", geoms, s, s * math.sqrt(2))
 
 
+def pen_xml(rgba):
+    hx, hy, hz = PEN_HALF
+    geoms = [_geom("body", "box", [hx, hy, hz], [0, 0, 0], rgba, .02)]
+    return _xml("pen", geoms, hz, hx)
+
+
 def make_object(kind, name, rgba):
     CACHE.mkdir(parents=True, exist_ok=True)
-    text = {"mug": mug_xml, "book": book_xml, "block": block_xml}[kind](rgba)
+    text = {"mug": mug_xml, "book": book_xml, "block": block_xml, "pen": pen_xml}[kind](rgba)
     path = CACHE / f"{kind}_{'_'.join(f'{v:.2f}' for v in rgba[:3])}.xml"
     if not path.exists() or path.read_text() != text:
         path.write_text(text)
@@ -78,23 +85,32 @@ def make_object(kind, name, rgba):
                            obj_type="all", duplicate_collision_geoms=True)
 
 
-def _static(worldbody, name, size, pos, rgba, friction):
+def _static(worldbody, name, size, pos, rgba, friction, yaw=0.0):
     # Robosuite renders only the visual group (1); collision geoms (group 0) are invisible.
-    worldbody.append(new_geom(name=name, type="box", size=size, pos=pos, rgba=[0, 0, 0, 0], group=0,
+    quat = [math.cos(yaw / 2), 0, 0, math.sin(yaw / 2)]
+    worldbody.append(new_geom(name=name, type="box", size=size, pos=pos, quat=quat, rgba=[0, 0, 0, 0], group=0,
                               friction=friction))
-    worldbody.append(new_geom(name=name + "_visual", type="box", size=size, pos=pos, rgba=rgba, group=1,
+    worldbody.append(new_geom(name=name + "_visual", type="box", size=size, pos=pos, quat=quat, rgba=rgba, group=1,
                               contype="0", conaffinity="0"))
 
 
-def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=0.065):
-    """Static receptacle: a coloured base plate plus wooden rims (tray) or walls (toy box)."""
+def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=(0.065, 0.065), yaw=0.0,
+                   wall_half_height=None):
+    """Static receptacle: a coloured base plate plus wooden rims (tray) or walls (toy box, pen case), rotated by
+    yaw about its centre. half: inner half extents along the receptacle's own x and y axes."""
+    hx, hy = (half, half) if isinstance(half, (int, float)) else half
+    c, s = math.cos(yaw), math.sin(yaw)
+
+    def at(dx, dy, z):
+        return [xy[0] + c * dx - s * dy, xy[1] + s * dx + c * dy, z]
+
     base_h = .002
-    _static(worldbody, f"{name}_base", [half, half, base_h], [xy[0], xy[1], table_z + base_h], base_rgba,
-            [1.5, .005, .0001])
-    wall_half_h = .004 if style == "tray" else .025  # 8 mm tray rim, 5 cm toy-box walls
+    _static(worldbody, f"{name}_base", [hx, hy, base_h], at(0, 0, table_z + base_h), base_rgba,
+            [1.5, .005, .0001], yaw)
+    wall_half_h = wall_half_height or (.004 if style == "tray" else .025)
     t = .004
-    for i, (dx, dy, sx, sy) in enumerate(((half + t, 0, t, half + 2 * t), (-half - t, 0, t, half + 2 * t),
-                                          (0, half + t, half, t), (0, -half - t, half, t))):
-        _static(worldbody, f"{name}_wall_{i}", [sx, sy, wall_half_h],
-                [xy[0] + dx, xy[1] + dy, table_z + wall_half_h], WOOD, [1.0, .005, .0001])
+    for i, (dx, dy, sx, sy) in enumerate(((hx + t, 0, t, hy + 2 * t), (-hx - t, 0, t, hy + 2 * t),
+                                          (0, hy + t, hx, t), (0, -hy - t, hx, t))):
+        _static(worldbody, f"{name}_wall_{i}", [sx, sy, wall_half_h], at(dx, dy, table_z + wall_half_h), WOOD,
+                [1.0, .005, .0001], yaw)
     return table_z + 2 * base_h  # surface height inside the receptacle

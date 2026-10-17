@@ -1,4 +1,4 @@
-"""Robosuite tabletop with varied layouts: toy blocks, mugs and books, plus trays and a toy box.
+"""Robosuite tabletop with varied layouts: toy blocks, mugs, books and pens, plus trays, a toy box and a pen case.
 
 The layout (which objects, where, which zones) is supplied by a Layout; the scene itself
 only builds MJCF. Object state is read back only by the private evaluator.
@@ -17,14 +17,23 @@ TABLE_Z = 0.8
 # Object colors (segmented above the table) and zone colors (segmented at table height) are disjoint.
 OBJECT_RGBA = {"red": [.85, .08, .06, 1], "green": [.08, .62, .12, 1], "blue": [.06, .18, .85, 1],
                "yellow": [.92, .78, .05, 1]}
-ZONE_RGBA = {"purple": [.55, .12, .70, 1], "cyan": [.05, .72, .78, 1], "orange": [.95, .45, .05, 1]}
+ZONE_RGBA = {"purple": [.55, .12, .70, 1], "cyan": [.05, .72, .78, 1], "orange": [.95, .45, .05, 1],
+             "pink": [.90, .10, .60, 1]}
 # Receptacle catalogue: base colour -> (style, name). Trays are shallow; the toy box has walls.
-RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"), "purple": ("box", "purple_box")}
+RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"), "purple": ("box", "purple_box"),
+               "pink": ("case", "pink_case")}  # the pen case is long and narrow: a pen fits only when aligned
 # Object half heights (m), used by the evaluator.
-KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035}
-KIND_RADIUS = {"block": .028, "book": .047, "mug": .04}
+KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035, "pen": .006}
+KIND_RADIUS = {"block": .028, "book": .047, "mug": .04, "pen": .072}
 ZONE_HALF = .055                               # default inner half width (toy box)
-RECEPTACLE_HALF = {"tray": .068, "box": .058}  # trays are larger so a rotated book still lies flat
+RECEPTACLE_HALF = {"tray": .068, "box": .058, "case": (.0775, .0225)}  # trays are larger so a rotated book lies flat
+WALL_HALF_HEIGHT = {"tray": .004, "box": .025, "case": .0075}  # 8 mm rims, 5 cm toy-box walls, 1.5 cm pen-case walls
+
+
+def receptacle_half(style):
+    """Inner half extents (along the receptacle's own x, y axes)."""
+    half = RECEPTACLE_HALF[style]
+    return tuple(half) if isinstance(half, tuple) else (half, half)
 
 
 def look_at(eye, target):
@@ -54,6 +63,7 @@ class ObjectSpec:
 class ZoneSpec:
     color: str
     xy: tuple
+    yaw: float = 0.0
 
     @property
     def name(self):
@@ -89,7 +99,8 @@ class TabletopOrganize(Lift):
         for zone in self.layout.zones:
             style = RECEPTACLES[zone.color][0]
             add_receptacle(arena.worldbody, zone.name, style, ZONE_RGBA[zone.color],
-                           zone.xy, TABLE_Z, half=RECEPTACLE_HALF[style])
+                           zone.xy, TABLE_Z, half=receptacle_half(style), yaw=zone.yaw,
+                           wall_half_height=WALL_HALF_HEIGHT[style])
         self.items = {}
         self.placement_initializer = SequentialCompositeSampler("LayoutSampler")
         for spec in self.layout.objects:

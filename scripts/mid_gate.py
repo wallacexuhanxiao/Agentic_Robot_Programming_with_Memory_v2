@@ -21,7 +21,7 @@ if not g["holding_something"]:
     raise RuntimeError("grasp missed")
 spots = free_spots("{zone}")
 s = spots["spots"][0]
-carry_to(s["x"], s["y"], 0.18, s["gripper_yaw"])
+carry_to(s["x"], s["y"], 0.18, s["object_long_axis_yaw"] + fit[0]["yaw"] - fit[0]["object_long_axis_yaw"])
 lowered = lower_until_contact()
 open_gripper()
 retreat()

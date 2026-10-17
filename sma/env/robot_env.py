@@ -8,8 +8,8 @@ import os
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .perception import object_on_zone, perceive
-from .scene import KIND_HALF_HEIGHT, RECEPTACLE_HALF, RECEPTACLES, TABLE_Z, TabletopOrganize
+from .perception import inside_zone, object_on_zone, perceive
+from .scene import KIND_HALF_HEIGHT, RECEPTACLES, TABLE_Z, TabletopOrganize, receptacle_half
 
 HOME = np.array([-0.20, 0.0, 1.08])
 WORKSPACE = np.array([[-0.32, 0.30], [-0.36, 0.36], [TABLE_Z + 0.004, 1.30]])
@@ -470,8 +470,9 @@ class TabletopEnv:
 
     def free_spots(self, zone_name, object_name=None, max_spots=5):
         """Placement spots inside a zone for an object's footprint (object_name, or the held object), avoiding
-        other objects. Returns {"zone", "center", "half_size", "occupants", "spots": [{"x", "y",
-        "object_long_axis_yaw", "gripper_yaw", "clearance"}]}; spots is empty if nothing fits."""
+        other objects. Returns {"zone", "center", "half_size", "long_axis_yaw", "occupants", "spots": [{"x", "y",
+        "object_long_axis_yaw", "clearance"}]}; spots is empty if nothing fits. object_long_axis_yaw is the direction
+        the object's long axis must have at that spot; turning the held object there is left to the caller."""
         self.go_home()
         scene = self.observe()
         zone = self._zone_from_last_view(zone_name)
@@ -488,30 +489,37 @@ class TabletopEnv:
         others = [o for n, o in scene["objects"].items() if n.split("_")[0] != colour]
         cx, cy = zone["center"][:2]
         hx, hy = zone["half_size"]
-        occupants = [o["name"] for o in others if abs(o["center"][0] - cx) <= hx and abs(o["center"][1] - cy) <= hy]
+        zyaw = zone.get("long_axis_yaw", 0.0)
+        ax, ay = np.array([np.cos(zyaw), np.sin(zyaw)]), np.array([-np.sin(zyaw), np.cos(zyaw)])
+        occupants = [o["name"] for o in others if inside_zone(o["center"], zone)]
         spots = []
-        for long_yaw, ex, ey in ((0.0, long_side / 2, short_side / 2), (np.pi / 2, short_side / 2, long_side / 2)):
-            ux, uy = hx - ex - .006, hy - ey - .006
-            if ux < 0 or uy < 0:
+        for turn, ex, ey in ((0.0, long_side / 2, short_side / 2), (np.pi / 2, short_side / 2, long_side / 2)):
+            # Camera footprints are accurate to a few millimetres; allow a near-exact fit (pen in its case).
+            ux, uy = hx - ex - .003, hy - ey - .003
+            if ux < -.004 or uy < -.004:
                 continue
-            for x in np.linspace(cx - ux, cx + ux, 5):
-                for y in np.linspace(cy - uy, cy + uy, 5):
+            ux, uy = max(ux, 0.0), max(uy, 0.0)
+            for a in np.linspace(-ux, ux, 5):
+                for b in np.linspace(-uy, uy, 5):
+                    x, y = np.array([cx, cy]) + a * ax + b * ay
                     gaps = [np.hypot(x - o["center"][0], y - o["center"][1]) - o["footprint_long"] / 2
                             - np.hypot(ex, ey) for o in others]
                     clearance = min(gaps) if gaps else .1
                     if clearance < .005:
                         continue
-                    gripper_yaw = None
-                    if held and held.get("object_long_axis_yaw") is not None:
-                        gripper_yaw = round(float(long_yaw + held["grasp_yaw"] - held["object_long_axis_yaw"]), 3)
-                    spots.append({"x": round(float(x), 4), "y": round(float(y), 4), "object_long_axis_yaw": round(long_yaw, 3),
-                                  "gripper_yaw": gripper_yaw, "clearance": round(float(min(clearance, .1)), 4),
-                                  "_rank": (-min(clearance, .04), np.hypot(x - cx, y - cy))})
+                    yaw = (zyaw + turn + np.pi / 2) % np.pi - np.pi / 2
+                    spots.append({"x": round(float(x), 4), "y": round(float(y), 4),
+                                  "object_long_axis_yaw": round(float(yaw), 3),
+                                  "clearance": round(float(min(clearance, .1)), 4),
+                                  "_rank": (-min(clearance, .04), float(np.hypot(a, b)))})
         spots.sort(key=lambda s: s["_rank"])
-        for s in spots:
-            s.pop("_rank")
-        return {"zone": zone_name, "center": zone["center"], "half_size": zone["half_size"], "occupants": occupants,
-                "spots": spots[:max_spots]}
+        unique = []
+        for sp in spots:
+            sp.pop("_rank")
+            if sp not in unique:
+                unique.append(sp)
+        return {"zone": zone_name, "center": zone["center"], "half_size": zone["half_size"],
+                "long_axis_yaw": zyaw, "occupants": occupants, "spots": unique[:max_spots]}
 
     def carry_to(self, x, y, height=.18, yaw=None):
         """Rise vertically to table_z + height (if lower), then move horizontally to (x, y) at that height,
@@ -580,22 +588,28 @@ class TabletopEnv:
         out = {}
         for name, body in self.env.item_body_ids.items():
             out[name] = {"position": sim.data.body_xpos[body].round(4).tolist(),
+                         "x_axis": sim.data.body_xmat[body].reshape(3, 3)[:, 0].round(3).tolist(),
                          "z_axis": sim.data.body_xmat[body].reshape(3, 3)[:, 2].round(3).tolist()}
         return out
 
     def private_evaluate(self, goal):
         """Ground-truth success of object -> zone goals. Never shown to the agent."""
         state = self.private_state()
-        zones = {z.name: z.xy for z in self.task.layout.zones}
-        halves = {z.name: RECEPTACLE_HALF[RECEPTACLES[z.color][0]] for z in self.task.layout.zones}
+        zones = {z.name: {"center": z.xy, "long_axis_yaw": z.yaw,
+                          "half_size": receptacle_half(RECEPTACLES[z.color][0])} for z in self.task.layout.zones}
         held = self.gripper_state()["holding_something"]
         details, ok_all = {}, True
         for name, zone in goal.items():
             pos = np.array(state[name]["position"])
             kind = name.split("_", 1)[1]
             half_h = KIND_HALF_HEIGHT[kind]
-            inside = bool(np.all(np.abs(pos[:2] - np.array(zones[zone])) <= halves[zone] - .005))
-            resting = bool(pos[2] <= TABLE_Z + .004 + half_h + .01)  # receptacle base is 4 mm thick
+            inside = inside_zone(pos, zones[zone], .005)
+            if kind == "pen":  # both ends inside the case (a pen across a wall has its centre inside too)
+                from .assets import PEN_HALF
+                tip = np.array(state[name]["x_axis"][:2]) * PEN_HALF[0]
+                inside = inside and all(inside_zone(pos[:2] + sgn * tip, zones[zone]) for sgn in (-1, 1))
+            inside = bool(inside)
+            resting = bool(pos[2] <= TABLE_Z + .004 + half_h + (.006 if kind == "pen" else .01))  # base is 4 mm thick
             upright = bool(abs(state[name]["z_axis"][2]) > .9)
             ok = inside and resting and upright
             details[name] = {"zone": zone, "inside": inside, "resting": resting, "upright": upright,

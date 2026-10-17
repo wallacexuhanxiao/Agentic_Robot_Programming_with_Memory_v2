@@ -7,12 +7,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .scene import KIND_RADIUS, Layout, ObjectSpec, RECEPTACLE_HALF, RECEPTACLES, ZoneSpec
+from .scene import KIND_RADIUS, Layout, ObjectSpec, RECEPTACLES, ZoneSpec, receptacle_half
 
 # Reachable top-down workspace for the Panda on this table (world frame, metres).
 OBJECT_X, OBJECT_Y = (-0.12, 0.20), (-0.26, 0.26)
 SORT_RULE = {"block": "purple", "mug": "cyan", "book": "orange"}  # the simulated user's preference (colour of base)
-KIND_WORDS = {"block": "toy block", "mug": "mug", "book": "book"}
+KIND_WORDS = {"block": "toy block", "mug": "mug", "book": "book", "pen": "pen"}
 
 
 def receptacle(color):
@@ -52,7 +52,29 @@ TEACH_INSTRUCTION = ("From now on, please always put my toy blocks in the purple
 VAGUE_INSTRUCTIONS = ["Tidy up my desk, please.", "Could you clean up the table?", "Put my things where they belong."]
 
 
+def make_pen_task(seed):
+    """'pen': put a pen into a narrow pen case. Case and pen have random orientations, so the pen must be turned
+    to the case's long axis while it is carried (it fits only within about 13 degrees of alignment)."""
+    rng = np.random.default_rng(seed)
+    color = str(rng.choice(["red", "green", "blue", "yellow"]))
+    hx, hy = receptacle_half("case")
+    radius = np.hypot(hx + .008, hy + .008)
+    for _ in range(200):  # the whole case, not only its centre, must be in reach
+        xy = _sample_xy(rng, [], radius, x_range=(-0.10, 0.12), y_range=(-0.22, 0.22))
+        yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
+        ends = [xy + sgn * hx * np.array([np.cos(yaw), np.sin(yaw)]) for sgn in (-1, 1)]
+        if all(np.linalg.norm(e - ROBOT_BASE_XY) < MAX_REACH - .03 for e in ends):
+            break
+    case = ZoneSpec("pink", tuple(np.round(xy, 4)), round(yaw, 3))
+    pen_xy = _sample_xy(rng, [(np.asarray(xy), radius)], _radius("pen"))
+    pen = ObjectSpec(color, "pen", tuple(np.round(pen_xy, 4)), round(float(rng.uniform(-np.pi / 2, np.pi / 2)), 3))
+    instruction = f"Put the {color} pen in the pink pen case."
+    return Task(f"pen_{seed}", "pen", instruction, Layout([pen], [case]), {pen.name: case.name}, seed)
+
+
 def make_task(family, seed, *, kinds=None):
+    if family == "pen":
+        return make_pen_task(seed)
     if family in ("teach", "tidy"):
         # Same layouts as sort/clear; the instruction no longer states where things go (teach states it once).
         base = make_task("clear" if seed % 2 else "sort", seed, kinds=kinds)
@@ -77,7 +99,7 @@ def make_task(family, seed, *, kinds=None):
 
     zones, placed = [], []
     for color in zone_colors:
-        footprint = (RECEPTACLE_HALF[RECEPTACLES[color][0]] + .008) * 1.15  # base + walls, as a radius
+        footprint = (max(receptacle_half(RECEPTACLES[color][0])) + .008) * 1.15  # base + walls, as a radius
         xy = _sample_xy(rng, placed, footprint, x_range=(-0.12, 0.16), y_range=(-0.26, 0.26))
         placed.append((xy, footprint))
         zones.append(ZoneSpec(color, tuple(np.round(xy, 4))))
@@ -121,6 +143,9 @@ def suite(name):
         # One simulated user: teaches preferences once, then gives vague requests on new layouts.
         return [make_task("teach", 4), make_task("place", 1, kinds=["block"]), make_task("place", 2, kinds=["book"]),
                 make_task("place", 3, kinds=["mug"])] + [make_task("tidy", 1000 + i) for i in range(6)]
+    if name == "pen":
+        # Ten pen-case placements on new layouts (explicit instructions, so user memory plays no role).
+        return [make_task("pen", 2000 + i) for i in range(10)]
     if name == "smoke":
         return [make_task("place", 7, kinds=["block"])]
     raise ValueError(name)

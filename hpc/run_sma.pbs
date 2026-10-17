@@ -60,6 +60,12 @@ print(' '.join(str(x.getsockname()[1]) for x in s))")
     sleep 2
   done
   echo "$SMA_API_LEVEL services ready after $((i*2))s" >> "$OUT/model_ready.txt"
+  if [[ "$SMA_API_LEVEL" == mid && "${SMA_MODE:-dev}" == pen_gate ]]; then
+    # Pen-case gate (no LLM) plus the earlier mid-level gate as a regression check of the shared primitives.
+    "$SIM_PY" -X faulthandler scripts/pen_gate.py "$OUT/pen_gate" > "$OUT/pen_gate.log" 2>&1 || echo "pen gate failed: $?" >> "$OUT/pen_gate.log"
+    "$SIM_PY" -X faulthandler scripts/mid_gate.py "$OUT/mid_gate" > "$OUT/mid_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/mid_gate.log"
+    exit 0
+  fi
   if [[ "$SMA_API_LEVEL" == mid && ( "${SMA_MODE:-dev}" == mid_gate || "${SMA_MODE:-dev}" == midsuite ) ]]; then
     # Scripted mid-level pick-and-place (no LLM) first; the model run only starts if the primitives work.
     "$SIM_PY" scripts/mid_gate.py "$OUT/mid_gate" > "$OUT/mid_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/mid_gate.log"

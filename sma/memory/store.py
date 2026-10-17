@@ -8,6 +8,8 @@ import json
 import math
 from pathlib import Path
 
+from ..env.perception import inside_zone
+
 ROBOT_BASE_XY = (-0.56, 0.0)
 REACH_MARGIN = .03
 
@@ -32,8 +34,7 @@ def zone_occupants(scene, zone_name, exclude=None):
     for name, obj in scene["objects"].items():
         if name == exclude:
             continue
-        if (abs(obj["center"][0] - zone["center"][0]) <= zone["half_size"][0] and
-                abs(obj["center"][1] - zone["center"][1]) <= zone["half_size"][1]):
+        if inside_zone(obj["center"], zone):
             out.append(name)
     return out
 

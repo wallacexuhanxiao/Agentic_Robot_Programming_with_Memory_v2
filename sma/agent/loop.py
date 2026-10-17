@@ -162,9 +162,16 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
         facts.append(f"After the program the camera could not see {obj} or {zone}.")
     elif "offset_from_zone_center" in check:
         off = check["offset_from_zone_center"]
-        facts.append(f"After the program {obj} is offset {off} m from the centre of {zone} "
-                     f"(the zone half size is {check['zone_half_size']}); inside_zone={check['inside_zone']}, "
-                     f"resting={check['resting']}, gripper_holding={check['gripper_holding']}.")
+        zone_frame = check.get("offset_along_across_zone_axis")
+        facts.append(f"After the program {obj} is offset {off} m from the centre of {zone}"
+                     + (f" ({zone_frame} m along / across the zone's long axis)" if zone_frame else "")
+                     + f" (the zone half size along / across its long axis is {check['zone_half_size']}); "
+                     f"inside_zone={check['inside_zone']}, resting={check['resting']}, "
+                     f"gripper_holding={check['gripper_holding']}.")
+        if "object_axis_vs_zone_axis_deg" in check:
+            facts.append(f"{obj}'s long axis is {check['object_axis_vs_zone_axis_deg']} degrees from {zone}'s long axis; "
+                         f"its top is {check['top_height_above_table']} m above the table "
+                         f"(lying flat on the floor would be about {check['nominal_height']} m).")
     return "\n".join("- " + f for f in facts)
 
 

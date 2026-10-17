@@ -77,12 +77,14 @@ squeeze (yaw and yaw + pi are the same). The open fingers are 0.08 m apart.
 Only these functions exist (they are already defined; do not import anything, do not use try/except):
 observe() -> dict from the top-down RGB-D camera:
   {"table_z": float,
-   "objects": {name: {"name": str, "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z": float,
+   "objects": {name: {"name": str, "kind": "block"|"book"|"mug"|"pen", "center": [x, y, z], "top_z": float,
                       "height": float, "footprint_long": float, "footprint_short": float,
                       "long_axis_yaw": float, "short_axis_yaw": float}},
-   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a toy box)
+   "zones": {name: {"name": str, "center": [x, y, z], "half_size": [h_long, h_short],
+                    "long_axis_yaw": float}},   (trays, a toy box, a narrow pen case)
    "gripper": {"width": float, "holding_something": bool}}
-  "height" is the object's height above the table. The arm can hide objects; go_home() first for a clear view.
+  "height" is the object's height above the table. A zone's half_size is measured along its long axis
+  (direction long_axis_yaw) and across it. The arm can hide objects; go_home() first for a clear view.
 
 grasp_candidates(object_name) -> list of top-down grasp proposals for a visible object, each a dict
   {"id", "object", "source", "x", "y", "height", "yaw", "squeeze_width", "fits_open_fingers", "score", ...}
@@ -95,12 +97,13 @@ grasp(candidate) -> {"holding_something": bool, "finger_gap": float, "expected_s
   Opens the fingers, moves above (x, y) at a safe height, descends vertically to the candidate's
   height, closes the fingers and lifts to 0.18 m above the table. finger_gap is the measured gap after
   closing (close to 0 means nothing was caught).
-free_spots(zone_name, object_name=None) -> {"zone", "center", "half_size", "occupants": [names],
-  "spots": [{"x", "y", "object_long_axis_yaw", "gripper_yaw", "clearance"}]}
+free_spots(zone_name, object_name=None) -> {"zone", "center", "half_size", "long_axis_yaw",
+  "occupants": [names], "spots": [{"x", "y", "object_long_axis_yaw", "clearance"}]}
   Positions inside the zone where the object's footprint fits without touching other objects (for the
-  held object if object_name is None). object_long_axis_yaw: the object's long axis direction for that
-  spot; gripper_yaw: the gripper yaw that gives this orientation for the object currently held (None if
-  nothing is held). spots is empty if nothing fits; occupants lists objects already in the zone.
+  held object if object_name is None). object_long_axis_yaw: the direction the object's long axis must
+  have at that spot (it fits only in that orientation in a narrow zone). spots is empty if nothing fits;
+  occupants lists objects already in the zone. It does not turn anything: a held object turns with the
+  gripper (changing the gripper yaw by d turns the object by d), so choosing the carry yaw is up to you.
 carry_to(x, y, height=0.18, yaw=None) rises vertically to table_z + height (if lower), then moves
   horizontally to (x, y) at that height; whatever is held comes along. yaw=None keeps the current yaw.
 lower_until_contact() -> {"stopped_by_contact": bool, "held_object_bottom_above_table": float, ...}
