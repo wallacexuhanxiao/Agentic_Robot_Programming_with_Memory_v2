@@ -22,7 +22,7 @@ ZONE_RGBA = {"purple": [.55, .12, .70, 1], "cyan": [.05, .72, .78, 1], "orange":
 RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"), "purple": ("box", "purple_box")}
 # Object half heights (m), used by the evaluator.
 KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035}
-KIND_RADIUS = {"block": .028, "book": .054, "mug": .04}
+KIND_RADIUS = {"block": .028, "book": .047, "mug": .04}
 ZONE_HALF = .055                               # default inner half width (toy box)
 RECEPTACLE_HALF = {"tray": .068, "box": .058}  # trays are larger so a rotated book still lies flat
 

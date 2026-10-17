@@ -16,7 +16,7 @@ PAGES = [0.93, 0.91, 0.84, 1]
 CACHE = Path(tempfile.gettempdir()) / "sma_assets"
 
 # Half extents used by the scene sampler, the evaluator and perception.
-BOOK_HALF = (0.045, 0.030, 0.0125)          # 9 x 6 x 2.5 cm
+BOOK_HALF = (0.0375, 0.0275, 0.0125)        # 7.5 x 5.5 x 2.5 cm pocket notebook (fits the 8 cm gripper either way)
 MUG_RADIUS, MUG_HALF_HEIGHT = 0.024, 0.035  # 4.8 cm wide, 7 cm tall (+ handle)
 BLOCK_HALF = 0.02                            # 4 cm toy block
 
