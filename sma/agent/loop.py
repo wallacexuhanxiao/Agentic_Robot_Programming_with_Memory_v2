@@ -79,7 +79,10 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
         sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved})
         env.steps, env.step_budget = 0, ATTEMPT_STEPS
         started = time.time()
-        ok, error = sandbox.run(code)
+        if llm.last_truncated():
+            ok, error = False, {"type": "rejected", "message": "program text was cut off at the output limit; write a shorter program"}
+        else:
+            ok, error = sandbox.run(code)
         env.step_budget = env.steps + 800  # the verifier's own go_home is not charged to the program
         check = env.check_on_zone(obj, zone)
         attempt = {"n": n, "code": code, "program_ok": ok, "error": error, "check": check,

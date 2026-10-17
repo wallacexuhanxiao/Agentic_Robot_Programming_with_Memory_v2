@@ -177,6 +177,42 @@ class TabletopEnv:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "approximate": True}
             raise
 
+    # ---------------------------------------------------------------- task-level fallback API
+    # Used only when SMA_API_LEVEL=task. Built on the same pose-level calls and perception.
+    def pick(self, object_name, grasp_depth=None, yaw_offset=0.0):
+        """Grasp object_name from above. grasp_depth: metres below its top surface (default half height)."""
+        self.go_home()
+        scene = self.observe()
+        obj = scene["objects"].get(object_name)
+        if obj is None:
+            raise RobotError("object_not_visible", object=object_name, visible=sorted(scene["objects"]))
+        depth = obj["height"] / 2 if grasp_depth is None else float(grasp_depth)
+        z = max(obj["top_z"] - depth, scene["table_z"] + .008)
+        yaw = obj["long_axis_yaw"] + np.pi / 2 + float(yaw_offset)
+        x, y = obj["center"][:2]
+        self.open_gripper()
+        self.move_to(x, y, obj["top_z"] + .10, yaw)
+        self.move_to(x, y, z, yaw)
+        state = self.close_gripper()
+        self._last_grasp_height = z - scene["table_z"]
+        self.move_to(x, y, scene["table_z"] + .18, yaw)
+        return {**state, "grasp_z": round(z, 4)}
+
+    def place(self, zone_name, offset_xy=(0.0, 0.0), release_height=.006):
+        """Carry the held object above zone_name (+offset) and release it just above the table."""
+        scene = self.observe()
+        zone = scene["zones"].get(zone_name)
+        if zone is None:
+            raise RobotError("zone_not_visible", zone=zone_name, visible=sorted(scene["zones"]))
+        x, y = zone["center"][0] + offset_xy[0], zone["center"][1] + offset_xy[1]
+        here = self._ee()
+        self.move_to(x, y, here[2])
+        held_z = getattr(self, "_last_grasp_height", None)
+        self.move_to(x, y, scene["table_z"] + (held_z or .02) + float(release_height))
+        self.open_gripper()
+        self.move_to(x, y, scene["table_z"] + .18)
+        return {"released_at": [round(x, 4), round(y, 4)]}
+
     def wait(self, steps=20):
         hold = self._ee()
         for _ in range(int(steps)):

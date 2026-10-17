@@ -13,7 +13,7 @@ class LLM:
         self.log_dir = Path(log_dir) if log_dir else None
         self.calls = []
 
-    def chat(self, messages, *, purpose, max_tokens=1500):
+    def chat(self, messages, *, purpose, max_tokens=2500):
         body = {"model": self.model, "messages": messages, "max_tokens": max_tokens,
                 "temperature": self.temperature, "chat_template_kwargs": {"enable_thinking": False}}
         started = time.time()
@@ -31,9 +31,10 @@ class LLM:
             self.log_dir.mkdir(parents=True, exist_ok=True)
             (self.log_dir / f"call_{record['index']:03d}_{purpose}.json").write_text(
                 json.dumps(record, indent=1, ensure_ascii=False))
-        if choice.get("finish_reason") == "length":
-            raise RuntimeError(f"LLM output truncated for {purpose}")
         return text
+
+    def last_truncated(self):
+        return bool(self.calls) and self.calls[-1]["finish_reason"] == "length"
 
     def usage(self):
         tokens = [c["usage"] or {} for c in self.calls]
@@ -52,7 +53,7 @@ class ScriptedLLM(LLM):
         super().__init__("http://offline", log_dir=log_dir)
         self.responses = responses
 
-    def chat(self, messages, *, purpose, max_tokens=1500):
+    def chat(self, messages, *, purpose, max_tokens=2500):
         queue = self.responses.get(purpose)
         text = queue.pop(0) if isinstance(queue, list) else queue
         if callable(text):
