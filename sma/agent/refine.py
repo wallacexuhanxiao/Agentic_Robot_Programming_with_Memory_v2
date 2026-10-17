@@ -49,10 +49,22 @@ def scene_summary(scene):
     return objects
 
 
-def refine(llm, instruction, preferences, scene):
+def blocking_objects(spec_goals, scene):
+    """Objects lying on a goal's target zone that have no goal of their own (they must be moved first)."""
+    targets = {g["zone"] for g in spec_goals}
+    moved = {g["object"] for g in spec_goals}
+    out = []
+    for zone in targets:
+        for occupant in zone_occupants(scene, zone):
+            if occupant not in moved and not any(g["object"] == occupant for g in spec_goals):
+                out.append({"object": occupant, "zone_blocked": zone})
+    return out
+
+
+def refine(llm, instruction, preferences, scene, _note=""):
     raw = llm.chat([{"role": "user", "content": REFINE.format(
         instruction=instruction, preferences=json.dumps(preferences) if preferences else "none",
-        objects=json.dumps(scene_summary(scene)), zones=sorted(scene["zones"]))}],
+        objects=json.dumps(scene_summary(scene)), zones=sorted(scene["zones"])) + _note}],
         purpose="refine", max_tokens=1200)
     try:
         spec = _json(raw)
@@ -72,7 +84,16 @@ def refine(llm, instruction, preferences, scene):
         elif source not in ("instruction", "user_memory", "assumption"):
             reason = "missing source"
         (dropped if reason else goals).append({**g, **({"rejected_because": reason} if reason else {})})
-    return {"goals": goals, "dropped": dropped, "already_done": spec.get("already_done", []),
+    blocking = blocking_objects(goals, scene)
+    if blocking and not _note:
+        # One consistency round: a target zone is covered by an object the spec does not move.
+        note = ("\n\nYour previous specification had a problem: " + "; ".join(
+            f"{b['object']} lies on {b['zone_blocked']}, which another object must go to, but {b['object']} has no goal"
+            for b in blocking) + ". Give it a goal (a zone where it belongs) so the zone can be cleared first.")
+        again = refine(llm, instruction, preferences, scene, _note=note)
+        again["consistency_round"] = {"blocking": blocking}
+        return again
+    return {"goals": goals, "dropped": dropped, "already_done": spec.get("already_done", []), "blocking_left": blocking,
             "constraints": spec.get("constraints", []),
             "refined_instruction": spec.get("refined_instruction") or instruction,
             "sources": {s: sum(1 for g in goals if g["source"] == s) for s in ("instruction", "user_memory", "assumption")}}
