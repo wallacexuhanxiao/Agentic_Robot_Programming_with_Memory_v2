@@ -40,6 +40,9 @@ def main():
     p.add_argument("--coder-model", default=None)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--no-validate", action="store_true")
+    p.add_argument("--resume", action="store_true",
+                   help="continue a sequence whose process died: keep finished tasks (summary.json) and the memories "
+                        "on disk, rerun from the first unfinished task")
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     memory = SkillMemory(args.out / "memory.json") if args.condition in ("skill", "both", "memory") else None
@@ -52,10 +55,25 @@ def main():
         log_file.write(line + "\n")
         log_file.flush()
 
-    rows = []
+    rows, done = [], set()
+    previous = args.out / "summary.json"
+    if args.resume and previous.exists():
+        old = json.loads(previous.read_text())
+        rows = old["tasks"]
+        done = {r["task"] for r in rows}
+        if memory is not None:
+            memory.applicability_log = old.get("applicability_log", [])
+        log(f"[{args.condition}] resuming after a harness crash: {len(rows)} finished tasks kept")
     for suite_name in args.suites.split(","):
         for task in suite(suite_name):
-            log(f"[{args.condition}] {suite_name} {task.task_id}: {task.instruction}")
+            if task.task_id in done:
+                continue
+            if args.resume and (args.out / task.task_id).exists():  # partial output of the task that crashed
+                import shutil
+                shutil.move(str(args.out / task.task_id), str(args.out / f"{task.task_id}.crashed_{int(time.time())}"))
+            import resource
+            log(f"[{args.condition}] {suite_name} {task.task_id}: {task.instruction} "
+                f"(process max RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MB)")
             llm = LLM(args.base_url, model=args.model, log_dir=args.out / task.task_id / "llm",
                       coder_url=args.coder_url, coder_model=args.coder_model)
             try:
@@ -72,6 +90,7 @@ def main():
                        "skill_calls": 0, "control_steps": 0, "llm_calls": len(llm.calls),
                        "llm_seconds": 0, "completion_tokens": 0, "seconds": 0,
                        "harness_error": f"{type(exc).__name__}: {exc}"}
+            row["after_resume"] = bool(done)  # ran in a process restarted after a harness crash
             rows.append(row)
             log(f"  -> {row}")
             (args.out / "summary.json").write_text(json.dumps(

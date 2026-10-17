@@ -164,8 +164,18 @@ if [[ "${SMA_MODE:-dev}" == dev ]]; then
 else
   # qsub -v splits on commas: lists use ':' (conditions) and '+' (suites).
   SUITES=${SMA_SUITES:-train+heldout}
+  # A crashed simulator process (e.g. a native abort) is restarted with --resume: finished tasks and the memories on
+  # disk are kept and the unfinished task is rerun. -X faulthandler prints the Python stack of a native crash.
   for condition in ${SMA_CONDITIONS//:/ }; do
-    "$SIM_PY" -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
-      --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$OUT/$condition" > "$OUT/$condition.log" 2>&1 || true
+    RESUME=(); [[ -n "${SMA_RESUME:-}" ]] && RESUME=(--resume)
+    for try in 1 2 3 4; do
+      rc=0
+      "$SIM_PY" -X faulthandler -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
+        --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$OUT/$condition" \
+        "${RESUME[@]}" >> "$OUT/$condition.log" 2>&1 || rc=$?
+      [[ $rc == 0 ]] && break
+      echo "$(date +%T) run_suite $condition exited with code $rc (try $try); restarting with --resume" | tee -a "$OUT/$condition.log" >> "$OUT/crashes.log"
+      RESUME=(--resume)
+    done
   done
 fi
