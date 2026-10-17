@@ -18,7 +18,8 @@ done
 [[ -n "${SMA_GENERAL_GPU_UTIL:-}" && -z "${SMA_CODER:-}" ]] && VARS+=",SMA_GENERAL_GPU_UTIL=$SMA_GENERAL_GPU_UTIL"
 mkdir -p "$ROOT/outputs"
 # Same pattern as the existing project: submit held, shrink the hook-expanded request, release.
-JOB_ID=$($PBS/qsub -h -q interactive -v "$VARS" -o "$ROOT/outputs/$SMA_RUN_NAME.pbs.log" "$ROOT/hpc/run_sma.pbs")
+# interactive (default) allows one running job per user; small allows three, for a parallel run.
+JOB_ID=$($PBS/qsub -h -q "${SMA_QUEUE:-interactive}" -v "$VARS" -o "$ROOT/outputs/$SMA_RUN_NAME.pbs.log" "$ROOT/hpc/run_sma.pbs")
 $PBS/qalter -l select=1:ncpus=8:mem=48gb:ngpus=1 "$JOB_ID"
 $PBS/qrls "$JOB_ID"
 printf '%s\n' "$JOB_ID"
