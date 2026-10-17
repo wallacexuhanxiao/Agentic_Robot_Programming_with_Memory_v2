@@ -1,0 +1,690 @@
+{
+ "task_id": "place_1",
+ "family": "place",
+ "instruction": "Put the red toy block on the orange tray.",
+ "skill_memory": false,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "go_home()\nwait(20)\n\nobs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\n\n# Check if orange_tray is occupied\noccupied = False\nfor obj_name, obj in obs[\"objects\"].items():\n    if obj_name == \"red_block\":\n        continue\n    obj_center = obj[\"center\"]\n    if (abs(obj_center[0] - orange_tray[\"center\"][0]) < orange_tray[\"half_size\"][0] +\n        obj[\"footprint_long\"] / 2 and\n        abs(obj_center[1] - orange_tray[\"center\"][1]) < orange_tray[\"half_size\"][1] +\n        obj[\"footprint_short\"] / 2):\n        # Object is on the tray; move it to purple_box if possible\n        purple_box = obs[\"zones\"][\"purple_box\"]\n        # Check if purple_box is available (not occupied)\n        purple_box_occupied = False\n        for o_name, o in obs[\"objects\"].items():\n            if o_name == \"red_block\":\n                continue\n            o_center = o[\"center\"]\n            if (abs(o_center[0] - purple_box[\"center\"][0]) < purple_box[\"half_size\"][0] +\n                o[\"footprint_long\"] / 2 and\n                abs(o_center[1] - purple_box[\"center\"][1]) < purple_box[\"half_size\"][1] +\n                o[\"footprint_short\"] / 2):\n                purple_box_occupied = True\n                break\n        if not purple_box_occupied:\n            # Move object to purple_box\n            obj_center = obj[\"center\"]\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.01, yaw=None)\n            open_gripper()\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.01, yaw=None)\n            close_gripper()\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n        else:\n            # Cannot clear tray; abort\n            raise RuntimeError(\"Cannot clear orange_tray: purple_box is occupied\")\n        occupied = True\n        break\n\n# Now pick up red_block\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], red_block[\"top_z\"] + 0.01, yaw=None)\nopen_gripper()\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], red_block[\"top_z\"] + 0.01, yaw=None)\nclose_gripper()\nwait(20)\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red_block\")\n\n# Lift high enough to clear obstacles\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=None)\n\n# Move to orange_tray and place\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=None)\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], orange_tray[\"center\"][2] + 0.01, yaw=None)\nopen_gripper()\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=None)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "RuntimeError",
+      "message": "Failed to grip red_block",
+      "location": [
+       "<program>",
+       57
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1134,
+       -0.1485
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0399,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 296,
+     "seconds": 1.5,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 15,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         0.0,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 16,
+       "source": "<program>",
+       "line": 2,
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 24,
+       "frame": 23,
+       "source": "<program>",
+       "line": 4
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.9
+       ],
+       "kwargs": {
+        "yaw": null
+       },
+       "control_step": 24,
+       "frame": 23,
+       "source": "<program>",
+       "line": 50,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1051,
+         0.0238,
+         0.8972
+        ],
+        "steps": 74
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.8499
+       ],
+       "kwargs": {
+        "yaw": null
+       },
+       "control_step": 98,
+       "frame": 47,
+       "source": "<program>",
+       "line": 51,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1092,
+         0.0239,
+         0.8514
+        ],
+        "steps": 12
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 110,
+       "frame": 51,
+       "source": "<program>",
+       "line": 52,
+       "result": {
+        "width": 0.08,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.8499
+       ],
+       "kwargs": {
+        "yaw": null
+       },
+       "control_step": 135,
+       "frame": 60,
+       "source": "<program>",
+       "line": 53,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1096,
+         0.0239,
+         0.8501
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "close_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 139,
+       "frame": 61,
+       "source": "<program>",
+       "line": 54,
+       "result": {
+        "width": 0.0015,
+        "closed_command": true,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 164,
+       "frame": 69,
+       "source": "<program>",
+       "line": 55,
+       "result": null
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: Failed to grip red_block RuntimeError ('<program>', 57).\n- close_gripper (call 7) -> holding_something=False with the grip point at [0.1096, 0.0239, 0.8501]; red_block was at xy [0.1097, 0.0239] with top_z 0.8399, so the grip point was +0.010 m relative to its top surface.\n- After the program red_block is offset [0.1134, -0.1485] m from the centre of orange_tray (the zone half size is [0.0668, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use the block's long_axis_yaw (-0.695) as the yaw for pick and place to ensure proper alignment with the tray, and adjust the grasp height to be 0.01 m above the block's top_z (0.8499 m) to ensure a secure grip."
+    },
+    {
+     "n": 2,
+     "code": "go_home()\nwait(20)\n\nobs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\nlong_axis_yaw = red_block[\"long_axis_yaw\"]\n\n# Check if orange_tray is occupied and clear it if needed\noccupied = False\nfor obj_name, obj in obs[\"objects\"].items():\n    if obj_name == \"red_block\":\n        continue\n    obj_center = obj[\"center\"]\n    if (abs(obj_center[0] - orange_tray[\"center\"][0]) < orange_tray[\"half_size\"][0] + obj[\"footprint_long\"] / 2 and\n        abs(obj_center[1] - orange_tray[\"center\"][1]) < orange_tray[\"half_size\"][1] + obj[\"footprint_short\"] / 2):\n        purple_box = obs[\"zones\"][\"purple_box\"]\n        purple_box_occupied = False\n        for o_name, o in obs[\"objects\"].items():\n            if o_name == \"red_block\":\n                continue\n            o_center = o[\"center\"]\n            if (abs(o_center[0] - purple_box[\"center\"][0]) < purple_box[\"half_size\"][0] + o[\"footprint_long\"] / 2 and\n                abs(o_center[1] - purple_box[\"center\"][1]) < purple_box[\"half_size\"][1] + o[\"footprint_short\"] / 2):\n                purple_box_occupied = True\n                break\n        if not purple_box_occupied:\n            # Move object to purple_box\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.01, yaw=None)\n            open_gripper()\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.01, yaw=None)\n            close_gripper()\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n        else:\n            raise RuntimeError(\"Cannot clear orange_tray: purple_box is occupied\")\n        occupied = True\n        break\n\n# Pick up red_block with correct yaw and grasp height\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], red_block[\"top_z\"] + 0.01, yaw=long_axis_yaw)\nopen_gripper()\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], red_block[\"top_z\"] + 0.01, yaw=long_axis_yaw)\nclose_gripper()\nwait(20)\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red_block\")\n\n# Lift high\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)\n\n# Place on orange_tray\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], orange_tray[\"center\"][2] + 0.01, yaw=long_axis_yaw)\nopen_gripper()\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "RuntimeError",
+      "message": "Failed to grip red_block",
+      "location": [
+       "<program>",
+       50
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1134,
+       -0.1485
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0399,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 328,
+     "seconds": 1.7,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 113,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         0.0001,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 114,
+       "source": "<program>",
+       "line": 2,
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 24,
+       "frame": 121,
+       "source": "<program>",
+       "line": 4
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.9
+       ],
+       "kwargs": {
+        "yaw": null
+       },
+       "control_step": 24,
+       "frame": 121,
+       "source": "<program>",
+       "line": 43,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1051,
+         0.0238,
+         0.8972
+        ],
+        "steps": 74
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.8499
+       ],
+       "kwargs": {
+        "yaw": -0.695
+       },
+       "control_step": 98,
+       "frame": 145,
+       "source": "<program>",
+       "line": 44,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1096,
+         0.0237,
+         0.8503
+        ],
+        "steps": 44
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 142,
+       "frame": 160,
+       "source": "<program>",
+       "line": 45,
+       "result": {
+        "width": 0.0785,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.8499
+       ],
+       "kwargs": {
+        "yaw": -0.695
+       },
+       "control_step": 167,
+       "frame": 168,
+       "source": "<program>",
+       "line": 46,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1096,
+         0.0239,
+         0.85
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "close_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 171,
+       "frame": 170,
+       "source": "<program>",
+       "line": 47,
+       "result": {
+        "width": 0.0015,
+        "closed_command": true,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 196,
+       "frame": 178,
+       "source": "<program>",
+       "line": 48,
+       "result": null
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "block",
+       "object_height": 0.0399,
+       "footprint": [
+        0.0396,
+        0.0381
+       ],
+       "grasp_height": 0.0499,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": null
+      }
+     ],
+     "diagnosis": "- The program did not run as written: Failed to grip red_block RuntimeError ('<program>', 50).\n- The grip point was +0.010 m relative to the object's top surface (grasp_height 0.050 vs object height 0.040); the fingers only grip what is below the grip point.\n- close_gripper (call 7) -> holding_something=False with the grip point at [0.1096, 0.0239, 0.85]; red_block was at xy [0.1097, 0.0239] with top_z 0.8399, so the grip point was +0.010 m relative to its top surface.\n- After the program red_block is offset [0.1134, -0.1485] m from the centre of orange_tray (the zone half size is [0.0668, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Adjust the grasp height to be 0.010 m below the block's top_z (i.e., use grasp_height = top_z - 0.010) and use long_axis_yaw as the yaw for gripping and placing to ensure proper alignment and grip within the block's footprint."
+    },
+    {
+     "n": 3,
+     "code": "go_home()\nwait(20)\n\nobs = observe()\nred_block = obs[\"objects\"][\"red_block\"]\norange_tray = obs[\"zones\"][\"orange_tray\"]\nlong_axis_yaw = red_block[\"long_axis_yaw\"]\ngrasp_height = red_block[\"top_z\"] - 0.010\n\n# Clear orange_tray if occupied\nfor obj_name, obj in obs[\"objects\"].items():\n    if obj_name == \"red_block\":\n        continue\n    obj_center = obj[\"center\"]\n    if (abs(obj_center[0] - orange_tray[\"center\"][0]) < orange_tray[\"half_size\"][0] + obj[\"footprint_long\"] / 2 and\n        abs(obj_center[1] - orange_tray[\"center\"][1]) < orange_tray[\"half_size\"][1] + obj[\"footprint_short\"] / 2):\n        purple_box = obs[\"zones\"][\"purple_box\"]\n        purple_box_occupied = False\n        for o_name, o in obs[\"objects\"].items():\n            if o_name == \"red_block\":\n                continue\n            o_center = o[\"center\"]\n            if (abs(o_center[0] - purple_box[\"center\"][0]) < purple_box[\"half_size\"][0] + o[\"footprint_long\"] / 2 and\n                abs(o_center[1] - purple_box[\"center\"][1]) < purple_box[\"half_size\"][1] + o[\"footprint_short\"] / 2):\n                purple_box_occupied = True\n                break\n        if not purple_box_occupied:\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.01, yaw=None)\n            open_gripper()\n            move_to(obj_center[0], obj_center[1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.01, yaw=None)\n            close_gripper()\n            move_to(purple_box[\"center\"][0], purple_box[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\n        else:\n            raise RuntimeError(\"Cannot clear orange_tray: purple_box is occupied\")\n        break\n\n# Pick up red_block\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.1, yaw=None)\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], grasp_height, yaw=long_axis_yaw)\nopen_gripper()\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], grasp_height, yaw=long_axis_yaw)\nclose_gripper()\nwait(20)\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red_block\")\n\n# Lift high\nmove_to(red_block[\"center\"][0], red_block[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)\n\n# Place on orange_tray\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], orange_tray[\"center\"][2] + 0.01, yaw=long_axis_yaw)\nopen_gripper()\nmove_to(orange_tray[\"center\"][0], orange_tray[\"center\"][1], obs[\"table_z\"] + 0.3, yaw=long_axis_yaw)",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        0.1097,
+        0.0239,
+        0.8299
+       ],
+       "reached": [
+        0.1163,
+        0.025,
+        0.839
+       ],
+       "remaining_error_m": 0.0113
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.1163,
+       -0.149
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0649
+      ],
+      "top_height_above_table": 0.0399,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 287,
+     "seconds": 1.5,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 222,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         0.0,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 223,
+       "source": "<program>",
+       "line": 2,
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 24,
+       "frame": 230,
+       "source": "<program>",
+       "line": 4
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.9
+       ],
+       "kwargs": {
+        "yaw": null
+       },
+       "control_step": 24,
+       "frame": 230,
+       "source": "<program>",
+       "line": 41,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1051,
+         0.0238,
+         0.8972
+        ],
+        "steps": 74
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1097,
+        0.0239,
+        0.8299
+       ],
+       "kwargs": {
+        "yaw": -0.695
+       },
+       "control_step": 98,
+       "frame": 254,
+       "source": "<program>",
+       "line": 42,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         0.1097,
+         0.0239,
+         0.8299
+        ],
+        "reached": [
+         0.1163,
+         0.025,
+         0.839
+        ],
+        "remaining_error_m": 0.0113
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- Call 4 move_to(0.1097, 0.0239, 0.8299) failed: {'reason': 'motion_blocked', 'target': [0.1097, 0.0239, 0.8299], 'reached': [0.1163, 0.025, 0.839], 'remaining_error_m': 0.0113}.\n- The program never grasped anything.\n- After the program red_block is offset [0.1163, -0.149] m from the centre of orange_tray (the zone half size is [0.0668, 0.0649]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use the short_axis_yaw (0.876) as the yaw for grasping and place, and set grasp_height to top_z - 0.015 to ensure a reliable grip and stable placement."
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_memory_write": {
+  "accepted": [
+   {
+    "subject": "red_block",
+    "zone": "orange_tray",
+    "scope": "task_only",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "red_block",
+   "zone": "purple_box",
+   "rule_subject": "block",
+   "evidence": "From now on, please always put my toy blocks in the purple toy box",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_block",
+    "zone": "orange_tray",
+    "source": "instruction",
+    "evidence": "Put the red toy block on the orange tray."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The red_block must be moved from its current location (not on any zone) to the orange_tray.",
+   "The orange_tray must be clear before placing the red_block on it.",
+   "The purple_box is not involved in this task, despite the user's stored preference, because the current instruction overrides it.",
+   "The robot must confirm the red_block is successfully placed on the orange_tray before marking the task as complete."
+  ],
+  "refined_instruction": "Move the red_block from its current location (not on any zone) to the orange_tray. Ensure the orange_tray is unoccupied before placing the block. If the orange_tray is occupied, clear it first by moving any object on it to a valid alternative zone (e.g., the purple_box, if available and not conflicting with user preferences). The red_block should be placed stably on the orange_tray. Success is confirmed when the red_block is detected on the orange_tray and no other object is on the orange_tray.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_block",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_block": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.1163,
+    -0.149
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0649
+   ],
+   "top_height_above_table": 0.0399,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": false
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "red_block": {
+    "zone": "orange_tray",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.1146,
+     0.021,
+     0.8199
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820035696029663,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 20.2,
+ "llm_usage": {
+  "calls": 12,
+  "prompt_tokens": 15808,
+  "completion_tokens": 3266,
+  "seconds": 14.7,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6,
+   "user_memory_write": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

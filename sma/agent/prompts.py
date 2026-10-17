@@ -69,7 +69,48 @@ release() opens the fingers where the arm is now, lifts and parks the arm (use i
 go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
 The module math is available. A robot error stops the program and is reported back to you."""
 
-API_DOC = TASK_API_DOC if os.environ.get("SMA_API_LEVEL", "task") == "task" else POSE_API_DOC
+ASPIRE_API_DOC = """You control a Franka Panda arm above a table by writing Python against the ASPIRE robot API.
+Positions are metres in the robot base frame "robot0_base" (x forward, y left, z up); quaternions are wxyz.
+These names are already defined (no imports, no try/except):
+observe() -> scene summary in the base frame:
+  {"frame": "robot0_base", "table_z": float,
+   "objects": {name: {"name", "kind": "block"|"book"|"mug", "center": [x, y, z], "top_z", "height",
+                      "footprint_long", "footprint_short", "long_axis_yaw", "short_axis_yaw"}},
+   "zones": {name: {"name", "center": [x, y, z], "half_size": [hx, hy]}},   (trays and a walled toy box)
+   "gripper": {"width", "holding_something"}}
+get_robot_state() -> state with .base_frame and .end_effector_poses["primary"] (a Pose: .position,
+  .quaternion_wxyz, .frame). At start the gripper points straight down.
+localize_object(query, camera_name="topdown", target_frame="robot0_base") -> result with .ok, .segmentation,
+  .point_cloud.points (N x 3 array in the base frame), .geometry.pose.position. Queries like "red mug" or
+  "orange tray". The only camera is "topdown".
+generate_grasps("topdown", segmentation, backend="contact-graspnet", max_candidates=5) -> grasp set with .ok and
+  .grasps; each candidate has .pose (a Pose of the grip point, the point between the fingertips), .score, .width_m.
+select_grasp(grasps, strategy="top_down") -> the best candidate or None.
+Pose(position, quaternion_wxyz, frame) builds a pose.
+move_to_pose(pose, tolerance=0.01, max_steps=250, strategy=None) moves the grip point to the pose. With
+  strategy=MotionStrategy(ik_solver="curobo", trajectory_planner="curobo") the path is planned collision-free;
+  the default uses inverse kinematics plus joint interpolation. A failed motion raises an error.
+open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}. Fingers open to 0.08 m.
+go_home() parks the arm out of the camera view (call it before looking with observe/localize_object).
+The module math is available. A robot error stops the program and is reported back to you.
+"""
+
+
+def aspire_skill_notes():
+    """The official ASPIRE skill documents, read from the ASPIRE checkout (not copied into this repository)."""
+    import pathlib
+    root = pathlib.Path(os.environ.get("SMA_ASPIRE_SKILLS", "/scratch/e0985859/agentic_robot_programming/aspire_qwen/"
+                                       "ASPIRE/.claude/skills/iterative-debugging/skills"))
+    parts = []
+    for name in ("localize.md", "grasp.md"):
+        path = root / name
+        if path.exists():
+            parts.append(path.read_text().replace("agentview", "topdown"))
+    return ("\n\nOfficial ASPIRE skill notes (from the ASPIRE repository):\n" + "\n".join(parts)) if parts else ""
+
+
+_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
+API_DOC = {"task": TASK_API_DOC, "pose": POSE_API_DOC}.get(_LEVEL) or (ASPIRE_API_DOC + aspire_skill_notes())
 
 PLANNER = """You are the planning module of a tabletop robot. Task specification: {instruction}
 Goals: {goals}

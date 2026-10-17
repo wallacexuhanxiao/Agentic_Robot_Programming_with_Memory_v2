@@ -1,0 +1,493 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    # Observe current state\n    scene = observe()\n    obj = scene[\"objects\"][obj_name]\n    zone = scene[\"zones\"][zone_name]\n\n    # Approach from above\n    move_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.1, yaw=obj[\"short_axis_yaw\"])\n    open_gripper()\n    move_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] - 0.02, yaw=obj[\"short_axis_yaw\"])\n    close_gripper()\n    wait(20)\n\n    # Check if gripped\n    if not observe()[\"gripper\"][\"holding_something\"]:\n        raise RuntimeError(f\"Failed to grip the {obj_name}\")\n\n    # Lift high enough to clear obstacles\n    move_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.2, yaw=obj[\"short_axis_yaw\"])\n\n    # Move to placement zone and descend to place\n    move_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.1, yaw=obj[\"short_axis_yaw\"])\n    move_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.01, yaw=obj[\"short_axis_yaw\"])\n    open_gripper()\n    wait(20)\n    move_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.2, yaw=obj[\"short_axis_yaw\"])",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "book"
+    ],
+    "notes": "The function assumes the object is graspable and the zone is accessible and clear for placement."
+   },
+   "origin": {
+    "task": "tidy_1000",
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obj = observe()[\"objects\"][\"blue_book\"]\nzone = observe()[\"zones\"][\"orange_tray\"]\n\n# Approach from above\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.1, yaw=obj[\"short_axis_yaw\"])\nopen_gripper()\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] - 0.02, yaw=obj[\"short_axis_yaw\"])\nclose_gripper()\nwait(20)\n\n# Check if gripped\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip the blue book\")\n\n# Lift high enough to clear obstacles\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.2, yaw=obj[\"short_axis_yaw\"])\n\n# Move to placement zone and descend to place\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.1, yaw=obj[\"short_axis_yaw\"])\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.01, yaw=obj[\"short_axis_yaw\"])\nopen_gripper()\nwait(20)\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.2, yaw=obj[\"short_axis_yaw\"])"
+   },
+   "history": [
+    {
+     "task": "tidy_1000",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5010",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0548,
+      "object_reach": 0.494,
+      "zone_reach": 0.502
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5011",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0537,
+      "object_reach": 0.569,
+      "zone_reach": 0.558
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1001",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0474,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "tidy_1001",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.646,
+      "zone_reach": 0.5
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.008,
+      "footprint_short": 0.0,
+      "object_reach": 0.475,
+      "zone_reach": 0.504
+     },
+     "outcome": false,
+     "failure": "target_outside_workspace"
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0548,
+      "object_reach": 0.675,
+      "zone_reach": 0.504
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1003",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.0289,
+      "footprint_short": 0.0519,
+      "object_reach": 0.632,
+      "zone_reach": 0.637
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0476
+   ],
+   "grasp_height": 0.05,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0546
+   ],
+   "grasp_height": 0.0049,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_2"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0535,
+    0.047
+   ],
+   "grasp_height": 0.05,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.2975,
+   "footprint": [
+    0.054,
+    0.0357
+   ],
+   "grasp_height": 0.2775,
+   "yaw_from_long_axis_deg": 3,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.3397,
+   "footprint": [
+    0.0466,
+    0.03
+   ],
+   "grasp_height": 0.2981,
+   "yaw_from_long_axis_deg": 1,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0467
+   ],
+   "grasp_height": 0.05,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.2975,
+   "footprint": [
+    0.0559,
+    0.0356
+   ],
+   "grasp_height": 0.2623,
+   "yaw_from_long_axis_deg": 6,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0547
+   ],
+   "grasp_height": 0.0049,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.074,
+   "footprint": [
+    0.055,
+    0.0474
+   ],
+   "grasp_height": 0.054,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.3082,
+   "footprint": [
+    0.0432,
+    0.0243
+   ],
+   "grasp_height": 0.2609,
+   "yaw_from_long_axis_deg": 40,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0732,
+    0.0549
+   ],
+   "grasp_height": 0.0049,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0548
+   ],
+   "grasp_height": 0.0049,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.0394
+   ],
+   "grasp_height": 0.0099,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0398,
+    0.0395
+   ],
+   "grasp_height": 0.0099,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1005"
+  }
+ ],
+ "lessons": [
+  {
+   "kind": "mug",
+   "lesson": "Use the long_axis_yaw (-1.506) as the yaw for the grasp and adjust the grasp_height to be -0.020 m relative to the mug's top_z (i.e., grasp_z = top_z - 0.020) to ensure proper grip and avoid motion blocking.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.8149 (book's top_z minus 0.01) and set yaw to short_axis_yaw (-1.107) for better alignment and to avoid motion blockage during grasping.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use short_axis_yaw for grasp yaw and set grasp_height to book['top_z'] - 0.02 to ensure reliable grasp and avoid motion blocking.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use short_axis_yaw (-1.144) for grasping and set grasp_height to book['top_z'] - 0.02, ensuring the robot moves to a position above the book at book['top_z'] + 0.1 before descending to grasp, and verify the gripper closes properly before lifting.",
+   "task": "teach_4"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use a grasp height of red_block['top_z'] + 0.01 to 0.02 and align the yaw with the block's long_axis_yaw (-0.695) for a more stable pick and accurate placement.",
+   "task": "place_1"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use the block's long_axis_yaw (-0.695) as the yaw angle during pick and place, and set the grasp height to red_block['center'][2] + 0.015 with a safety margin of 0.015 above the top_z (0.8399) to ensure the gripper clears the block and avoids motion blocking.",
+   "task": "place_1"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use a grasp height of red_block['top_z'] + 0.015 and yaw = red_block['long_axis_yaw'] for both pick and place operations to ensure proper alignment and clearance.",
+   "task": "place_1"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use the long_axis_yaw (0.499) as yaw for grasping and set grasp_height to top_z - 0.01 to ensure the gripper aligns with the book's long axis and grips securely above the center of mass.",
+   "task": "place_2"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.050 m (0.020 m below the top_z) and the long_axis_yaw (1.261) as the yaw for both pick and place to ensure proper grip and alignment.",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.015 to 0.025 m below the mug's top surface and align the yaw to the mug's long_axis_yaw (-1.534 rad) to ensure proper grip and avoid motion blocking.",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.020 m below the object's top_z and align the yaw to the object's long_axis_yaw (-1.297) to ensure proper grip and avoid motion blocking.",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Set grasp_height to top_z - 0.035 to ensure the gripper engages the mug's body below the top surface, and use long_axis_yaw for yaw to align the gripper with the mug's handle orientation.",
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Set grasp_height to top_z - 0.055 (0.055 m below the top surface) and use long_axis_yaw as yaw to align the gripper properly with the mug's long axis, ensuring the fingers span the full width of the mug and achieve a secure grip.",
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.815 (mug's top_z minus 0.055) and set yaw to the long_axis_yaw (0.0) for proper alignment during approach and grasp.",
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.054 m with a yaw aligned to the long_axis_yaw (1.557 rad) to ensure the gripper grips the mug securely and avoids motion blocking during placement.",
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp_height of 0.261 - 0.271 m (0.037 - 0.047 m below the top surface) and align the yaw with the mug's long_axis_yaw (-0.992) to ensure the gripper fingers fully span the mug's footprint.",
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use the short_axis_yaw (-1.457) instead of long_axis_yaw (-0.114) for the yaw angle during approach and placement to ensure proper alignment with the mug's orientation, and adjust grasp height to be 0.04 m below the top_z (i.e., mug['top_z'] - 0.04) to ensure a secure grip.",
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw for yaw during approach and grasp, and adjust grasp_height to 0.83 (top_z - 0.04) to ensure proper alignment and clearance, while verifying the target pose is not blocked by recalculating the approach path with the correct object dimensions and orientation.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw for yaw alignment during approach and grasp, and set grasp_height to top_z - 0.05 to ensure reliable grip, as the current grasp height of top_z - 0.04 is too shallow and the yaw alignment is inconsistent with the object's orientation.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw for yaw alignment during pick and place, and grasp at top_z - 0.05 m, ensuring the gripper approaches from above with proper clearance and alignment to avoid motion blocking and ensure successful grasp.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Set the grasp_height to 0.808 m and align the book's long_axis_yaw to 0.0 radians to ensure the book is placed within the workspace and properly centered on the orange_tray.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp height of 0.808 m with yaw set to the object's long_axis_yaw (0.0) and ensure the robot approaches from above with a clearance of at least 0.1 m to avoid motion blocking, while verifying the gripper's holding status before lifting.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp height of 0.808 m with yaw set to the long_axis_yaw of the book (0.0) to ensure the gripper approaches parallel to the book's long axis and avoids motion blocking.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp_height of 0.8289 m (top_z of the book) and align the yaw to the long_axis_yaw of -0.464 radians to ensure the book is placed stably on the orange_tray without motion blockage.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use the short_axis_yaw (-1.107) as the yaw for all motion commands and set the grasp height to top_z - 0.01 (0.819) to ensure stable gripping and clearance from the tray.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use short_axis_yaw = 1.107 for yaw and set grasp_height to top_z - 0.01 = 0.819 for stable grasp, ensuring the approach and grasp positions align with the actual object orientation and height.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use the short_axis_yaw (\u22121.326) instead of long_axis_yaw (0.245) for the yaw in move_to and grasp operations, and adjust the grasp height to 0.809 (top_z \u2212 0.03) to avoid motion blocking and ensure proper grip.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use the short_axis_yaw (-1.326) for the yaw in move_to and grasp operations, and adjust the grasp height to be 0.03 m below the block's top_z (i.e., yellow_block['top_z'] - 0.03) to ensure the gripper can safely approach and grasp the yellow_block without exceeding workspace limits.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use the short_axis_yaw (-1.326) for yaw and set grasp_height to 0.03 below top_z (0.8099) when picking and placing the yellow_block, and ensure the target position is within the workspace bounds by adjusting the x/y coordinates to stay within [-0.32, 0.3] and [-0.36, 0.36] respectively.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use a grasp_height of 0.010 m below the top_z with yaw set to short_axis_yaw to ensure the gripper aligns properly with the block's orientation and maintains a secure grip, avoiding motion blocking due to incorrect approach angle.",
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use the short_axis_yaw (0.452) as the yaw for pick and place operations and set the grasp height to top_z - 0.05 (0.82) to ensure the gripper aligns with the mug's orientation and avoids collision with the tray.",
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw (0.094) for yaw alignment during approach and grasp, and set grasp_height to obj['top_z'] - 0.05 to ensure the gripper closes at a stable height above the mug's base.",
+   "task": "tidy_1005"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw = 0.109 for approach and grasp, and set grasp_height to top_z - 0.05 (0.874 - 0.05 = 0.824) to ensure proper alignment and clearance during pick.",
+   "task": "tidy_1005"
+  },
+  {
+   "kind": "mug",
+   "lesson": "Use short_axis_yaw = -0.012 for approach and grasp, and set grasp height to top_z - 0.05 to ensure stable grip while avoiding collision with the table.",
+   "task": "tidy_1005"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use a grasp_height of 0.010 m with short_axis_yaw for the yaw to ensure the gripper aligns properly with the block's orientation and maintains a stable grip, avoiding motion blocking due to misalignment.",
+   "task": "tidy_1005"
+  }
+ ]
+}

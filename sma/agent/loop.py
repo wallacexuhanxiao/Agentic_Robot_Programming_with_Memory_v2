@@ -15,6 +15,15 @@ from .refine import refine
 from .sandbox import Sandbox, check_source, strip_code, ProgramRejected
 
 MAX_ATTEMPTS = 3
+
+
+def make_env(task, **kwargs):
+    """TabletopEnv, or the ASPIRE-backed environment when SMA_API_LEVEL=aspire."""
+    import os
+    if os.environ.get("SMA_API_LEVEL") == "aspire":
+        from ..aspire_level.env import AspireTabletopEnv
+        return AspireTabletopEnv(task, image_size=512, **kwargs)
+    return TabletopEnv(task, **kwargs)
 ATTEMPT_STEPS = 1500
 
 
@@ -193,8 +202,9 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             # Reuse policy: an applicable, validated skill is executed as is; no new code is generated.
             code = f'skills.{retrieved[0][0]["function"]}("{obj}", "{zone}")'
         else:
+            shown = env.observe_base() if hasattr(env, "observe_base") else scene  # ASPIRE level: base frame
             prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction),
-                                          object=obj, zone=zone, scene=prompts.scene_text(scene), skills=skills_text,
+                                          object=obj, zone=zone, scene=prompts.scene_text(shown), skills=skills_text,
                                           attempts=attempts_text)
             code = strip_code(llm.chat([{"role": "user", "content": prompt}], purpose="code"))
         sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved})
@@ -283,7 +293,7 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
     for seed in seeds:
         task = make_task("place", seed, kinds=[kind])
         obj, zone = next(iter(task.goal.items()))
-        env = TabletopEnv(task, video=video)
+        env = make_env(task, video=video)
         try:
             scene = env.reset()
             sandbox = Sandbox(env, skills={function: memory.get(function)["code"]})
@@ -306,7 +316,7 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
 def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, log=print):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    env = TabletopEnv(task)
+    env = make_env(task)
     record = {"task_id": task.task_id, "family": task.family, "instruction": task.instruction,
               "skill_memory": memory is not None, "user_memory": user_memory is not None,
               "subgoals": [], "validations": []}

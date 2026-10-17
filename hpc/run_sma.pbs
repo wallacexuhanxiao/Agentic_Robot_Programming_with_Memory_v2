@@ -31,6 +31,42 @@ sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
 PIDS=()
 trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 
+# ASPIRE backends (SMA_API_LEVEL=aspire): Contact-GraspNet, cuRobo and PyRoki services from the existing
+# aspire_qwen provider environment, started exactly as in aspire_qwen/hpc/run_aspire_qwen.pbs.
+if [[ "${SMA_API_LEVEL:-task}" == aspire ]]; then
+  AQ=$PROJECT/aspire_qwen
+  export PYTHONPATH="$ROOT:$AQ/client_deps:$AQ/ASPIRE/src"
+  export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 XDG_CACHE_HOME=$AQ/cache CAP_HARNESS_VENDOR_ROOT=$AQ/ASPIRE/third_party
+  export CAP_HARNESS_SERVICE_CONCURRENCY=1
+  read -r GRASP_PORT CUROBO_PORT IK_PORT < <("$SIM_PY" -c "
+import socket
+s=[socket.socket() for i in range(3)]
+[x.bind(('127.0.0.1',0)) for x in s]
+print(' '.join(str(x.getsockname()[1]) for x in s))")
+  export CAP_HARNESS_GRASPNET_URL=http://127.0.0.1:$GRASP_PORT CAP_HARNESS_CUROBO_URL=http://127.0.0.1:$CUROBO_PORT
+  export CAP_HARNESS_PYROKI_URL=http://127.0.0.1:$IK_PORT
+  PROVIDER_PY=$AQ/provider_env/bin/python
+  (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.graspnet.service --port "$GRASP_PORT") > "$OUT/grasp.log" 2>&1 &
+  PIDS+=("$!")
+  (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.curobo.service --port "$CUROBO_PORT") > "$OUT/curobo.log" 2>&1 &
+  PIDS+=("$!")
+  (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" JAX_PLATFORMS=cpu "$PROVIDER_PY" -m cap_harness.providers.pyroki.service --port "$IK_PORT") > "$OUT/pyroki.log" 2>&1 &
+  PIDS+=("$!")
+  for i in $(seq 1 150); do
+    if curl -sf "$CAP_HARNESS_GRASPNET_URL/healthz" >/dev/null && curl -sf "$CAP_HARNESS_CUROBO_URL/healthz" >/dev/null &&
+       curl -sf "$CAP_HARNESS_PYROKI_URL/healthz" >/dev/null; then break; fi
+    sleep 2
+  done
+  echo "aspire services ready after $((i*2))s" >> "$OUT/model_ready.txt"
+  if [[ "${SMA_MODE:-dev}" == aspire_gate || "${SMA_MODE:-dev}" == devsuite ]]; then
+    "$SIM_PY" scripts/aspire_gate.py "$OUT/aspire_gate" > "$OUT/aspire_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/aspire_gate.log"
+    if [[ "${SMA_MODE}" == aspire_gate || $(grep -c " GT True" "$OUT/aspire_gate.log") -lt 2 ]]; then
+      echo "aspire gate finished (suite skipped unless >=2 scripted successes)" >> "$OUT/aspire_gate.log"; exit 0
+    fi
+    SMA_MODE=suite
+  fi
+fi
+
 # Optional Grounded-SAM2 perception service (SMA_PERCEPTION=gsam), on the same GPU.
 if [[ "${SMA_PERCEPTION:-color}" == gsam ]]; then
   export SMA_PERCEPTION

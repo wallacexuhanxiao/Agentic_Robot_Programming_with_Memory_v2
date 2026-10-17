@@ -24,7 +24,9 @@ import os
 # API level (see prompts.API_DOCS): "pose" = move_to + gripper, "task" = parameterized pick/place.
 API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
 API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
-             "task": ("observe", "pick", "place", "release", "go_home", "wait")}[API_LEVEL]
+             "task": ("observe", "pick", "place", "release", "go_home", "wait"),
+             "aspire": ()}[API_LEVEL]  # the ASPIRE level takes its functions from env.aspire_api()
+UNTRACED = ("Pose", "MotionStrategy")
 
 
 class ProgramRejected(ValueError):
@@ -100,7 +102,11 @@ class Sandbox:
         return call
 
     def namespace(self):
-        api = {name: self._traced(name, getattr(self.env, name)) for name in API_NAMES}
+        if API_LEVEL == "aspire":
+            api = {name: (fn if name in UNTRACED else self._traced(name, fn))
+                   for name, fn in self.env.aspire_api().items()}
+        else:
+            api = {name: self._traced(name, getattr(self.env, name)) for name in API_NAMES}
         ns = {"__builtins__": SAFE_BUILTINS, "math": math, **api}
         skill_fns = {}
         for skill_name, code in self.skills.items():

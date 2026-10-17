@@ -1,0 +1,1070 @@
+{
+ "task_id": "tidy_1000",
+ "family": "tidy",
+ "instruction": "Could you clean up the table?",
+ "skill_memory": true,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "go_home()\nobs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\ntray = obs[\"zones\"][\"cyan_tray\"]\ngrasp_height = mug[\"top_z\"] - 0.020\nyaw = mug[\"long_axis_yaw\"]\n# Approach from above\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0)\nmove_to(mug[\"center\"][0], mug[\"center\"][1], grasp_height, yaw)\nopen_gripper()\nclose_gripper()\nwait(20)\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red mug\")\n# Lift high enough to clear obstacles\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0, yaw)\n# Move to tray above placement point\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)\n# Descend to place\nmove_to(tray[\"center\"][0], tray[\"center\"][1], tray[\"center\"][2] + 0.01, yaw)\nopen_gripper()\nwait(20)\n# Lift after placing\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "RuntimeError",
+      "message": "Failed to grip red mug",
+      "location": [
+       "<program>",
+       14
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": false,
+      "offset_from_zone_center": [
+       -0.1172,
+       -0.0174
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.2975,
+      "nominal_height": 0.07,
+      "gripper_holding": true,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 276,
+     "seconds": 1.9,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 16,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1999,
+         -0.0001,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 17,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.0883,
+        0.0153,
+        1.0
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 17,
+       "source": "<program>",
+       "line": 8,
+       "result": {
+        "ok": true,
+        "position": [
+         0.0855,
+         0.0152,
+         0.9982
+        ],
+        "steps": 62
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.0883,
+        0.0153,
+        0.85,
+        -1.493
+       ],
+       "kwargs": {},
+       "control_step": 66,
+       "frame": 38,
+       "source": "<program>",
+       "line": 9,
+       "result": {
+        "ok": true,
+        "position": [
+         0.0883,
+         0.0153,
+         0.852
+        ],
+        "steps": 32
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 98,
+       "frame": 48,
+       "source": "<program>",
+       "line": 10,
+       "result": {
+        "width": 0.08,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "close_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 123,
+       "frame": 57,
+       "source": "<program>",
+       "line": 11,
+       "result": {
+        "width": 0.049,
+        "closed_command": true,
+        "holding_something": true
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 148,
+       "frame": 65,
+       "source": "<program>",
+       "line": 12,
+       "result": null
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.648,
+      "zone_reach": 0.495
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.07,
+       "footprint": [
+        0.0528,
+        0.0467
+       ],
+       "grasp_height": 0.05,
+       "yaw_from_long_axis_deg": 0,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "diagnosis": "- The program did not run as written: Failed to grip red mug RuntimeError ('<program>', 14).\n- The grip point was -0.020 m relative to the object's top surface (grasp_height 0.050 vs object height 0.070); the fingers only grip what is below the grip point.\n- close_gripper (call 5) -> holding_something=True with the grip point at [0.0883, 0.0153, 0.852]; red_mug was at xy [0.0883, 0.0153] with top_z 0.87, so the grip point was -0.018 m relative to its top surface.\n- After the program red_mug is offset [-0.1172, -0.0174] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=False, gripper_holding=True.",
+     "lesson": "Set grasp_height to top_z - 0.035 to ensure the gripper engages the mug's body below the top surface, and use long_axis_yaw for yaw to align the gripper with the mug's handle orientation."
+    },
+    {
+     "n": 2,
+     "code": "go_home()\nobs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\ntray = obs[\"zones\"][\"cyan_tray\"]\ngrasp_height = mug[\"top_z\"] - 0.035\nyaw = mug[\"long_axis_yaw\"]\n\n# Approach from above\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0)\nmove_to(mug[\"center\"][0], mug[\"center\"][1], grasp_height, yaw)\n\nopen_gripper()\nclose_gripper()\nwait(20)\n\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red mug\")\n\n# Lift high enough to clear obstacles\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0, yaw)\n\n# Move to tray above placement point\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)\n\n# Descend to place\nmove_to(tray[\"center\"][0], tray[\"center\"][1], tray[\"center\"][2] + 0.01, yaw)\nopen_gripper()\nwait(20)\n\n# Lift after placing\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.1162,
+       -0.0218
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.07,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 315,
+     "seconds": 2.4,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 108,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.2003,
+         -0.0,
+         1.0795
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 109,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.1837,
+        0.0005,
+        1.0
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 109,
+       "source": "<program>",
+       "line": 9,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1829,
+         0.0004,
+         1.0039
+        ],
+        "steps": 20
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.1837,
+        0.0005,
+        1.0623,
+        1.376
+       ],
+       "kwargs": {},
+       "control_step": 24,
+       "frame": 116,
+       "source": "<program>",
+       "line": 10,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1839,
+         0.0008,
+         1.0572
+        ],
+        "steps": 12
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 36,
+       "frame": 120,
+       "source": "<program>",
+       "line": 12,
+       "result": {
+        "width": 0.0785,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "close_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 61,
+       "frame": 128,
+       "source": "<program>",
+       "line": 13,
+       "result": {
+        "width": 0.0015,
+        "closed_command": true,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 86,
+       "frame": 136,
+       "source": "<program>",
+       "line": 14,
+       "result": null
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.1837,
+        0.0005,
+        1.0,
+        1.376
+       ],
+       "kwargs": {},
+       "control_step": 106,
+       "frame": 143,
+       "source": "<program>",
+       "line": 20,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1822,
+         0.0001,
+         1.0053
+        ],
+        "steps": 12
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.0649,
+        0.0185,
+        1.0
+       ],
+       "kwargs": {},
+       "control_step": 118,
+       "frame": 147,
+       "source": "<program>",
+       "line": 23,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.0698,
+         0.0183,
+         0.9983
+        ],
+        "steps": 24
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.0649,
+        0.0185,
+        0.81,
+        1.376
+       ],
+       "kwargs": {},
+       "control_step": 142,
+       "frame": 155,
+       "source": "<program>",
+       "line": 26,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.0641,
+         0.0186,
+         0.8132
+        ],
+        "steps": 40
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 182,
+       "frame": 168,
+       "source": "<program>",
+       "line": 27,
+       "result": {
+        "width": 0.0452,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 207,
+       "frame": 177,
+       "source": "<program>",
+       "line": 28,
+       "result": null
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.0649,
+        0.0185,
+        1.0
+       ],
+       "kwargs": {},
+       "control_step": 227,
+       "frame": 183,
+       "source": "<program>",
+       "line": 31,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.0655,
+         0.0183,
+         0.9975
+        ],
+        "steps": 40
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.2975,
+      "footprint_short": 0.0356,
+      "object_reach": 0.378,
+      "zone_reach": 0.495
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "mug",
+       "object_height": 0.2975,
+       "footprint": [
+        0.0559,
+        0.0356
+       ],
+       "grasp_height": 0.2623,
+       "yaw_from_long_axis_deg": 6,
+       "holding": false,
+       "error": null
+      }
+     ],
+     "diagnosis": "- The grip point was -0.035 m relative to the object's top surface (grasp_height 0.262 vs object height 0.297); the fingers only grip what is below the grip point.\n- The fingertip line (yaw) was 6 degrees from the object's long axis, so the fingers squeezed across a 0.056 m extent of the object (the open fingers are 0.08 m apart; footprint is 0.056 along long_axis_yaw x 0.036 along short_axis_yaw).\n- close_gripper (call 5) -> holding_something=False with the grip point at [-0.1839, 0.0008, 1.0572]; red_mug was at xy [-0.1821, 0.0011] with top_z 1.0975, so the grip point was -0.040 m relative to its top surface.\n- After the program red_mug is offset [-0.1162, -0.0218] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Set grasp_height to top_z - 0.055 (0.055 m below the top surface) and use long_axis_yaw as yaw to align the gripper properly with the mug's long axis, ensuring the fingers span the full width of the mug and achieve a secure grip."
+    },
+    {
+     "n": 3,
+     "code": "go_home()\nobs = observe()\nmug = obs[\"objects\"][\"red_mug\"]\ntray = obs[\"zones\"][\"cyan_tray\"]\ngrasp_height = mug[\"top_z\"] - 0.055\nyaw = mug[\"long_axis_yaw\"]\n\n# Approach from above\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0)\nmove_to(mug[\"center\"][0], mug[\"center\"][1], grasp_height, yaw)\n\nopen_gripper()\nclose_gripper()\nwait(20)\n\nif not obs[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip red mug\")\n\n# Lift high enough to clear obstacles\nmove_to(mug[\"center\"][0], mug[\"center\"][1], 1.0, yaw)\n\n# Move to tray above placement point\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)\n\n# Descend to place\nmove_to(tray[\"center\"][0], tray[\"center\"][1], tray[\"center\"][2] + 0.01, yaw)\nopen_gripper()\nwait(20)\n\n# Lift after placing\nmove_to(tray[\"center\"][0], tray[\"center\"][1], 1.0)",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.1811,
+        -0.0033,
+        0.815
+       ],
+       "reached": [
+        -0.1782,
+        -0.0046,
+        0.8381
+       ],
+       "remaining_error_m": 0.0233
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.1147,
+       -0.0226
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.07,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 311,
+     "seconds": 2.6,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 213,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         -0.0,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 214,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.1811,
+        -0.0033,
+        1.0
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 214,
+       "source": "<program>",
+       "line": 9,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1798,
+         -0.0032,
+         1.0045
+        ],
+        "steps": 20
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        -0.1811,
+        -0.0033,
+        0.815,
+        0.0
+       ],
+       "kwargs": {},
+       "control_step": 24,
+       "frame": 221,
+       "source": "<program>",
+       "line": 10,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.1811,
+         -0.0033,
+         0.815
+        ],
+        "reached": [
+         -0.1782,
+         -0.0046,
+         0.8381
+        ],
+        "remaining_error_m": 0.0233
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0492,
+      "object_reach": 0.379,
+      "zone_reach": 0.495
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- Call 3 move_to(-0.1811, -0.0033, 0.815, 0.0) failed: {'reason': 'motion_blocked', 'target': [-0.1811, -0.0033, 0.815], 'reached': [-0.1782, -0.0046, 0.8381], 'remaining_error_m': 0.0233}.\n- The program never grasped anything.\n- After the program red_mug is offset [-0.1147, -0.0226] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp_height of 0.815 (mug's top_z minus 0.055) and set yaw to the long_axis_yaw (0.0) for proper alignment during approach and grasp."
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obj = observe()[\"objects\"][\"blue_book\"]\nzone = observe()[\"zones\"][\"orange_tray\"]\n\n# Approach from above\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.1, yaw=obj[\"short_axis_yaw\"])\nopen_gripper()\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] - 0.02, yaw=obj[\"short_axis_yaw\"])\nclose_gripper()\nwait(20)\n\n# Check if gripped\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grip the blue book\")\n\n# Lift high enough to clear obstacles\nmove_to(obj[\"center\"][0], obj[\"center\"][1], obj[\"top_z\"] + 0.2, yaw=obj[\"short_axis_yaw\"])\n\n# Move to placement zone and descend to place\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.1, yaw=obj[\"short_axis_yaw\"])\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.01, yaw=obj[\"short_axis_yaw\"])\nopen_gripper()\nwait(20)\nmove_to(zone[\"center\"][0], zone[\"center\"][1], zone[\"center\"][2] + 0.2, yaw=obj[\"short_axis_yaw\"])",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0123,
+       -0.0052
+      ],
+      "zone_half_size": [
+       0.0668,
+       0.0668
+      ],
+      "top_height_above_table": 0.0263,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 450,
+     "seconds": 3.7,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 316,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 316,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1053,
+        -0.0969,
+        0.9249
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 0,
+       "frame": 316,
+       "source": "<program>",
+       "line": 5,
+       "result": {
+        "ok": true,
+        "position": [
+         0.102,
+         -0.097,
+         0.9227
+        ],
+        "steps": 75
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 75,
+       "frame": 341,
+       "source": "<program>",
+       "line": 6,
+       "result": {
+        "width": 0.08,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1053,
+        -0.0969,
+        0.8049
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 100,
+       "frame": 349,
+       "source": "<program>",
+       "line": 7,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1074,
+         -0.0963,
+         0.8095
+        ],
+        "steps": 24
+       }
+      },
+      {
+       "call": "close_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 124,
+       "frame": 357,
+       "source": "<program>",
+       "line": 8,
+       "result": {
+        "width": 0.0546,
+        "closed_command": true,
+        "holding_something": true
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 149,
+       "frame": 365,
+       "source": "<program>",
+       "line": 9,
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 169,
+       "frame": 372,
+       "source": "<program>",
+       "line": 12
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.1053,
+        -0.0969,
+        1.0249
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 169,
+       "frame": 372,
+       "source": "<program>",
+       "line": 16,
+       "result": {
+        "ok": true,
+        "position": [
+         0.1048,
+         -0.0969,
+         1.0223
+        ],
+        "steps": 44
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.0037,
+        -0.2485,
+        0.9
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 213,
+       "frame": 387,
+       "source": "<program>",
+       "line": 19,
+       "result": {
+        "ok": true,
+        "position": [
+         0.0041,
+         -0.2468,
+         0.9008
+        ],
+        "steps": 44
+       }
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.0037,
+        -0.2485,
+        0.81
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 257,
+       "frame": 401,
+       "source": "<program>",
+       "line": 20,
+       "result": {
+        "ok": true,
+        "position": [
+         0.0046,
+         -0.2476,
+         0.8135
+        ],
+        "steps": 20
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 277,
+       "frame": 408,
+       "source": "<program>",
+       "line": 21,
+       "result": {
+        "width": 0.0643,
+        "closed_command": false,
+        "holding_something": false
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 302,
+       "frame": 416,
+       "source": "<program>",
+       "line": 22,
+       "result": null
+      },
+      {
+       "call": "move_to",
+       "args": [
+        0.0037,
+        -0.2485,
+        1.0
+       ],
+       "kwargs": {
+        "yaw": 0.438
+       },
+       "control_step": 322,
+       "frame": 423,
+       "source": "<program>",
+       "line": 23,
+       "result": {
+        "ok": true,
+        "position": [
+         0.0034,
+         -0.2485,
+         0.998
+        ],
+        "steps": 40
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.075,
+        0.0547
+       ],
+       "grasp_height": 0.0049,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extracted_skill": "place_on_zone_v1"
+  }
+ ],
+ "validations": [
+  {
+   "seed": 5010,
+   "kind": "book",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  },
+  {
+   "seed": 5011,
+   "kind": "book",
+   "perception_ok": true,
+   "gt_ok": true,
+   "error": null
+  }
+ ],
+ "user_memory_write": {
+  "accepted": [],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray",
+   "rule_subject": "mug",
+   "evidence": "From now on, please always put my mugs on the cyan tray",
+   "source_task": "teach_4"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "rule_subject": "book",
+   "evidence": "From now on, please always put my books on the orange tray",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_mug",
+    "zone": "cyan_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my mugs on the cyan tray"
+   },
+   {
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my books on the orange tray"
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "Do not place any object on a zone that is already occupied by another object.",
+   "Clear an occupied zone before placing an object on it.",
+   "Only move objects that are currently not on their designated zone."
+  ],
+  "refined_instruction": "The robot must move the red mug to the cyan tray and the blue book to the orange tray. Both zones are currently unoccupied. The robot should first move the red mug to the cyan tray, then move the blue book to the orange tray. Success is achieved when both objects are correctly placed on their designated zones, and no object remains on a zone other than its assigned one.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 2,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "red_mug": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.1147,
+    -0.0226
+   ],
+   "zone_half_size": [
+    0.0649,
+    0.0668
+   ],
+   "top_height_above_table": 0.07,
+   "nominal_height": 0.07,
+   "gripper_holding": false,
+   "satisfied": false
+  },
+  "blue_book": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0123,
+    -0.0052
+   ],
+   "zone_half_size": [
+    0.0668,
+    0.0668
+   ],
+   "top_height_above_table": 0.0263,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "red_mug": {
+    "zone": "cyan_tray",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.1827,
+     -0.0071,
+     0.835
+    ]
+   },
+   "blue_book": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.007,
+     -0.2566,
+     0.8128
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9819664359092712,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 21.5,
+ "llm_usage": {
+  "calls": 14,
+  "prompt_tokens": 15202,
+  "completion_tokens": 2129,
+  "seconds": 9.8,
+  "by_purpose": {
+   "code": 4,
+   "extract": 1,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6,
+   "user_memory_write": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

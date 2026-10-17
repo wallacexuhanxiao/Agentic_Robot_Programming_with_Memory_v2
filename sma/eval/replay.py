@@ -99,7 +99,8 @@ def replay(run_dir, out_dir, item):
     task = find_task(task_id)
     overlay = Overlay(condition, task)
     overlay.skill_codes = skill_codes
-    env = TabletopEnv(task)
+    from ..agent.loop import make_env
+    env = make_env(task)
     env.frame_hook = overlay
     out = Path(out_dir) / condition / task_id
     out.mkdir(parents=True, exist_ok=True)
