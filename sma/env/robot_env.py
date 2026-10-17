@@ -29,10 +29,12 @@ class BudgetExceeded(RobotError):
 
 
 class TabletopEnv:
-    def __init__(self, task, *, image_size=256, video=True, video_every=3, step_budget=2400,
+    def __init__(self, task, *, image_size=None, video=True, video_every=3, step_budget=2400,
                  render_gpu=None):
         self.task = task
-        self.image_size = image_size
+        # Perception backend: "color" (hue segmentation) or "gsam" (Grounding DINO + SAM2 service).
+        self.perception = os.environ.get("SMA_PERCEPTION", "color")
+        self.image_size = image_size or (512 if self.perception == "gsam" else 256)
         self.video = video
         self.video_every = video_every
         self.step_budget = step_budget
@@ -178,7 +180,11 @@ class TabletopEnv:
             rgb, depth = self.render("topdown", self.image_size, self.image_size, depth=True)  # re-render once
             self.depth_rerendered = getattr(self, "depth_rerendered", 0) + 1
         depth_m = self._metric_depth(depth)
-        scene = perceive(rgb, depth_m, self.K, self.world_from_camera)
+        if self.perception == "gsam":
+            from .perception_gsam import perceive_gsam
+            scene = perceive_gsam(rgb, depth_m, self.K, self.world_from_camera, os.environ["SMA_SEG_URL"])
+        else:
+            scene = perceive(rgb, depth_m, self.K, self.world_from_camera)
         scene["gripper"] = self.gripper_state()
         scene["end_effector"] = {"position": [round(float(v), 4) for v in self._ee()],
                                  "yaw": round(self._yaw(), 3)}

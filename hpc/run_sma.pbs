@@ -31,6 +31,29 @@ sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
 PIDS=()
 trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 
+# Optional Grounded-SAM2 perception service (SMA_PERCEPTION=gsam), on the same GPU.
+if [[ "${SMA_PERCEPTION:-color}" == gsam ]]; then
+  export SMA_PERCEPTION
+  SHARED=/scratch/Projects/CFP-04/CFP04-CF-057
+  export SMA_GDINO=$(ls -d $SHARED/hf_cache/models--IDEA-Research--grounding-dino-tiny/snapshots/*/ | head -1)
+  export SMA_SAM2=$(ls -d $SHARED/hf_cache_cotrvs/hub/models--facebook--sam2-hiera-large/snapshots/*/ | head -1)
+  SPORT=$("$SIM_PY" -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
+  HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 "$PROJECT/aspire_qwen/provider_env/bin/python" -m sma.perception_service.server "$SPORT" \
+    > "$OUT/segmentation.log" 2>&1 &
+  PIDS+=("$!")
+  for i in $(seq 1 120); do
+    if curl -sf "http://127.0.0.1:$SPORT/" > /dev/null; then break; fi
+    kill -0 "${PIDS[-1]}"; sleep 2
+  done
+  export SMA_SEG_URL="http://127.0.0.1:$SPORT"
+  echo "segmentation service ready after $((i*2))s" >> "$OUT/model_ready.txt"
+fi
+
+if [[ "${SMA_MODE:-dev}" == perception ]]; then
+  "$SIM_PY" scripts/perception_compare.py "$OUT/perception" > "$OUT/perception.log" 2>&1
+  exit 0
+fi
+
 if [[ "${SMA_MODE:-dev}" == replay ]]; then
   # Re-execute recorded programs (no LLM) with the code overlay; items are '+'-separated condition/task.
   "$SIM_PY" -m sma.eval.replay "$ROOT/outputs/${SMA_REPLAY_RUN:?}" "$OUT" ${SMA_REPLAY_ITEMS//+/ } > "$OUT/replay.log" 2>&1
