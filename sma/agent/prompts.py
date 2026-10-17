@@ -1,7 +1,8 @@
 """Prompts. Every condition (with or without memory) gets the same API description."""
 import json
+import os
 
-API_DOC = """You control a Franka Panda arm above a table by writing Python. All units are metres and radians,
+POSE_API_DOC = """You control a Franka Panda arm above a table by writing Python. All units are metres and radians,
 world frame: x away from the robot base, y to the left, z up. The table surface is at z = table_z.
 
 Functions already available (no imports, no try/except):
@@ -34,6 +35,30 @@ object-specific grasp heights or orientations, you must choose those):
 4. To place: move above the target, descend vertically until the object is just above the table,
    open the gripper, then lift vertically."""
 
+TASK_API_DOC = """You control a Franka Panda arm above a table by writing short Python. Units: metres and radians;
+world frame: x away from the robot base, y to the left, z up. The table surface is at z = table_z.
+
+Only these functions exist (they are already defined; do not import anything, do not use try/except,
+do not define helper names that are not used):
+observe() -> dict from the top-down RGB-D camera:
+  {"table_z": float,
+   "objects": {name: {"kind": "cube"|"book"|"cup", "center": [x, y, z], "top_z": float, "height": float,
+                      "footprint_long": float, "footprint_short": float, "long_axis_yaw": float}},
+   "zones": {name: {"center": [x, y, z], "half_size": [hx, hy]}},
+   "gripper": {"width": float, "holding_something": bool}}
+pick(object_name, grasp_height, yaw) -> {"holding_something": bool, ...}
+  Top-down grasp: opens the fingers, comes down vertically over the object's centre until the grip
+  point (midpoint between the fingertips) is at table_z + grasp_height, closes the fingers along the
+  direction yaw (an angle in the xy plane; yaw and yaw + pi are the same), then lifts.
+  The fingers open to 0.08 m and only grip what is between them below the grip point.
+  YOU choose grasp_height and yaw for the object.
+place(zone_name, dx=0.0, dy=0.0) carries the held object above the zone centre (+ dx, dy), lowers it
+  to just above the table, releases it, lifts and parks the arm. Fails if nothing is held.
+go_home() parks the arm out of the camera view.  wait(steps) holds still (20 steps = 1 s).
+The module math is available. A robot error stops the program and is reported back to you."""
+
+API_DOC = TASK_API_DOC if os.environ.get("SMA_API_LEVEL", "task") == "task" else POSE_API_DOC
+
 PLANNER = """You are the planning module of a tabletop robot. Instruction: {instruction}
 
 Current scene (from the camera):
@@ -51,8 +76,8 @@ Current subgoal: move the object "{object}" so it rests on the zone "{zone}", th
 Current scene:
 {scene}
 {skills}{attempts}
-Write the Python program for this subgoal only. End with the gripper open and the arm lifted.
-Reply with the code only."""
+Write the Python program for this subgoal only, using only the functions listed above (get every
+value from observe()). Keep it short with few comments. Reply with the code only."""
 
 SKILLS_HEADER = """
 Reusable skills from memory (each was extracted from a verified execution; call them as
@@ -81,8 +106,8 @@ Rewrite it as ONE reusable function
 
 def {function}(obj_name, zone_name):
 
-that calls observe() itself and computes every position from the observation (no scene-specific
-coordinates as literals; numeric offsets such as approach heights are fine). Keep what made it work.
+that calls observe() itself and computes every argument from the observation (no scene-specific
+coordinates as literals; numeric offsets are fine). Keep what made it work.
 Then, after the code, give a JSON object on the last line with the conditions under which you
 expect the function to work, using only these keys:
 {{"object_kinds": [...], "requires_zone_free": true|false, "requires_gripper_empty": true|false,

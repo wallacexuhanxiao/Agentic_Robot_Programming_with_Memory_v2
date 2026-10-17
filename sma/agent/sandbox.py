@@ -19,7 +19,12 @@ SAFE_BUILTINS = {name: getattr(__builtins__, name) if hasattr(__builtins__, name
                               "float", "int", "str", "bool", "enumerate", "zip", "sorted", "sum",
                               "any", "all", "print", "isinstance", "ValueError", "RuntimeError",
                               "KeyError", "Exception", "reversed", "set")}
-API_NAMES = ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait")
+import os
+
+# API level (see prompts.API_DOCS): "pose" = move_to + gripper, "task" = parameterized pick/place.
+API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
+API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
+             "task": ("observe", "pick", "place", "go_home", "wait")}[API_LEVEL]
 
 
 class ProgramRejected(ValueError):

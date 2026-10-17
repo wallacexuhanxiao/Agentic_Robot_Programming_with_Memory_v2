@@ -28,9 +28,12 @@ def feedback_text(error, trace, check):
     return json.dumps({"error": error, "last_calls": calls, "subgoal_check_after_program": check}, default=str)
 
 
-def diagnose(trace, scene_before, check, obj, zone):
+def diagnose(trace, scene_before, check, obj, zone, error=None):
     """Plain-language facts derived from the trace and camera; identical for every condition."""
     facts = []
+    if error and error.get("type") in ("rejected", "program_error"):
+        facts.append(f"The program did not run as written: {error.get('message')} "
+                     f"{error.get('exception', '')} {error.get('location') or ''}".strip() + ".")
     target = scene_before["objects"].get(obj)
     last_pos = None
     closes = 0
@@ -40,6 +43,12 @@ def diagnose(trace, scene_before, check, obj, zone):
         result = entry.get("result")
         if entry["call"] == "move_to" and isinstance(result, dict):
             last_pos = result.get("position")
+        if entry["call"] == "pick" and isinstance(result, dict) and target:
+            closes += 1
+            facts.append(f"pick{tuple(entry['args'])} -> holding_something={result.get('holding_something')}; "
+                         f"grip point z {result.get('grasp_point_z')} vs {obj} top_z {target['top_z']} "
+                         f"(height {target['height']}, footprint {target['footprint_long']} x "
+                         f"{target['footprint_short']}, long_axis_yaw {target['long_axis_yaw']}).")
         if entry["call"] == "close_gripper" and isinstance(result, dict):
             closes += 1
             where = ""
@@ -48,8 +57,8 @@ def diagnose(trace, scene_before, check, obj, zone):
                          f" with top_z {target['top_z']}, so the grip point was "
                          f"{last_pos[2] - target['top_z']:+.3f} m relative to its top surface")
             facts.append(f"close_gripper (call {i}) -> holding_something={result.get('holding_something')}{where}.")
-    if closes == 0:
-        facts.append("The program never closed the gripper.")
+    if closes == 0 and not (error and error.get("type") in ("rejected", "program_error")):
+        facts.append("The program never grasped anything.")
     if check.get("reason") == "not_visible":
         facts.append(f"After the program the camera could not see {obj} or {zone}.")
     elif "offset_from_zone_center" in check:
@@ -95,7 +104,7 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             f"error={error and (error.get('reason') or error.get('message'))}")
         if check.get("satisfied"):
             return True, attempts
-        attempt["diagnosis"] = diagnose(sandbox.trace, scene, check, obj, zone)
+        attempt["diagnosis"] = diagnose(sandbox.trace, scene, check, obj, zone, error)
         attempts_text = prompts.ATTEMPT.format(n=n, code=code, diagnosis=attempt["diagnosis"],
                                                feedback=feedback_text(error, sandbox.trace, check))
     return False, attempts

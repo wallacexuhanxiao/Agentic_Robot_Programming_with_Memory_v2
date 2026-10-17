@@ -118,6 +118,7 @@ class TabletopEnv:
         scene["gripper"] = self.gripper_state()
         scene["end_effector"] = {"position": [round(float(v), 4) for v in self._ee()],
                                  "yaw": round(self._yaw(), 3)}
+        self._zones_seen = {**getattr(self, "_zones_seen", {}), **scene["zones"]}
         self.last_rgb = rgb
         return scene
 
@@ -177,41 +178,57 @@ class TabletopEnv:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "approximate": True}
             raise
 
-    # ---------------------------------------------------------------- task-level fallback API
-    # Used only when SMA_API_LEVEL=task. Built on the same pose-level calls and perception.
-    def pick(self, object_name, grasp_depth=None, yaw_offset=0.0):
-        """Grasp object_name from above. grasp_depth: metres below its top surface (default half height)."""
+    # ---------------------------------------------------------------- task-level API
+    # Parameterized primitives built on the pose-level calls. The caller must choose the grasp
+    # height and finger direction; nothing object-specific is decided here.
+    def pick(self, object_name, grasp_height, yaw):
+        """Top-down grasp of object_name with the grip point at table_z + grasp_height, fingers
+        closing along yaw. Approaches from above, closes, lifts. Returns the gripper state."""
+        grasp_height, yaw = float(grasp_height), float(yaw)
+        if not .004 <= grasp_height <= .15:
+            raise RobotError("grasp_height_out_of_range", grasp_height=grasp_height, allowed=[.004, .15])
+        if self.gripper_state()["holding_something"]:
+            raise RobotError("already_holding_something")
         self.go_home()
         scene = self.observe()
         obj = scene["objects"].get(object_name)
         if obj is None:
             raise RobotError("object_not_visible", object=object_name, visible=sorted(scene["objects"]))
-        depth = obj["height"] / 2 if grasp_depth is None else float(grasp_depth)
-        z = max(obj["top_z"] - depth, scene["table_z"] + .008)
-        yaw = obj["long_axis_yaw"] + np.pi / 2 + float(yaw_offset)
         x, y = obj["center"][:2]
+        table = scene["table_z"]
         self.open_gripper()
-        self.move_to(x, y, obj["top_z"] + .10, yaw)
-        self.move_to(x, y, z, yaw)
+        self.move_to(x, y, max(obj["top_z"], table + grasp_height) + .10, yaw)
+        self.move_to(x, y, table + grasp_height, yaw)
         state = self.close_gripper()
-        self._last_grasp_height = z - scene["table_z"]
-        self.move_to(x, y, scene["table_z"] + .18, yaw)
-        return {**state, "grasp_z": round(z, 4)}
+        self._held_grasp_height = grasp_height
+        self.move_to(x, y, table + .18, yaw)
+        return {**self.gripper_state(), "grasp_point_z": round(table + grasp_height, 4),
+                "object_top_z_before": obj["top_z"]}
 
-    def place(self, zone_name, offset_xy=(0.0, 0.0), release_height=.006):
-        """Carry the held object above zone_name (+offset) and release it just above the table."""
+    def place(self, zone_name, dx=0.0, dy=0.0):
+        """Carry the held object above zone_name's centre (+dx, dy), lower it until it is just
+        above the table, release, lift and park the arm."""
+        if not self.gripper_state()["holding_something"]:
+            raise RobotError("not_holding_anything")
+        scene_zone = self._zone_from_last_view(zone_name)
+        x, y = scene_zone["center"][0] + float(dx), scene_zone["center"][1] + float(dy)
+        table = scene_zone["center"][2]
+        here = self._ee()
+        self.move_to(here[0], here[1], max(here[2], table + .18))
+        self.move_to(x, y, table + .18)
+        self.move_to(x, y, table + self._held_grasp_height + .006)
+        self.open_gripper()
+        self.move_to(x, y, table + .18)
+        self.go_home()
+        return {"released_at": [round(x, 4), round(y, 4)]}
+
+    def _zone_from_last_view(self, zone_name):
+        # Zones are flat and static; the view from before the grasp is used if the arm hides one now.
         scene = self.observe()
-        zone = scene["zones"].get(zone_name)
+        zone = scene["zones"].get(zone_name) or getattr(self, "_zones_seen", {}).get(zone_name)
         if zone is None:
             raise RobotError("zone_not_visible", zone=zone_name, visible=sorted(scene["zones"]))
-        x, y = zone["center"][0] + offset_xy[0], zone["center"][1] + offset_xy[1]
-        here = self._ee()
-        self.move_to(x, y, here[2])
-        held_z = getattr(self, "_last_grasp_height", None)
-        self.move_to(x, y, scene["table_z"] + (held_z or .02) + float(release_height))
-        self.open_gripper()
-        self.move_to(x, y, scene["table_z"] + .18)
-        return {"released_at": [round(x, 4), round(y, 4)]}
+        return zone
 
     def wait(self, steps=20):
         hold = self._ee()

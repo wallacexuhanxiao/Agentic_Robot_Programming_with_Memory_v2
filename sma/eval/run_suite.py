@@ -1,5 +1,6 @@
 """Run a task sequence under one condition: 'memory' (persistent skill memory) or 'none'."""
 import argparse
+import os
 import json
 import time
 from pathlib import Path
@@ -53,7 +54,7 @@ def main():
             rows.append(row)
             log(f"  -> {row}")
             (args.out / "summary.json").write_text(json.dumps(
-                {"condition": args.condition, "tasks": rows,
+                {"condition": args.condition, "api_level": os.environ.get("SMA_API_LEVEL", "task"), "tasks": rows,
                  "applicability_log": memory.applicability_log if memory else []}, indent=1))
 
 
