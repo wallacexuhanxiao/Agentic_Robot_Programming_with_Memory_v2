@@ -188,11 +188,22 @@ def extract_skill(llm, memory, task, obj, zone, attempt, scene, log):
     try:
         tree = check_source(code)
     except ProgramRejected as exc:
-        log(f"    extraction rejected: {exc}")
-        return None
-    if not any(getattr(n, "name", None) == function for n in tree.body):
+        # The model sometimes puts the conditions JSON inside the code block; keep the function only.
+        match = re.search(rf"def {function}\(.*?(?=\n\S|\Z)", code, re.S)
+        if not match:
+            log(f"    extraction rejected: {exc}")
+            return None
+        code = match.group(0)
+        try:
+            tree = check_source(code)
+        except ProgramRejected as exc2:
+            log(f"    extraction rejected: {exc2}")
+            return None
+    fn_node = next((n for n in tree.body if isinstance(n, __import__("ast").FunctionDef) and n.name == function), None)
+    if fn_node is None:
         log("    extraction rejected: function not defined")
         return None
+    code = __import__("ast").get_source_segment(code, fn_node)  # drop any module-level extras
     literals = literal_coordinates(code, scene)
     if literals:
         log(f"    extraction rejected: scene coordinates hard-coded {literals}")

@@ -102,7 +102,10 @@ class Sandbox:
             tree = check_source(source)
         except ProgramRejected as exc:
             return False, {"type": "rejected", "message": str(exc)}
-        ns = self.namespace()
+        try:
+            ns = self.namespace()
+        except Exception as exc:  # a stored skill that does not load is a failed attempt, not a crash
+            return False, {"type": "rejected", "message": f"skill failed to load: {type(exc).__name__}: {exc}"}
         try:
             exec(compile(tree, "<program>", "exec"), ns)
         except RobotError as exc:

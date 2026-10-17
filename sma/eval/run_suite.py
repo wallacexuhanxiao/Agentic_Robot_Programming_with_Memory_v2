@@ -57,9 +57,20 @@ def main():
             log(f"[{args.condition}] {suite_name} {task.task_id}: {task.instruction}")
             llm = LLM(args.base_url, log_dir=args.out / task.task_id / "llm",
                       coder_url=args.coder_url, coder_model=args.coder_model)
-            record = run_episode(task, llm, memory, args.out / task.task_id, user_memory=user_memory,
-                                 validate=not args.no_validate, log=log)
-            row = {"suite": suite_name, **summarize(record)}
+            try:
+                record = run_episode(task, llm, memory, args.out / task.task_id, user_memory=user_memory,
+                                     validate=not args.no_validate, log=log)
+                row = {"suite": suite_name, **summarize(record)}
+            except Exception as exc:  # keep the sequence going; the failure is recorded, not hidden
+                import traceback
+                log(f"  HARNESS EXCEPTION in {task.task_id}: {type(exc).__name__}: {exc}")
+                (args.out / task.task_id).mkdir(parents=True, exist_ok=True)
+                (args.out / task.task_id / "harness_exception.txt").write_text(traceback.format_exc())
+                row = {"suite": suite_name, "task": task.task_id, "family": task.family, "success_gt": False,
+                       "subgoals": 0, "subgoals_verified": 0, "code_generations": 0, "executions_failed": 0,
+                       "skill_calls": 0, "control_steps": 0, "llm_calls": len(llm.calls),
+                       "llm_seconds": 0, "completion_tokens": 0, "seconds": 0,
+                       "harness_error": f"{type(exc).__name__}: {exc}"}
             rows.append(row)
             log(f"  -> {row}")
             (args.out / "summary.json").write_text(json.dumps(
