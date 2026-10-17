@@ -1,0 +1,307 @@
+{
+ "task_id": "tidy_1005",
+ "family": "tidy",
+ "instruction": "Tidy up my desk, please.",
+ "skill_memory": false,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "yellow_cup",
+   "zone": "cyan_zone",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "data = observe()\ncup = data[\"objects\"][\"yellow_cup\"]\nzone = data[\"zones\"][\"cyan_zone\"]\ngrasp_h = 0.05\nyaw = cup[\"long_axis_yaw\"]\npick(\"yellow_cup\", grasp_h, yaw)\nplace(\"cyan_zone\", 0.0, 0.0)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0015,
+       0.001
+      ],
+      "zone_half_size": [
+       0.0595,
+       0.0576
+      ],
+      "top_height_above_table": 0.0706,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 383,
+     "seconds": 2.0,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "yellow_cup",
+        0.05,
+        -1.249
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0497,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.85,
+        "object_top_z_before": 0.8706
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "cyan_zone",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         0.0706,
+         0.1617
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.0442,
+      "object_reach": 0.597,
+      "zone_reach": 0.651
+     }
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "red_cube",
+   "zone": "purple_zone",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\nobj = obs[\"objects\"][\"red_cube\"]\nzone = obs[\"zones\"][\"purple_zone\"]\n\n# Calculate grasp height: object top_z minus a small clearance (0.01m)\ngrasp_h = obj[\"top_z\"] - table_z - 0.01\n# Yaw aligned with object's long axis\nyaw = obj[\"long_axis_yaw\"]\n\npick(\"red_cube\", grasp_h, yaw)\nplace(\"purple_zone\", 0.0, 0.0)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0002,
+       0.0012
+      ],
+      "zone_half_size": [
+       0.0576,
+       0.0576
+      ],
+      "top_height_above_table": 0.0398,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "control_steps": 379,
+     "seconds": 1.9,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_cube",
+        0.0298,
+        1.215
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0375,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.8298,
+        "object_top_z_before": 0.8398
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "purple_zone",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         0.0279,
+         -0.0242
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0395,
+      "object_reach": 0.524,
+      "zone_reach": 0.588
+     }
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_memory_write": {
+  "accepted": [],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "red_cube",
+   "zone": "purple_zone",
+   "rule_subject": "cube",
+   "evidence": "From now on, I always want cubes on the purple zone",
+   "source_task": "teach_4"
+  },
+  {
+   "object": "yellow_cup",
+   "zone": "cyan_zone",
+   "rule_subject": "cup",
+   "evidence": "I always want ... cups on the cyan zone",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_cube",
+    "zone": "purple_zone",
+    "source": "user_memory",
+    "evidence": "From now on, I always want cubes on the purple zone"
+   }
+  ],
+  "dropped": [],
+  "already_done": [
+   "yellow_cup"
+  ],
+  "constraints": [
+   "The yellow_cup is already in the cyan_zone per user preference, so it requires no action.",
+   "The red_cube must be moved to the purple_zone; the purple_zone is currently occupied by the yellow_cup, so the cup must be moved to the cyan_zone first."
+  ],
+  "refined_instruction": "First, move the yellow_cup from the purple_zone to the cyan_zone to clear the destination. Once the purple_zone is empty, move the red_cube from its current location to the purple_zone. Success is achieved when the red_cube is on the purple_zone and the yellow_cup is on the cyan_zone.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 1,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "yellow_cup",
+   "zone": "cyan_zone"
+  },
+  {
+   "object": "red_cube",
+   "zone": "purple_zone"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "yellow_cup",
+   "zone": "cyan_zone"
+  },
+  {
+   "object": "red_cube",
+   "zone": "purple_zone"
+  }
+ ],
+ "final_perception": {
+  "yellow_cup": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0015,
+    0.001
+   ],
+   "zone_half_size": [
+    0.0595,
+    0.0576
+   ],
+   "top_height_above_table": 0.0706,
+   "nominal_height": 0.07,
+   "gripper_holding": false,
+   "satisfied": true
+  },
+  "red_cube": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0002,
+    0.0012
+   ],
+   "zone_half_size": [
+    0.0576,
+    0.0576
+   ],
+   "top_height_above_table": 0.0398,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": true,
+  "objects": {
+   "yellow_cup": {
+    "zone": "cyan_zone",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.071,
+     0.1615,
+     0.8356
+    ]
+   },
+   "red_cube": {
+    "zone": "purple_zone",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0298,
+     -0.0255,
+     0.8198
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "seconds": 7.6,
+ "llm_usage": {
+  "calls": 5,
+  "prompt_tokens": 3471,
+  "completion_tokens": 494,
+  "seconds": 2.8,
+  "by_purpose": {
+   "code": 2,
+   "plan": 1,
+   "refine": 1,
+   "user_memory_write": 1
+  }
+ }
+}

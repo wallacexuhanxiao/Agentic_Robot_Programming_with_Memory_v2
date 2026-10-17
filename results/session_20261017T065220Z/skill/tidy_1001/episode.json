@@ -1,0 +1,318 @@
+{
+ "task_id": "tidy_1001",
+ "family": "tidy",
+ "instruction": "Put my things where they belong.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "blue_book",
+   "zone": "purple_zone",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "import math\n\nobs = observe()\ntable_z = obs[\"table_z\"]\nbook = obs[\"objects\"][\"blue_book\"]\nzone = obs[\"zones\"][\"purple_zone\"]\n\n# Calculate grasp point relative to table\ngrasp_h = book[\"height\"] + 0.01\n# Yaw aligned with book's long axis\nyaw = book[\"long_axis_yaw\"]\n\n# Pick the book\npick(book[\"name\"], grasp_h, yaw)\n\n# Move to zone center with small offset to avoid collision\nplace(zone[\"name\"], 0.0, 0.0)",
+     "program_ok": false,
+     "error": {
+      "type": "rejected",
+      "message": "forbidden_statement: Import at line 1 (no imports, try/except, classes, lambdas)"
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0481,
+       0.3636
+      ],
+      "zone_half_size": [
+       0.0576,
+       0.0576
+      ],
+      "top_height_above_table": 0.0248,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 0.0,
+     "trace": [],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.0248,
+      "footprint_short": 0.0598,
+      "object_reach": 0.647,
+      "zone_reach": 0.669
+     },
+     "diagnosis": "- The program did not run as written: forbidden_statement: Import at line 1 (no imports, try/except, classes, lambdas).\n- After the program blue_book is offset [-0.0481, 0.3636] m from the centre of purple_zone (the zone half size is [0.0576, 0.0576]); inside_zone=False, resting=True, gripper_holding=False."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\nbook = obs[\"objects\"][\"blue_book\"]\nzone = obs[\"zones\"][\"purple_zone\"]\n\ngrasp_h = book[\"height\"] + 0.01\nyaw = book[\"long_axis_yaw\"]\n\npick(book[\"name\"], grasp_h, yaw)\nplace(zone[\"name\"], 0.0, 0.0)",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "not_holding_anything",
+      "details": {}
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0481,
+       0.3636
+      ],
+      "zone_half_size": [
+       0.0576,
+       0.0576
+      ],
+      "top_height_above_table": 0.0248,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 276,
+     "seconds": 1.4,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.0348,
+        0.5
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.001,
+        "closed_command": true,
+        "holding_something": false,
+        "grasp_point_z": 0.8348,
+        "object_top_z_before": 0.8248
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "purple_zone",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "not_holding_anything"
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.0248,
+      "footprint_short": 0.0598,
+      "object_reach": 0.647,
+      "zone_reach": 0.669
+     },
+     "diagnosis": "- pick('blue_book', 0.0348, 0.5) -> holding_something=False; grip point z 0.8348 vs blue_book top_z 0.8248 (height 0.0248, footprint 0.0892 x 0.0598, long_axis_yaw 0.5).\n- Call 2 place('purple_zone', 0.0, 0.0) failed: {'reason': 'not_holding_anything'}.\n- After the program blue_book is offset [-0.0481, 0.3636] m from the centre of purple_zone (the zone half size is [0.0576, 0.0576]); inside_zone=False, resting=True, gripper_holding=False."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\nbook = obs[\"objects\"][\"blue_book\"]\nzone = obs[\"zones\"][\"purple_zone\"]\n\n# Ensure grasp height is strictly above the object's top surface\ngrasp_h = book[\"top_z\"] - table_z + 0.01\nyaw = book[\"long_axis_yaw\"]\n\npick(book[\"name\"], grasp_h, yaw)\nplace(zone[\"name\"], 0.0, 0.0)",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "not_holding_anything",
+      "details": {}
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0481,
+       0.3636
+      ],
+      "zone_half_size": [
+       0.0576,
+       0.0576
+      ],
+      "top_height_above_table": 0.0248,
+      "nominal_height": 0.025,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 288,
+     "seconds": 1.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "blue_book",
+        0.0348,
+        0.5
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.001,
+        "closed_command": true,
+        "holding_something": false,
+        "grasp_point_z": 0.8348,
+        "object_top_z_before": 0.8248
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "purple_zone",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "error": {
+        "reason": "not_holding_anything"
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.0248,
+      "footprint_short": 0.0598,
+      "object_reach": 0.647,
+      "zone_reach": 0.669
+     },
+     "diagnosis": "- pick('blue_book', 0.0348, 0.5) -> holding_something=False; grip point z 0.8348 vs blue_book top_z 0.8248 (height 0.0248, footprint 0.0892 x 0.0598, long_axis_yaw 0.5).\n- Call 2 place('purple_zone', 0.0, 0.0) failed: {'reason': 'not_holding_anything'}.\n- After the program blue_book is offset [-0.0481, 0.3636] m from the centre of purple_zone (the zone half size is [0.0576, 0.0576]); inside_zone=False, resting=True, gripper_holding=False."
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "yellow_cup",
+    "zone": "orange_zone",
+    "source": "instruction",
+    "evidence": "Put my things where they belong."
+   },
+   {
+    "object": "blue_book",
+    "zone": "purple_zone",
+    "source": "assumption",
+    "evidence": "Books typically belong in a designated storage or reading zone; purple_zone is the only unoccupied zone suitable for a book."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "constraints": [
+   "The yellow_cup is already on the orange_zone, which is its target zone, so no action is needed for it.",
+   "The blue_book is currently unplaced (on_zone: null) and must be moved to the purple_zone.",
+   "Ensure the robot does not disturb the yellow_cup during the task."
+  ],
+  "refined_instruction": "The user's request is to 'Put my things where they belong.' Analysis shows the yellow_cup is already on the orange_zone, which is its correct location based on the instruction, so it requires no movement. The blue_book is currently unplaced. Based on standard object categorization and available space, the blue_book should be moved to the purple_zone, as it is the only unoccupied zone and suitable for a book. Execute the task by moving the blue_book to the purple_zone. Do not move the yellow_cup. Success is achieved when the blue_book is located on the purple_zone and the yellow_cup remains on the orange_zone.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 1
+  }
+ },
+ "plan": [
+  {
+   "object": "blue_book",
+   "zone": "purple_zone"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "blue_book",
+   "zone": "purple_zone"
+  }
+ ],
+ "final_perception": {
+  "yellow_cup": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0203,
+    -0.237
+   ],
+   "zone_half_size": [
+    0.0576,
+    0.0576
+   ],
+   "top_height_above_table": 0.0706,
+   "nominal_height": 0.07,
+   "gripper_holding": false,
+   "satisfied": false
+  },
+  "blue_book": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.1397,
+    0.3898
+   ],
+   "zone_half_size": [
+    0.0596,
+    0.0577
+   ],
+   "top_height_above_table": 0.0248,
+   "nominal_height": 0.025,
+   "gripper_holding": false,
+   "satisfied": false
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "yellow_cup": {
+    "zone": "cyan_zone",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0806,
+     -0.175,
+     0.8356
+    ]
+   },
+   "blue_book": {
+    "zone": "orange_zone",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0484,
+     0.2213,
+     0.8123
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "seconds": 7.9,
+ "llm_usage": {
+  "calls": 5,
+  "prompt_tokens": 5618,
+  "completion_tokens": 706,
+  "seconds": 4.0,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1
+  }
+ }
+}

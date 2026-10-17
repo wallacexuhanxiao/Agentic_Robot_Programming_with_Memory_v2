@@ -11,10 +11,10 @@ import imageio.v2 as imageio
 import numpy as np
 
 
-def card(text_lines, size=(240, 320), seconds=2.0, fps=20):
+def card(text_lines, size=(240, 320), seconds=3.0, fps=20):
     frame = np.full((size[0], size[1], 3), 25, np.uint8)
     for i, line in enumerate(text_lines):
-        cv2.putText(frame, line, (10, 40 + 28 * i), cv2.FONT_HERSHEY_SIMPLEX, .5, (235, 235, 235), 1, cv2.LINE_AA)
+        cv2.putText(frame, line, (8, 30 + 26 * i), cv2.FONT_HERSHEY_SIMPLEX, .42, (235, 235, 235), 1, cv2.LINE_AA)
     return [frame] * int(seconds * fps)
 
 
@@ -23,6 +23,10 @@ def label(frame, text):
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 18), (0, 0, 0), -1)
     cv2.putText(frame, text, (4, 13), cv2.FONT_HERSHEY_SIMPLEX, .38, (255, 255, 255), 1, cv2.LINE_AA)
     return frame
+
+
+LABELS = {"none": "no memory", "skill": "skill memory", "user": "user memory", "both": "user + skill memory",
+          "memory": "skill memory"}
 
 
 def main(run_dir, out, items):
@@ -34,12 +38,15 @@ def main(run_dir, out, items):
         gt = episode["private_eval"]["success"]
         gens = sum(len(s["attempts"]) for s in episode.get("subgoals", []))
         skills = sorted({f for s in episode.get("subgoals", []) for a in s["attempts"] for f in a["used_skills"]})
-        lines = [f"{task}  [{'with memory' if condition == 'memory' else 'no memory'}]",
+        goals = [f"{s['object']}->{s['zone'].replace('_zone', '')}{' ok' if s['success'] else ' X'}"
+                 for s in episode.get("subgoals", [])]
+        lines = [f"{task}  [{LABELS.get(condition, condition)}]",
                  episode["instruction"][:45], episode["instruction"][45:90],
                  f"code generations: {gens}", f"skills called: {', '.join(skills) or 'none'}",
+                 "plan: " + ", ".join(goals)[:46],
                  f"ground truth: {'SUCCESS' if gt else 'FAIL'}"]
         frames += card(lines)
-        tag = f"{task} | {'memory' if condition == 'memory' else 'no memory'} | GT {'ok' if gt else 'fail'}"
+        tag = f"{task} | {LABELS.get(condition, condition)} | GT {'ok' if gt else 'fail'}"
         frames += [label(f, tag) for f in imageio.mimread(video, memtest=False)]
     imageio.mimwrite(out, frames, fps=20)
     print(out, len(frames), "frames")

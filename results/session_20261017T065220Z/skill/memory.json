@@ -1,0 +1,134 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    cup = obs[\"objects\"][obj_name]\n    target = obs[\"zones\"][zone_name]\n\n    # Calculate grasp height: object top_z minus a small clearance (0.01m)\n    grasp_h = cup[\"top_z\"] - table_z - 0.01\n\n    # Grasp the object. Yaw 0 aligns with the object's long axis (assumed consistent with original logic).\n    pick(obj_name, grasp_h, 0.0)\n\n    # Move to zone center\n    place(zone_name, 0.0, 0.0)\n\n    # Wait for release to complete\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "cup"
+    ],
+    "notes": "The function assumes the target zone is initially empty and the gripper is free before execution, relying on the object's top_z relative to the table height for grasp calculation."
+   },
+   "origin": {
+    "task": "tidy_1002",
+    "object": "red_cup",
+    "zone": "cyan_zone",
+    "attempt": 2,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncup = obs[\"objects\"][\"red_cup\"]\ntarget = obs[\"zones\"][\"cyan_zone\"]\n\n# Calculate grasp height: object top_z minus a small clearance (0.01m)\ngrasp_h = cup[\"top_z\"] - table_z - 0.01\n\n# Grasp the cup. Yaw 0 aligns with the cup's long axis (0.0).\npick(\"red_cup\", grasp_h, 0.0)\n\n# Move to zone center\nplace(\"cyan_zone\", 0.0, 0.0)\n\n# Wait for release to complete\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "tidy_1002",
+     "source": "origin",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.0426,
+      "object_reach": 0.66,
+      "zone_reach": 0.56
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5010",
+     "source": "validation",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.0433,
+      "object_reach": 0.672,
+      "zone_reach": 0.494
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5011",
+     "source": "validation",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.046,
+      "object_reach": 0.655,
+      "zone_reach": 0.552
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    cube = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n\n    # Grasp height: slightly above table surface\n    grasp_h = 0.02\n    # Yaw aligned with cube's long axis (assuming 'long_axis_yaw' exists for cubes)\n    yaw = cube.get(\"long_axis_yaw\", 0.0)\n\n    pick(obj_name, grasp_h, yaw)\n    place(zone_name, 0.0, 0.0)\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "cube"
+    ],
+    "notes": "The function assumes the target object has a 'long_axis_yaw' property for orientation and that the zone is currently unoccupied."
+   },
+   "origin": {
+    "task": "tidy_1004",
+    "object": "red_cube",
+    "zone": "cyan_zone",
+    "attempt": 1,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncube = obs[\"objects\"][\"red_cube\"]\nzone = obs[\"zones\"][\"cyan_zone\"]\n\n# Grasp height: slightly above table surface\ngrasp_h = 0.02\n# Yaw aligned with cube's long axis\nyaw = cube[\"long_axis_yaw\"]\n\npick(\"red_cube\", grasp_h, yaw)\nplace(\"cyan_zone\", 0.0, 0.0)\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "tidy_1004",
+     "source": "origin",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.039,
+      "object_reach": 0.653,
+      "zone_reach": 0.554
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0397,
+      "object_reach": 0.503,
+      "zone_reach": 0.573
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.039,
+      "object_reach": 0.656,
+      "zone_reach": 0.656
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ]
+}

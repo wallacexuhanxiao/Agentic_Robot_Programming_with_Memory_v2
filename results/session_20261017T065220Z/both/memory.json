@@ -1,0 +1,69 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    \"\"\"\n    Places a specified object onto a specified zone.\n    Computes grasp height and orientation dynamically from observation.\n    \"\"\"\n    obs = observe()\n    \n    # Retrieve object and zone data\n    obj = obs[\"objects\"][obj_name]\n    zone = obs[\"zones\"][zone_name]\n    \n    # Compute dynamic arguments\n    # Use 5cm above table as a safe grasp height (offset from table_z)\n    grasp_h = 0.05 \n    \n    # Align with the object's long axis to ensure stable placement\n    yaw = obj[\"long_axis_yaw\"]\n    \n    # Execute the pick and place sequence\n    pick(obj_name, grasp_h, yaw)\n    place(zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "cup"
+    ],
+    "notes": "The function assumes the target zone is clear and the gripper is empty before execution, relying on the object's long_axis_yaw for orientation."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "yellow_cup",
+    "zone": "cyan_zone",
+    "attempt": 3,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncup = obs[\"objects\"][\"yellow_cup\"]\nzone = obs[\"zones\"][\"cyan_zone\"]\n\n# Grasp 5cm above table to avoid collision with table edge or other objects\ngrasp_h = 0.05\n# Align with cup's long axis\nyaw = cup[\"long_axis_yaw\"]\n\npick(\"yellow_cup\", grasp_h, yaw)\nplace(\"cyan_zone\")"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.0444,
+      "object_reach": 0.464,
+      "zone_reach": 0.622
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5010",
+     "source": "validation",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.0433,
+      "object_reach": 0.672,
+      "zone_reach": 0.494
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5011",
+     "source": "validation",
+     "features": {
+      "kind": "cup",
+      "height": 0.0706,
+      "footprint_short": 0.046,
+      "object_reach": 0.655,
+      "zone_reach": 0.552
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ]
+}

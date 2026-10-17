@@ -1,0 +1,382 @@
+{
+ "task_id": "tidy_1005",
+ "family": "tidy",
+ "instruction": "Tidy up my desk, please.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_cube",
+   "zone": "purple_zone",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncube = obs[\"objects\"][\"red_cube\"]\npurple = obs[\"zones\"][\"purple_zone\"]\ncup = obs[\"objects\"][\"yellow_cup\"]\n\n# Check if cup is inside purple zone\ncup_in_zone = (\n    abs(cup[\"center\"][0] - purple[\"center\"][0]) <= purple[\"half_size\"][0] + 0.01 and\n    abs(cup[\"center\"][1] - purple[\"center\"][1]) <= purple[\"half_size\"][1] + 0.01\n)\n\nif cup_in_zone:\n    # Place on cyan_zone instead\n    grasp_h = cube[\"top_z\"] - table_z - 0.01\n    pick(\"red_cube\", grasp_h, 0.0)\n    place(\"cyan_zone\", 0.0, 0.0)\nelse:\n    # Place on purple_zone\n    grasp_h = cube[\"top_z\"] - table_z - 0.01\n    pick(\"red_cube\", grasp_h, 0.0)\n    place(\"purple_zone\", 0.0, 0.0)\n\nwait(20)",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       0.0404,
+       0.1854
+      ],
+      "zone_half_size": [
+       0.0576,
+       0.0576
+      ],
+      "top_height_above_table": 0.0398,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 495,
+     "seconds": 2.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_cube",
+        0.0298,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0378,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.8298,
+        "object_top_z_before": 0.8398
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        "cyan_zone",
+        0.0,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "released_at": [
+         0.0706,
+         0.1617
+        ]
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "result": null
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "state: zone occupied by ['yellow_cup']"
+        ],
+        "kind_record": [
+         0,
+         0
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "state: zone occupied by ['yellow_cup']"
+        ],
+        "kind_record": [
+         3,
+         0
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0395,
+      "object_reach": 0.524,
+      "zone_reach": 0.588
+     },
+     "diagnosis": "- pick('red_cube', 0.0298, 0.0) -> holding_something=True; grip point z 0.8298 vs red_cube top_z 0.8398 (height 0.0398, footprint 0.0399 x 0.0395, long_axis_yaw 1.215).\n- After the program red_cube is offset [0.0404, 0.1854] m from the centre of purple_zone (the zone half size is [0.0576, 0.0576]); inside_zone=False, resting=True, gripper_holding=False."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncube = obs[\"objects\"][\"red_cube\"]\npurple = obs[\"zones\"][\"purple_zone\"]\ncyan = obs[\"zones\"][\"cyan_zone\"]\ncup = obs[\"objects\"][\"yellow_cup\"]\n\n# Check if cup is inside purple zone\ncup_in_purple = (\n    abs(cup[\"center\"][0] - purple[\"center\"][0]) <= purple[\"half_size\"][0] + 0.01 and\n    abs(cup[\"center\"][1] - purple[\"center\"][1]) <= purple[\"half_size\"][1] + 0.01\n)\n\n# Determine target zone\ntarget_zone = cyan if cup_in_purple else purple\n\n# Calculate grasp height (just above object top)\ngrasp_h = cube[\"top_z\"] - table_z - 0.01\n\n# Pick up the cube\npick(\"red_cube\", grasp_h, 0.0)\n\n# Place on the chosen zone\nplace(target_zone, 0.0, 0.0)\n\nwait(20)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "unhashable type: 'dict'",
+      "location": [
+       "<program>",
+       24
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 288,
+     "seconds": 1.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      },
+      {
+       "call": "pick",
+       "args": [
+        "red_cube",
+        0.0298,
+        0.0
+       ],
+       "kwargs": {},
+       "result": {
+        "width": 0.0376,
+        "closed_command": true,
+        "holding_something": true,
+        "grasp_point_z": 0.8298,
+        "object_top_z_before": 0.8398
+       }
+      },
+      {
+       "call": "place",
+       "args": [
+        {
+         "name": "cyan_zone",
+         "center": [
+          0.0706,
+          0.1617,
+          0.8
+         ],
+         "half_size": [
+          0.0595,
+          0.0576
+         ]
+        },
+        0.0,
+        0.0
+       ],
+       "kwargs": {}
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "state: zone occupied by ['yellow_cup']"
+        ],
+        "kind_record": [
+         0,
+         0
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "state: zone occupied by ['yellow_cup']"
+        ],
+        "kind_record": [
+         3,
+         0
+        ]
+       }
+      }
+     ],
+     "features": {
+      "kind": "cube",
+      "height": 0.0398,
+      "footprint_short": 0.0359,
+      "object_reach": 0.649,
+      "zone_reach": 0.588
+     },
+     "diagnosis": "- The program did not run as written: unhashable type: 'dict' TypeError ('<program>', 24).\n- pick('red_cube', 0.0298, 0.0) -> holding_something=True; grip point z 0.8298 vs red_cube top_z 0.8398 (height 0.0398, footprint 0.0369 x 0.0359, long_axis_yaw -1.571).\n- After the program the camera could not see red_cube or purple_zone."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncube = obs[\"objects\"][\"red_cube\"]\npurple = obs[\"zones\"][\"purple_zone\"]\ncyan = obs[\"zones\"][\"cyan_zone\"]\ncup = obs[\"objects\"][\"yellow_cup\"]\n\n# Check if cup is inside purple zone\ncup_in_purple = (\n    abs(cup[\"center\"][0] - purple[\"center\"][0]) <= purple[\"half_size\"][0] + 0.01 and\n    abs(cup[\"center\"][1] - purple[\"center\"][1]) <= purple[\"half_size\"][1] + 0.01\n)\n\n# Determine target zone\ntarget_zone = cyan if cup_in_purple else purple\n\n# Calculate grasp height (just above object top)\ngrasp_h = cube[\"top_z\"] - table_z - 0.01\n\n# Pick up the cube\npick(\"red_cube\", grasp_h, 0.0)\n\n# Place on the chosen zone (pass string name, not dict)\nplace(target_zone[\"name\"], 0.0, 0.0)\n\nwait(20)",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'red_cube'",
+      "location": [
+       "<program>",
+       3
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 20,
+     "seconds": 0.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {}
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "not_applicable",
+        "reasons": [
+         "object or zone not visible"
+        ]
+       }
+      }
+     ],
+     "features": null,
+     "diagnosis": "- The program did not run as written: 'red_cube' KeyError ('<program>', 3).\n- After the program the camera could not see red_cube or purple_zone."
+    }
+   ],
+   "zone_occupied_at_start": [
+    "yellow_cup"
+   ]
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_cube",
+    "zone": "purple_zone",
+    "source": "assumption",
+    "evidence": "The red_cube is currently floating (on_zone: null) and must be placed on a valid zone to tidy the desk; purple_zone is the only zone currently holding an object, suggesting it is the active workspace, but since the cup is already there, the cube should be placed on the same zone to consolidate items or an empty zone if one existed. However, with only purple_zone occupied by the cup, and no other objects, placing the cube on purple_zone is the logical step to 'tidy' it from floating to a surface. Wait, re-evaluating: 'Tidy up' usually implies organizing. If the cup is on purple_zone, and the cube is floating, placing the cube on purple_zone makes sense if we assume the desk surface is the purple_zone. But the prompt says 'on_zone' for the cup is 'purple_zone'. The cube has null. The available zones are cyan, orange, purple. Purple is occupied. To tidy, we should place the cube on a zone. Since no specific zone is requested, and purple is the only one with an object (implying it's the 'desk' area?), but we can't stack arbitrarily without knowing physics. Let's assume the goal is to place the floating object onto a valid zone. The most logical 'tidy' action for a floating object is to place it on a surface. If purple_zone is the main desk surface (holding the cup), the cube should go there. However, if 'tidy' means 'put everything in its place', and we don't know the place, we default to placing it on an available zone. But purple is occupied. Can we place on top? The prompt doesn't specify stacking limits. Let's assume standard robot logic: place on a zone. If purple is the only 'desk' zone, place there. If we must choose an empty zone, we have cyan and orange. Without user preference, 'assumption' is the source. Let's pick purple_zone as the primary workspace, assuming the cup doesn't block the entire zone or stacking is allowed, OR pick an empty zone. Actually, the safest 'tidy' assumption for a floating object is to place it on the zone that currently has items (the active desk), assuming the object fits. Let's select purple_zone."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "constraints": [
+   "The red_cube is currently floating and must be placed on a valid zone.",
+   "The yellow_cup is already on the purple_zone and should remain undisturbed unless necessary to access the cube.",
+   "If the purple_zone is considered full or the cup blocks placement, the red_cube should be placed on an empty zone (cyan_zone or orange_zone).",
+   "Success is defined when the red_cube is resting on a valid zone and the yellow_cup remains on the purple_zone."
+  ],
+  "refined_instruction": "Pick up the red_cube from its current floating position. Place the red_cube onto the purple_zone, ensuring it does not displace the yellow_cup. If the purple_zone is deemed occupied or inaccessible for the cube, place the red_cube on the cyan_zone instead. Verify that the yellow_cup remains stationary on the purple_zone throughout the operation. The task is complete when the red_cube is securely resting on a valid zone and the desk appears organized with no floating objects.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 0,
+   "assumption": 1
+  }
+ },
+ "plan": [
+  {
+   "object": "red_cube",
+   "zone": "purple_zone"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_cube",
+   "zone": "purple_zone"
+  }
+ ],
+ "final_perception": {
+  "yellow_cup": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0357,
+    -0.1984
+   ],
+   "zone_half_size": [
+    0.0595,
+    0.0576
+   ],
+   "top_height_above_table": 0.0706,
+   "nominal_height": 0.07,
+   "gripper_holding": true,
+   "satisfied": false
+  },
+  "red_cube": {
+   "satisfied": false,
+   "reason": "not_visible",
+   "object_visible": false,
+   "zone_visible": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "yellow_cup": {
+    "zone": "cyan_zone",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0377,
+     -0.0387,
+     0.8356
+    ]
+   },
+   "red_cube": {
+    "zone": "purple_zone",
+    "inside": false,
+    "resting": false,
+    "upright": true,
+    "position": [
+     -0.1981,
+     -0.0002,
+     1.0678
+    ]
+   }
+  },
+  "gripper_holding": true
+ },
+ "seconds": 13.2,
+ "llm_usage": {
+  "calls": 5,
+  "prompt_tokens": 6901,
+  "completion_tokens": 1496,
+  "seconds": 8.3,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1
+  }
+ }
+}

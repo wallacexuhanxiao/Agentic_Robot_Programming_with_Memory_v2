@@ -1,0 +1,19 @@
+{
+ "index": 4,
+ "purpose": "extract",
+ "seconds": 1.34,
+ "finish_reason": "stop",
+ "usage": {
+  "prompt_tokens": 342,
+  "total_tokens": 586,
+  "completion_tokens": 244,
+  "prompt_tokens_details": null
+ },
+ "messages": [
+  {
+   "role": "user",
+   "content": "A robot program just achieved this subgoal, verified by the camera:\n  place object \"red_cup\" (kind: cup) on zone \"cyan_zone\".\nProgram:\n```python\nobs = observe()\ntable_z = obs[\"table_z\"]\ncup = obs[\"objects\"][\"red_cup\"]\ntarget = obs[\"zones\"][\"cyan_zone\"]\n\n# Calculate grasp height: object top_z minus a small clearance (0.01m)\ngrasp_h = cup[\"top_z\"] - table_z - 0.01\n\n# Grasp the cup. Yaw 0 aligns with the cup's long axis (0.0).\npick(\"red_cup\", grasp_h, 0.0)\n\n# Move to zone center\nplace(\"cyan_zone\", 0.0, 0.0)\n\n# Wait for release to complete\nwait(20)\n```\nRewrite it as ONE reusable function\n\ndef place_on_zone_v1(obj_name, zone_name):\n\nthat calls observe() itself and computes every argument from the observation (no scene-specific\ncoordinates as literals; numeric offsets are fine). Keep what made it work.\nThen, after the code, give a JSON object on the last line with the conditions under which you\nexpect the function to work, using only these keys:\n{\"object_kinds\": [...], \"requires_zone_free\": true|false, \"requires_gripper_empty\": true|false,\n  \"notes\": \"<one sentence>\"}\nFormat: a ```python block with the function, then the JSON line."
+  }
+ ],
+ "response": "```python\ndef place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    cup = obs[\"objects\"][obj_name]\n    target = obs[\"zones\"][zone_name]\n\n    # Calculate grasp height: object top_z minus a small clearance (0.01m)\n    grasp_h = cup[\"top_z\"] - table_z - 0.01\n\n    # Grasp the object. Yaw 0 aligns with the object's long axis (assumed consistent with original logic).\n    pick(obj_name, grasp_h, 0.0)\n\n    # Move to zone center\n    place(zone_name, 0.0, 0.0)\n\n    # Wait for release to complete\n    wait(20)\n```\n\n```json\n{\"object_kinds\": [\"cup\"], \"requires_zone_free\": true, \"requires_gripper_empty\": true, \"notes\": \"The function assumes the target zone is initially empty and the gripper is free before execution, relying on the object's top_z relative to the table height for grasp calculation.\"}\n```"
+}
