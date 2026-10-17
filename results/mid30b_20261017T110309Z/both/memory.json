@@ -1,0 +1,583 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    # Get grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        return  # No valid grasp candidate found\n    \n    candidate = candidates[0]\n    grasp(candidate)\n    \n    # Verify grasp success\n    if not observe()[\"gripper\"][\"holding_something\"]:\n        return  # Failed to grasp; abort\n    \n    # Get free spots on target zone\n    spots = free_spots(zone_name)\n    if not spots or not spots[\"spots\"]:\n        # Target zone is occupied; move the occupant first\n        occupant = spots[\"occupants\"][0]\n        # Find a free spot in purple_box\n        free_spots_purple = free_spots(\"purple_box\")\n        if not free_spots_purple or not free_spots_purple[\"spots\"]:\n            return  # No space to move occupant\n        \n        spot = free_spots_purple[\"spots\"][0]\n        carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        wait(20)\n    \n    # Now place the object on the target zone\n    spots = free_spots(zone_name)  # Re-check after moving occupant\n    if not spots or not spots[\"spots\"]:\n        return  # Still no free spot\n    \n    spot = spots[\"spots\"][0]\n    carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    wait(20)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug"
+    ],
+    "notes": "The function works when the target zone may be occupied, and it relocates the occupant to a free spot in the purple_box if needed."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"yellow_mug\")\ncandidate = candidates[0]  # Use first candidate; adjust if needed\ngrasp(candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    # Failed to grasp; abort\n    pass\nspots = free_spots(\"cyan_tray\")\nif not spots:\n    # Target zone occupied; move the occupant first\n    occupant = spots[\"occupants\"][0]\n    # Find a free spot in purple_box\n    free_spots_purple = free_spots(\"purple_box\")\n    if free_spots_purple[\"spots\"]:\n        spot = free_spots_purple[\"spots\"][0]\n        carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        wait(20)\n# Now place yellow_mug on cyan_tray\nspot = spots[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0476,
+      "object_reach": 0.693,
+      "zone_reach": 0.611
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.507,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_1",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_3",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.503,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.69,
+      "zone_reach": 0.555
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1003",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0392,
+      "object_reach": 0.497,
+      "zone_reach": 0.647
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0394,
+      "object_reach": 0.502,
+      "zone_reach": 0.607
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0456,
+      "object_reach": 0.513,
+      "zone_reach": 0.549
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1005",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0457,
+      "object_reach": 0.575,
+      "zone_reach": 0.642
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1005",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0395,
+      "object_reach": 0.524,
+      "zone_reach": 0.579
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    # Get grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        return False\n    candidate = candidates[0]\n    grasp(candidate)\n    \n    # Verify object is now held\n    if not observe()[\"gripper\"][\"holding_something\"]:\n        return False\n    \n    # Try to place on target zone\n    spots = free_spots(zone_name)\n    if spots and spots[\"spots\"]:\n        spot = spots[\"spots\"][0]\n        carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        wait(20)\n        return True\n    else:\n        # If target zone is not free, try to find an alternative zone (e.g., purple_box)\n        fallback_zone = \"purple_box\"\n        fallback_spots = free_spots(fallback_zone)\n        if not fallback_spots or not fallback_spots[\"spots\"]:\n            return False\n        spot = fallback_spots[\"spots\"][0]\n        carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        wait(20)\n        return True",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": false
+    },
+    "proposed_object_kinds": [
+     "book"
+    ],
+    "notes": "The function attempts to place the object on the target zone, and if unavailable, uses a fallback zone; it does not require the gripper to be empty at start, as it checks holding status after grasping."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"red_book\")\nif not candidates:\n    exit()\ncandidate = candidates[0]\ngrasp(candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    exit()\nspots = free_spots(\"orange_tray\")\nif not spots or not spots[\"spots\"]:\n    occupant = spots[\"occupants\"][0]\n    free_spots_purple = free_spots(\"purple_box\")\n    if not free_spots_purple or not free_spots_purple[\"spots\"]:\n        exit()\n    spot = free_spots_purple[\"spots\"][0]\n    carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    wait(20)\nspots = free_spots(\"orange_tray\")\nif not spots or not spots[\"spots\"]:\n    exit()\nspot = spots[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\nwait(20)"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0537,
+      "object_reach": 0.697,
+      "zone_reach": 0.581
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.503,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0545,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1000",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1003",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.0289,
+      "footprint_short": 0.0519,
+      "object_reach": 0.632,
+      "zone_reach": 0.637
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0476
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0733,
+    0.0537
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0396,
+    0.0381
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_1"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0546
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_2"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0535,
+    0.047
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0467
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0547
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.074,
+   "footprint": [
+    0.055,
+    0.0474
+   ],
+   "grasp_height": 0.037,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0732,
+    0.0549
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0538,
+    0.0471
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.008,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0548
+   ],
+   "grasp_height": 0.0189,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0289,
+   "footprint": [
+    0.0747,
+    0.0519
+   ],
+   "grasp_height": 0.014,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.073,
+    0.0519
+   ],
+   "grasp_height": 0.015,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.073,
+    0.0519
+   ],
+   "grasp_height": 0.015,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0399,
+    0.0392
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.0394
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0456
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.074,
+   "footprint": [
+    0.0518,
+    0.0457
+   ],
+   "grasp_height": 0.037,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1005"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0398,
+    0.0395
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1005"
+  }
+ ],
+ "lessons": [
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a grasp height of 0.025 m (equal to the book's height) and a yaw alignment matching the book's long axis to ensure the fingers grip the full thickness of the book, and pass the object name 'blue_book' to free_spots to resolve the footprint_unknown error.",
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use the 'long_axis_yaw' value from the object's camera observation (0.0) instead of relying on a potentially missing 'long_axis_yaw' in the grasp candidate dictionary.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with fingers oriented across the long axis (yaw aligned with long_axis_yaw) and adjust grasp height to be slightly below the object's top surface (e.g., 0.006m) to ensure the fingers fully enclose the book's thickness.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with fingers across the short axis (yaw = -1.571) and a grasp height slightly below the top surface (e.g., 0.006 m) to avoid motion blocking and ensure stable grip, as the current long-axis grasp is obstructed by the robot's kinematic constraints.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Adjust the grasp height to be 0.006 m below the object's top_z minus the table_z, ensuring table_z is properly retrieved from the object's observation before use.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Adjust the grasp height to be 0.006 m below the object's top surface using the observed 'top_z' value, and ensure 'table_z' is properly defined or retrieved from the object's state before use.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with fingers aligned along the long axis of the book (yaw = -0.464) and approach from the side with the short axis (yaw = 1.107) to avoid motion blocking and ensure stable grasp and placement.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with yaw = long_axis_yaw + pi/2 \u2248 1.107 and height = top_z - 0.006, but ensure the approach trajectory avoids motion blocking by adjusting the approach path to clear the object's footprint and maintain a safe clearance above the table.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with fingers aligned along the long axis of the book (yaw = -0.464) and approach from the side with sufficient clearance to avoid motion blocking, ensuring the grasp height is set to 0.829 - 0.006 = 0.823 m above the table.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "lesson": "Use a grasp candidate with a grip point at the top surface of the yellow_block (grasp_height = 0.0399) and align the fingers along the long axis (yaw = 0.245) to ensure stable pickup and successful placement on the purple_box.",
+   "task": "tidy_1003"
+  }
+ ]
+}

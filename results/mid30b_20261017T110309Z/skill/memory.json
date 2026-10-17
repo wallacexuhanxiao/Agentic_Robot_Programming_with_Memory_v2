@@ -1,0 +1,603 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    # Observe current state\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise RuntimeError(f\"No grasp candidates found for {obj_name}\")\n    \n    candidate = candidates[0]\n    grasp_result = grasp(candidate)\n    if not grasp_result[\"holding_something\"]:\n        raise RuntimeError(f\"Failed to grasp {obj_name}\")\n    \n    # Check if target zone is free\n    spots = free_spots(zone_name)\n    if not spots[\"spots\"]:\n        # Zone is occupied; clear it\n        occupant = spots[\"occupants\"][0]\n        # Determine where to move the occupant\n        if occupant == \"yellow_mug\":\n            # Move to cyan_tray\n            mug_candidates = grasp_candidates(\"yellow_mug\")\n            if not mug_candidates:\n                raise RuntimeError(\"No grasp candidates for yellow_mug\")\n            grasp_result = grasp(mug_candidates[0])\n            if not grasp_result[\"holding_something\"]:\n                raise RuntimeError(\"Failed to grasp yellow_mug\")\n            spots = free_spots(\"cyan_tray\")\n            if not spots[\"spots\"]:\n                raise RuntimeError(\"No free spots on cyan_tray\")\n            carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(\"yellow_mug\", \"cyan_tray\")\n        else:\n            # Move to temporary location: purple_box\n            spots = free_spots(\"purple_box\")\n            if not spots[\"spots\"]:\n                raise RuntimeError(\"No free spots on purple_box\")\n            carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(occupant, \"purple_box\")\n    \n    # Now place the target object\n    spots = free_spots(zone_name)\n    if not spots[\"spots\"]:\n        raise RuntimeError(f\"Still no free spots on {zone_name} after clearing\")\n    \n    target_spot = spots[\"spots\"][0]\n    carry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "book"
+    ],
+    "notes": "The function clears occupied zones by relocating occupants to known or temporary destinations, ensuring safe placement."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"red_book\")\ncandidate = candidates[0]  # Use first candidate\ngrasp_result = grasp(candidate)\nif not grasp_result[\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_book\")\n\nspots = free_spots(\"orange_tray\")\nif not spots[\"spots\"]:\n    # Zone is occupied; clear it first\n    occupant = spots[\"occupants\"][0]\n    # Move occupant to its correct zone if known, else to a temporary location\n    if occupant == \"yellow_mug\":\n        # Move yellow_mug to cyan_tray\n        mug_candidates = grasp_candidates(\"yellow_mug\")\n        grasp_result = grasp(mug_candidates[0])\n        if not grasp_result[\"holding_something\"]:\n            raise RuntimeError(\"Failed to grasp yellow_mug\")\n        spots = free_spots(\"cyan_tray\")\n        carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        check(\"yellow_mug\", \"cyan_tray\")\n    else:\n        # Move to temporary location (e.g., purple_box)\n        spots = free_spots(\"purple_box\")\n        carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        check(occupant, \"purple_box\")\n\n# Now place red_book in orange_tray\nspots = free_spots(\"orange_tray\")\ncarry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_book\", \"orange_tray\")"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0537,
+      "object_reach": 0.697,
+      "zone_reach": 0.581
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.503,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0545,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1000",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0547,
+      "object_reach": 0.672,
+      "zone_reach": 0.616
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    \"\"\"\n    Places the specified object on a free spot in the given zone.\n    Automatically observes the scene, finds grasp candidates, checks for obstacles,\n    clears occupied spots if necessary, and places the object.\n    \"\"\"\n    # Observe the current state\n    observe()\n\n    # Step 1: Try to grasp the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise RuntimeError(f\"No grasp candidates for {obj_name}\")\n    candidate = candidates[0]\n    grasp_result = grasp(candidate)\n    if not grasp_result[\"holding_something\"]:\n        raise RuntimeError(f\"Failed to grasp {obj_name}\")\n\n    # Step 2: Find free spots on the target zone\n    spots = free_spots(zone_name)\n    if not spots[\"spots\"]:\n        # Zone is full \u2014 check if the object is already there\n        occupant = spots[\"occupants\"][0]\n        if occupant == obj_name:\n            # Object is already on the zone \u2014 verify and return\n            check(obj_name, zone_name)\n            return\n        else:\n            # Object is on a different zone \u2014 move it to a free spot\n            # Try to place the occupant on a different zone (e.g., purple_box)\n            alternate_zone = \"purple_box\"\n            alt_spots = free_spots(alternate_zone)\n            if not alt_spots[\"spots\"]:\n                raise RuntimeError(f\"No free spots on {alternate_zone}\")\n            target_spot = alt_spots[\"spots\"][0]\n            carry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(occupant, alternate_zone)\n            # Re-check free spots on original zone\n            spots = free_spots(zone_name)\n            if not spots[\"spots\"]:\n                raise RuntimeError(f\"No free spots on {zone_name} after clearing\")\n    \n    # Step 3: Place the object on the free spot\n    target_spot = spots[\"spots\"][0]\n    carry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    \n    # Final verification\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug"
+    ],
+    "notes": "The function works when the object is graspable and the target zone has at least one free spot, or the object is already present on the zone."
+   },
+   "origin": {
+    "task": "teach_4",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"yellow_mug\")\nif not candidates:\n    raise RuntimeError(\"No grasp candidates for yellow_mug\")\ncandidate = candidates[0]\ngrasp_result = grasp(candidate)\nif not grasp_result[\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp yellow_mug\")\n\nspots = free_spots(\"cyan_tray\")\nif not spots[\"spots\"]:\n    occupant = spots[\"occupants\"][0]\n    if occupant == \"yellow_mug\":\n        mug_candidates = grasp_candidates(\"yellow_mug\")\n        if not mug_candidates:\n            raise RuntimeError(\"No grasp candidates for yellow_mug\")\n        grasp(mug_candidates[0])\n        spots = free_spots(\"cyan_tray\")\n        if not spots[\"spots\"]:\n            raise RuntimeError(\"No free spots on cyan_tray\")\n        carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        check(\"yellow_mug\", \"cyan_tray\")\n    else:\n        spots = free_spots(\"purple_box\")\n        if not spots[\"spots\"]:\n            raise RuntimeError(\"No free spots on purple_box\")\n        carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        check(occupant, \"purple_box\")\n\nspots = free_spots(\"cyan_tray\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spots on cyan_tray after clearing\")\ntarget_spot = spots[\"spots\"][0]\ncarry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_mug\", \"cyan_tray\")"
+   },
+   "history": [
+    {
+     "task": "teach_4",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0476,
+      "object_reach": 0.693,
+      "zone_reach": 0.611
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.507,
+      "zone_reach": 0.566
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.657,
+      "zone_reach": 0.644
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.69,
+      "zone_reach": 0.555
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.69,
+      "zone_reach": 0.555
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "height": 0.07,
+      "footprint_short": 0.0456,
+      "object_reach": 0.513,
+      "zone_reach": 0.549
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v3",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v3(obj_name, zone_name):\n    # Observe the current state\n    scene = observe()\n    \n    # Find grasp candidates for the object\n    candidates = grasp_candidates(obj_name)\n    if not candidates:\n        raise RuntimeError(f\"No grasp candidates found for {obj_name}\")\n    \n    candidate = candidates[0]\n    grasp_result = grasp(candidate)\n    if not grasp_result[\"holding_something\"]:\n        raise RuntimeError(f\"Failed to grasp {obj_name}\")\n    \n    # Check if the target zone has any occupants\n    zone_spots = free_spots(zone_name)\n    if zone_spots[\"occupants\"]:\n        # Move the occupant to a backup zone (e.g., purple_box) if available\n        backup_zone = \"purple_box\"\n        backup_spots = free_spots(backup_zone)\n        if not backup_spots[\"spots\"]:\n            raise RuntimeError(f\"No free spots on {backup_zone}\")\n        \n        target_backup_spot = backup_spots[\"spots\"][0]\n        carry_to(target_backup_spot[\"x\"], target_backup_spot[\"y\"], height=0.18, yaw=target_backup_spot[\"gripper_yaw\"])\n        lower_until_contact()\n        open_gripper()\n        retreat()\n        check(zone_spots[\"occupants\"][0], backup_zone)\n    \n    # Now ensure the target zone is free\n    final_zone_spots = free_spots(zone_name)\n    if not final_zone_spots[\"spots\"]:\n        raise RuntimeError(f\"No free spots on {zone_name} after clearing\")\n    \n    # Place the object on the first free spot of the target zone\n    target_spot = final_zone_spots[\"spots\"][0]\n    carry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    }
+   },
+   "origin": {
+    "task": "place_1",
+    "object": "red_block",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"red_block\")\nif not candidates:\n    raise RuntimeError(\"No grasp candidates found for red_block\")\n\ncandidate = candidates[0]\ngrasp_result = grasp(candidate)\nif not grasp_result[\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_block\")\n\nspots = free_spots(\"orange_tray\")\nif spots[\"occupants\"]:\n    occupant = spots[\"occupants\"][0]\n    spots = free_spots(\"purple_box\")\n    if not spots[\"spots\"]:\n        raise RuntimeError(\"No free spots on purple_box\")\n    carry_to(spots[\"spots\"][0][\"x\"], spots[\"spots\"][0][\"y\"], height=0.18, yaw=spots[\"spots\"][0][\"gripper_yaw\"])\n    lower_until_contact()\n    open_gripper()\n    retreat()\n    check(occupant, \"purple_box\")\n\nspots = free_spots(\"orange_tray\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spots on orange_tray after clearing\")\n\ntarget_spot = spots[\"spots\"][0]\ncarry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_block\", \"orange_tray\")"
+   },
+   "history": [
+    {
+     "task": "place_1",
+     "source": "origin",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0381,
+      "object_reach": 0.67,
+      "zone_reach": 0.582
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5030",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.039,
+      "object_reach": 0.605,
+      "zone_reach": 0.656
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5031",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0399,
+      "object_reach": 0.473,
+      "zone_reach": 0.515
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1003",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0392,
+      "object_reach": 0.497,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1004",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0394,
+      "object_reach": 0.502,
+      "zone_reach": 0.607
+     },
+     "outcome": true
+    },
+    {
+     "task": "tidy_1005",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "height": 0.0399,
+      "footprint_short": 0.0395,
+      "object_reach": 0.524,
+      "zone_reach": 0.642
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0733,
+    0.0537
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0533,
+    0.0476
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "teach_4"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0396,
+    0.0381
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_1"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0546
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_2"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0535,
+    0.047
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.3094,
+   "footprint": [
+    0.0425,
+    0.0323
+   ],
+   "grasp_height": 0.155,
+   "yaw_from_long_axis_deg": 85,
+   "holding": false,
+   "error": "grasp_height_out_of_range",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0467
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0547
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0732,
+    0.0549
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0538,
+    0.0471
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.008,
+   "footprint": [
+    0.1072,
+    0.0
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0548
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0538,
+    0.0471
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0289,
+   "footprint": [
+    0.0747,
+    0.0519
+   ],
+   "grasp_height": 0.014,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.073,
+    0.0519
+   ],
+   "grasp_height": 0.015,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0399,
+    0.0392
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.0394
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0456
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0398,
+    0.0395
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "tidy_1005"
+  }
+ ],
+ "lessons": [
+  {
+   "kind": "mug",
+   "lesson": "Use a grasp candidate with a grasp height closer to the top of the mug (e.g., 0.065 m) to ensure the fingers grip above the mug's center of mass, preventing it from slipping or tilting during transport.",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "lesson": "The grasp candidate's height (0.155 m) is above the allowed maximum of 0.15 m above the table, so the grasp height should be reduced to be within [0.004, 0.15] m, ideally close to 0.065 m to match the top of the mug.",
+   "task": "place_3"
+  },
+  {
+   "kind": "mug",
+   "lesson": "The grasp candidate should be selected based on the mug's actual height of 0.3093 m, adjusting the height range to include higher candidates (e.g., 0.25 to 0.35 m) and ensuring the grasp approach aligns with the mug's orientation as seen by the camera.",
+   "task": "place_3"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a grasp height of 0.008 m (at the top surface) and a finger direction aligned with the book's long axis (yaw = 0.0) to ensure full contact and secure grip across the book's footprint.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a grasp height of 0.008 m and yaw aligned with the long axis (0.0) to ensure proper grip, and select a placement spot on the purple_box that is centered within its footprint to prevent offset placement.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "The grasp candidate should be selected based on a grasp height of 0.008 m and a yaw of 0.0 rad, but the robot failed because the book's actual footprint_short is 0.0, indicating it is oriented with its short axis perpendicular to the gripper's approach direction; therefore, the grasp candidate must be adjusted to align with the book's long axis (0.1072 m) and approach along the long axis (yaw = 0.0) while ensuring the gripper's finger direction matches the book's orientation.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a grasp height of 0.008 m and a yaw aligned with the long axis (0.0) to ensure proper orientation, and place the book at the center of the purple_box with a target spot that has a gripper_yaw matching the book's long axis yaw to prevent offset placement.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a height of 0.008 and yaw aligned with the long axis (0.0), and place the book on the purple_box at a spot where the gripper yaw matches the book's long axis yaw to ensure proper alignment and prevent offset.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with height closer to 0.008 and ensure the gripper approaches from the side perpendicular to the long axis (yaw = 1.571) to avoid motion blocking and enable proper grasp.",
+   "task": "tidy_1002"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with fingers aligned along the long axis of the book (yaw = -0.464) and approach from the side with the gripper oriented to avoid collision, ensuring the grasp pose is not blocked by the robot's kinematics.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with yaw aligned to the book's long axis (-0.464) and ensure the gripper approaches the book with the same yaw orientation to prevent misalignment during placement.",
+   "task": "tidy_1003"
+  },
+  {
+   "kind": "book",
+   "lesson": "Use a grasp candidate with a higher approach height (e.g., 0.15m) and a gripper approach aligned to the book's long axis to avoid motion blocking by the table, ensuring the gripper can reach the book without collision.",
+   "task": "tidy_1003"
+  }
+ ]
+}

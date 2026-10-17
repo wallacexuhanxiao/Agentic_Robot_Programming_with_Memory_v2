@@ -1,0 +1,637 @@
+{
+ "task_id": "tidy_1001",
+ "family": "tidy",
+ "instruction": "Put my things where they belong.",
+ "skill_memory": false,
+ "user_memory": true,
+ "subgoals": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Confirm cyan_tray is unoccupied\nif cyan_tray[\"occupants\"]:\n    # Clear cyan_tray by moving all objects to free spots\n    for obj_name in cyan_tray[\"occupants\"]:\n        obj = obs[\"objects\"][obj_name]\n        free_spots_list = free_spots(\"cyan_tray\", obj_name)\n        if free_spots_list[\"spots\"]:\n            spot = free_spots_list[\"spots\"][0]\n            carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(obj_name, \"cyan_tray\")\n\n# Now move yellow_mug to cyan_tray\ncandidates = grasp_candidates(\"yellow_mug\")\ncandidate = candidates[0]  # Use first candidate\ngrasp(candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Grasp failed\")\n\nfree_spots_list = free_spots(\"cyan_tray\")\nif not free_spots_list[\"spots\"]:\n    raise RuntimeError(\"No free spot in cyan_tray\")\n\nspot = free_spots_list[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_mug\", \"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'occupants'",
+      "location": [
+       "<program>",
+       6
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0298,
+       -0.2416
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 19.2,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 15,
+       "source": "<program>",
+       "line": 1
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0474,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: 'occupants' KeyError ('<program>', 6).\n- After the program yellow_mug is offset [-0.0298, -0.2416] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp candidate with a higher grasp height (e.g., 0.18 m) and ensure the gripper approaches the mug from directly above with a vertical orientation to prevent misalignment during placement."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Confirm cyan_tray is unoccupied\nif cyan_tray[\"occupants\"]:\n    for obj_name in cyan_tray[\"occupants\"]:\n        obj = obs[\"objects\"][obj_name]\n        free_spots_list = free_spots(\"cyan_tray\", obj_name)\n        if free_spots_list[\"spots\"]:\n            spot = free_spots_list[\"spots\"][0]\n            carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(obj_name, \"cyan_tray\")\n\n# Now move yellow_mug to cyan_tray with proper approach\ncandidates = grasp_candidates(\"yellow_mug\")\n# Choose candidate with highest height for stable grasp\ncandidate = max(candidates, key=lambda c: c[\"height\"])\ngrasp(candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Grasp failed\")\n\nfree_spots_list = free_spots(\"cyan_tray\")\nif not free_spots_list[\"spots\"]:\n    raise RuntimeError(\"No free spot in cyan_tray\")\n\nspot = free_spots_list[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_mug\", \"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "rejected",
+      "message": "forbidden_statement: Lambda at line 21 (no imports, try/except, classes, lambdas)"
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0298,
+       -0.2416
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 19.2,
+     "trace": [],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0474,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: forbidden_statement: Lambda at line 21 (no imports, try/except, classes, lambdas).\n- After the program yellow_mug is offset [-0.0298, -0.2416] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Choose a grasp candidate for the yellow_mug with a lower height and align the gripper's approach angle to match the mug's long axis yaw to ensure stable placement within the cyan_tray."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\nmug = obs[\"objects\"][\"yellow_mug\"]\ncyan_tray = obs[\"zones\"][\"cyan_tray\"]\n\n# Confirm cyan_tray is unoccupied\nif cyan_tray[\"occupants\"]:\n    for obj_name in cyan_tray[\"occupants\"]:\n        obj = obs[\"objects\"][obj_name]\n        free_spots_list = free_spots(\"cyan_tray\", obj_name)\n        if free_spots_list[\"spots\"]:\n            spot = free_spots_list[\"spots\"][0]\n            carry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\n            lower_until_contact()\n            open_gripper()\n            retreat()\n            check(obj_name, \"cyan_tray\")\n\n# Get grasp candidates and choose one with height near the mug's center and matching yaw\ncandidates = grasp_candidates(\"yellow_mug\")\nbest_candidate = None\nmin_diff = float('inf')\nfor c in candidates:\n    height_diff = abs(c[\"height\"] - (mug[\"center\"][2] - obs[\"table_z\"]))\n    yaw_diff = min(abs(c[\"yaw\"] - mug[\"long_axis_yaw\"]), abs(c[\"yaw\"] - mug[\"long_axis_yaw\"] + 3.1416), abs(c[\"yaw\"] - mug[\"long_axis_yaw\"] - 3.1416))\n    total_diff = height_diff + yaw_diff\n    if total_diff < min_diff:\n        min_diff = total_diff\n        best_candidate = c\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Grasp failed\")\n\nfree_spots_list = free_spots(\"cyan_tray\")\nif not free_spots_list[\"spots\"]:\n    raise RuntimeError(\"No free spot in cyan_tray\")\n\nspot = free_spots_list[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_mug\", \"cyan_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'occupants'",
+      "location": [
+       "<program>",
+       6
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0298,
+       -0.2416
+      ],
+      "zone_half_size": [
+       0.0649,
+       0.0668
+      ],
+      "top_height_above_table": 0.074,
+      "nominal_height": 0.07,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 4,
+     "seconds": 5.0,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 17,
+       "source": "<program>",
+       "line": 1
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "mug",
+      "height": 0.074,
+      "footprint_short": 0.0474,
+      "object_reach": 0.496,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: 'occupants' KeyError ('<program>', 6).\n- After the program yellow_mug is offset [-0.0298, -0.2416] m from the centre of cyan_tray (the zone half size is [0.0649, 0.0668]); inside_zone=False, resting=True, gripper_holding=False.",
+     "lesson": "Use a grasp candidate with a height closer to the mug's center and a yaw aligned with the mug's long axis to ensure stable grasping and accurate placement on the cyan_tray."
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "go_home()\nobs = observe()\nblue_book_candidates = grasp_candidates(\"blue_book\")\ncandidate = blue_book_candidates[0]  # Use first candidate\ngrasp(candidate)\nwait(20)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp blue_book\")\nspots = free_spots(\"orange_tray\")\nspot = spots[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nwait(20)\nlower_until_contact()\nwait(20)\nopen_gripper()\nwait(20)\nretreat(dz=0.12)\nwait(20)\ncheck_result = check(\"blue_book\", \"orange_tray\")\nif not check_result[\"satisfied\"]:\n    raise RuntimeError(\"blue_book not correctly placed on orange_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "IndexError",
+      "message": "list index out of range",
+      "location": [
+       "<program>",
+       10
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 322,
+     "seconds": 41.3,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 18,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         0.0001,
+         1.08
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 19,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "blue_book"
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 19,
+       "source": "<program>",
+       "line": 3,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": 0.0463, \"y\": 0.224, \"height\": 0.013, \"yaw\": -1.071, \"score\": null, \"id\": 0, \"object\": \"blue_book\", \"squeeze_width\": 0.0527, \"fits_open_fingers\": true, \"object_height\": 0.025, \"object_long_axis_yaw\": 0.5, \"object_footprint\": [0.0732, 0.0549]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": 0.0463, \"y\": 0.224, \"height\": 0.013, \"yaw\": 0.5, \"score\": null, \"id\": 1, \"object\": \"blue_book\", \"squeeze_width\": 0.0717, \"fits_open_fingers\": true, \"object_height\": 0.025, \"object_long_axis_yaw\": 0.5, \"object_footprint\": [0.0732, 0.0549]..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": 0.0463,
+         "y": 0.224,
+         "height": 0.013,
+         "yaw": -1.071,
+         "score": null,
+         "id": 0,
+         "object": "blue_book",
+         "squeeze_width": 0.0527,
+         "fits_open_fingers": true,
+         "object_height": 0.025,
+         "object_long_axis_yaw": 0.5,
+         "object_footprint": [
+          0.0732,
+          0.0549
+         ]
+        }
+       ],
+       "kwargs": {},
+       "control_step": 8,
+       "frame": 20,
+       "source": "<program>",
+       "line": 5,
+       "result": {
+        "holding_something": true,
+        "finger_gap": 0.0557,
+        "finger_gap_when_closed": 0.0557,
+        "expected_squeeze_width": 0.0527,
+        "stopped_above_target_m": null
+       }
+      },
+      {
+       "call": "wait",
+       "args": [
+        20
+       ],
+       "kwargs": {},
+       "control_step": 206,
+       "frame": 86,
+       "source": "<program>",
+       "line": 6,
+       "result": null
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 226,
+       "frame": 93,
+       "source": "<program>",
+       "line": 7
+      },
+      {
+       "call": "free_spots",
+       "args": [
+        "orange_tray"
+       ],
+       "kwargs": {},
+       "control_step": 226,
+       "frame": 93,
+       "source": "<program>",
+       "line": 9,
+       "result": {
+        "zone": "orange_tray",
+        "center": [
+         -0.0927,
+         -0.178,
+         0.8
+        ],
+        "half_size": [
+         0.0668,
+         0.0668
+        ],
+        "occupants": [
+         "yellow_mug"
+        ],
+        "spots": []
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "book",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.646,
+      "zone_reach": 0.5
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.0732,
+        0.0549
+       ],
+       "grasp_height": 0.013,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "diagnosis": "- The program did not run as written: list index out of range IndexError ('<program>', 10).\n- grasp({'source': 'geometry (fingers across the short side)', 'x': 0.0463, 'y': 0.224, 'height': 0.013, 'yaw': -1.071, 'score': None, 'id': 0, 'object': 'blue_book', 'squeeze_width': 0.0527, 'fits_open_fingers': True, 'object_height': 0.025, 'object_long_axis_yaw': 0.5, 'object_footprint': [0.0732, 0.0549]},) -> holding_something=True.\n- The grip point was -0.012 m relative to the object's top surface (grasp_height 0.013 vs object height 0.025); the fingers only grip what is below the grip point.\n- The fingertip line (yaw) was 90 degrees from the object's long axis, so the fingers squeezed across a 0.055 m extent of the object (the open fingers are 0.08 m apart; footprint is 0.073 along long_axis_yaw x 0.055 along short_axis_yaw).\n- After the program the camera could not see blue_book or orange_tray.",
+     "lesson": "Use a grasp candidate with a grasp height closer to the center of the book (around 0.0125 m) and align the fingers parallel to the long axis of the book to ensure a stable grip across the full width of the book's short side."
+    },
+    {
+     "n": 2,
+     "code": "go_home()\nobs = observe()\nblue_book_candidates = grasp_candidates(\"blue_book\")\n# Choose candidate with fingers aligned along the long axis (yaw = object_long_axis_yaw) for stable grasp\ncandidate = None\nfor c in blue_book_candidates:\n    if abs(c[\"yaw\"] - c[\"object_long_axis_yaw\"]) < 0.1:  # Align yaw with long axis\n        candidate = c\n        break\nif candidate is None:\n    raise RuntimeError(\"No suitable grasp candidate found for blue_book\")\n\n# Adjust grasp height to be near the center of the book (object_height / 2)\nadjusted_height = obs[\"objects\"][\"blue_book\"][\"height\"] / 2\ncandidate[\"height\"] = adjusted_height\n\ngrasp(candidate)\nwait(20)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp blue_book\")\n\nspots = free_spots(\"orange_tray\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spot available in orange_tray\")\n\nspot = spots[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nwait(20)\nlower_until_contact()\nwait(20)\nopen_gripper()\nwait(20)\nretreat(dz=0.12)\nwait(20)\ncheck_result = check(\"blue_book\", \"orange_tray\")\nif not check_result[\"satisfied\"]:\n    raise RuntimeError(\"blue_book not correctly placed on orange_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "object_not_visible",
+      "details": {
+       "object": "blue_book",
+       "visible": [
+        "blue_mug",
+        "yellow_mug"
+       ]
+      }
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 12,
+     "seconds": 19.2,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 125,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.2004,
+         0.0001,
+         1.0795
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 126,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "blue_book"
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 126,
+       "source": "<program>",
+       "line": 3,
+       "error": {
+        "reason": "object_not_visible",
+        "object": "blue_book",
+        "visible": [
+         "blue_mug",
+         "yellow_mug"
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- Call 2 grasp_candidates('blue_book',) failed: {'reason': 'object_not_visible', 'object': 'blue_book', 'visible': ['blue_mug', 'yellow_mug']}.\n- The program never grasped anything.\n- After the program the camera could not see blue_book or orange_tray.",
+     "lesson": null
+    },
+    {
+     "n": 3,
+     "code": "go_home()\nobs = observe()\nblue_book = obs[\"objects\"][\"blue_book\"]\n# Ensure the book is visible by moving the arm to a better position\n# Use a grasp candidate from the learned detector with high score\ncandidates = grasp_candidates(\"blue_book\")\nif not candidates:\n    raise RuntimeError(\"No grasp candidates found for blue_book\")\n\n# Choose the first candidate (highest score from learned detector)\ncandidate = candidates[0]\n\n# Adjust grasp height to center of the book\ncandidate[\"height\"] = blue_book[\"height\"] / 2\n\ngrasp(candidate)\nwait(20)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp blue_book\")\n\nspots = free_spots(\"orange_tray\")\nif not spots[\"spots\"]:\n    raise RuntimeError(\"No free spot available in orange_tray\")\n\nspot = spots[\"spots\"][0]\ncarry_to(spot[\"x\"], spot[\"y\"], height=0.18, yaw=spot[\"gripper_yaw\"])\nwait(20)\nlower_until_contact()\nwait(20)\nopen_gripper()\nwait(20)\nretreat(dz=0.12)\nwait(20)\ncheck_result = check(\"blue_book\", \"orange_tray\")\nif not check_result[\"satisfied\"]:\n    raise RuntimeError(\"blue_book not correctly placed on orange_tray\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "'blue_book'",
+      "location": [
+       "<program>",
+       3
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 19.2,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 129,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.2003,
+         0.0,
+         1.0797
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 130,
+       "source": "<program>",
+       "line": 2
+      }
+     ],
+     "retrieved": [],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "diagnosis": "- The program did not run as written: 'blue_book' KeyError ('<program>', 3).\n- After the program the camera could not see blue_book or orange_tray.",
+     "lesson": null
+    }
+   ],
+   "zone_occupied_at_start": [
+    "yellow_mug"
+   ]
+  }
+ ],
+ "validations": [],
+ "user_memory_write": {
+  "accepted": [],
+  "rejected": []
+ },
+ "user_preferences_used": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray",
+   "rule_subject": "mug",
+   "evidence": "From now on, please always put my mugs on the cyan tray",
+   "source_task": "teach_4"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray",
+   "rule_subject": "book",
+   "evidence": "From now on, please always put my books on the orange tray",
+   "source_task": "teach_4"
+  }
+ ],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my mugs on the cyan tray"
+   },
+   {
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "source": "user_memory",
+    "evidence": "From now on, please always put my books on the orange tray"
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The cyan_tray must be cleared before placing the yellow_mug if it is occupied.",
+   "The orange_tray is currently occupied by the yellow_mug, so it must be cleared before placing the blue_book.",
+   "Only one object can be placed on a zone at a time.",
+   "The robot must verify the final placement of each object on its designated zone."
+  ],
+  "refined_instruction": "First, move the yellow_mug from the orange_tray to the cyan_tray. Before doing so, confirm that the cyan_tray is unoccupied; if not, clear it first. Then, move the blue_book from its current location (not on any zone) to the orange_tray. Before placing it, confirm that the orange_tray is now unoccupied (after the yellow_mug has been moved). After each placement, verify that the object is correctly positioned on its target zone. Success is achieved when both the yellow_mug is on the cyan_tray and the blue_book is on the orange_tray, with no other objects on those zones.",
+  "sources": {
+   "instruction": 0,
+   "user_memory": 2,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "yellow_mug",
+   "zone": "cyan_tray"
+  },
+  {
+   "object": "blue_book",
+   "zone": "orange_tray"
+  }
+ ],
+ "final_perception": {
+  "yellow_mug": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0298,
+    -0.2416
+   ],
+   "zone_half_size": [
+    0.0649,
+    0.0668
+   ],
+   "top_height_above_table": 0.074,
+   "nominal_height": 0.07,
+   "gripper_holding": true,
+   "satisfied": false
+  },
+  "blue_book": {
+   "satisfied": false,
+   "reason": "not_visible",
+   "object_visible": false,
+   "zone_visible": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "yellow_mug": {
+    "zone": "cyan_tray",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0943,
+     -0.1806,
+     0.839
+    ]
+   },
+   "blue_book": {
+    "zone": "orange_tray",
+    "inside": false,
+    "resting": false,
+    "upright": true,
+    "position": [
+     -0.1989,
+     -0.0013,
+     1.0769
+    ]
+   }
+  },
+  "gripper_holding": true
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9821245670318604,
+   0.9945789575576782
+  ],
+  "rerendered": 7
+ },
+ "seconds": 188.2,
+ "llm_usage": {
+  "calls": 17,
+  "prompt_tokens": 20067,
+  "completion_tokens": 2663,
+  "seconds": 12.2,
+  "by_purpose": {
+   "code": 6,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 8,
+   "user_memory_write": 1
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}
