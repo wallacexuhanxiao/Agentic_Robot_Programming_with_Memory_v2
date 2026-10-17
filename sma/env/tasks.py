@@ -43,7 +43,19 @@ def _sample_xy(rng, placed, radius, x_range=OBJECT_X, y_range=OBJECT_Y, tries=20
     raise RuntimeError("Could not sample a collision-free layout")
 
 
+TEACH_INSTRUCTION = ("From now on, I always want cubes on the purple zone, cups on the cyan zone and books on the "
+                     "orange zone. Please tidy the table that way.")
+VAGUE_INSTRUCTIONS = ["Tidy up my desk, please.", "Could you clean up the table?", "Put my things where they belong."]
+
+
 def make_task(family, seed, *, kinds=None):
+    if family in ("teach", "tidy"):
+        # Same layouts as sort/clear; the instruction no longer states where things go (teach states it once).
+        base = make_task("clear" if seed % 2 else "sort", seed, kinds=kinds)
+        base.family = family
+        base.task_id = f"{family}_{seed}"
+        base.instruction = TEACH_INSTRUCTION if family == "teach" else VAGUE_INSTRUCTIONS[seed % len(VAGUE_INSTRUCTIONS)]
+        return base
     """family: 'place' (one object, one zone + distractor zone), 'sort' (2-3 objects by kind),
     'clear' (a target zone is initially covered by an object that belongs elsewhere)."""
     rng = np.random.default_rng(seed)
@@ -99,6 +111,10 @@ def suite(name):
                 make_task("place", 3, kinds=["cup"]), make_task("sort", 4)]
     if name == "heldout":
         return [make_task("sort", 1000 + i) for i in range(3)] + [make_task("clear", 1100 + i) for i in range(3)]
+    if name == "session":
+        # One simulated user: teaches preferences once, then gives vague requests on new layouts.
+        return [make_task("teach", 4), make_task("place", 1, kinds=["cube"]), make_task("place", 2, kinds=["book"]),
+                make_task("place", 3, kinds=["cup"])] + [make_task("tidy", 1000 + i) for i in range(6)]
     if name == "smoke":
         return [make_task("place", 7, kinds=["cube"])]
     raise ValueError(name)

@@ -10,6 +10,7 @@ from ..env.robot_env import RobotError, TabletopEnv
 from ..env.tasks import make_task
 from ..memory.store import literal_coordinates, scene_features, zone_occupants
 from . import prompts
+from .refine import refine
 from .sandbox import Sandbox, check_source, strip_code, ProgramRejected
 
 MAX_ATTEMPTS = 3
@@ -82,7 +83,7 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             retrieved = memory.retrieve(scene, obj, zone)
             if retrieved:
                 skills_text = prompts.SKILLS_HEADER + memory.describe(retrieved)
-        prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=task.instruction, object=obj, zone=zone,
+        prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction), object=obj, zone=zone,
                                       scene=prompts.scene_text(scene), skills=skills_text, attempts=attempts_text)
         code = strip_code(llm.chat([{"role": "user", "content": prompt}], purpose="code"))
         sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved})
@@ -173,18 +174,30 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
     return results
 
 
-def run_episode(task, llm, memory, out_dir, *, validate=True, log=print):
+def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, log=print):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     env = TabletopEnv(task)
     record = {"task_id": task.task_id, "family": task.family, "instruction": task.instruction,
-              "memory": memory is not None, "subgoals": [], "validations": []}
+              "skill_memory": memory is not None, "user_memory": user_memory is not None,
+              "subgoals": [], "validations": []}
     started = time.time()
     pending = []
     try:
         scene = env.reset()
+        preferences = []
+        if user_memory is not None:
+            record["user_memory_write"] = user_memory.learn(llm, task.instruction, scene, task.task_id)
+            preferences = user_memory.retrieve(scene)
+        record["user_preferences_used"] = preferences
+        spec = refine(llm, task.instruction, preferences, scene)
+        record["task_spec"] = spec
+        task.spec_text = spec["refined_instruction"]
+        log(f"  spec: {[(g['object'], g['zone'], g['source']) for g in spec['goals']]} dropped={len(spec['dropped'])}")
+        goals = [{"object": g["object"], "zone": g["zone"]} for g in spec["goals"]]
         plan_text = llm.chat([{"role": "user", "content": prompts.PLANNER.format(
-            instruction=task.instruction, scene=prompts.scene_text(scene))}], purpose="plan")
+            instruction=spec["refined_instruction"], goals=json.dumps(goals),
+            scene=prompts.scene_text(scene))}], purpose="plan")
         plan, raw = parse_plan(plan_text, scene)
         record["plan"], record["raw_plan"] = plan, raw
         log(f"  plan: {plan}")

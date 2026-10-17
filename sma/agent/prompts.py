@@ -59,14 +59,15 @@ The module math is available. A robot error stops the program and is reported ba
 
 API_DOC = TASK_API_DOC if os.environ.get("SMA_API_LEVEL", "task") == "task" else POSE_API_DOC
 
-PLANNER = """You are the planning module of a tabletop robot. Instruction: {instruction}
+PLANNER = """You are the planning module of a tabletop robot. Task specification: {instruction}
+Goals: {goals}
 
 Current scene (from the camera):
 {scene}
 
-Decide which object goes to which zone and in which order. A zone that is covered by an object
-must be cleared first (move that object to its own destination). Skip objects that are already
-resting on their correct zone. Reply with JSON only:
+Order the goals into steps. A zone that is covered by an object must be cleared first (move that
+object to its own destination). Skip objects that are already resting on their target zone.
+Reply with JSON only:
 {{"steps": [{{"object": "<object name>", "zone": "<zone name>"}}, ...]}}"""
 
 CODER = """{api}

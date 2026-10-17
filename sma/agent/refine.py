@@ -1,0 +1,73 @@
+"""Prompt refiner: user instruction + retrieved user preferences + current scene -> explicit task spec.
+
+Runs before the code agent. Every goal must cite its source: the current instruction (verbatim
+quote), a stored user preference, or an explicit assumption. Assumptions are allowed so the robot
+can still act without memory, but they are labelled and counted.
+"""
+import json
+import re
+
+from ..memory.store import zone_occupants
+
+REFINE = """You turn a user's request to a tabletop robot into an explicit task specification for a
+robot-programming agent. Do not write robot code.
+
+User request: "{instruction}"
+Stored long-term preferences of this user (from earlier conversations): {preferences}
+Objects seen by the camera (name, kind, and the zone each currently lies on): {objects}
+Zones seen: {zones}
+
+For every object that the request concerns, give its target zone and the source of that decision:
+- "instruction": the request itself states it (give a verbatim quote as evidence);
+- "user_memory": a stored preference states it (the current request overrides stored preferences);
+- "assumption": neither does; you choose, and say why.
+Note zones that are occupied by another object, and objects that are already in place.
+Reply with ONLY JSON:
+{{"goals": [{{"object": "...", "zone": "...", "source": "instruction"|"user_memory"|"assumption",
+             "evidence": "..."}}],
+  "already_done": ["<object>", ...],
+  "constraints": ["<short sentence>", ...],
+  "refined_instruction": "<one explicit paragraph for the robot-programming agent: goals, order
+                          constraints such as clearing an occupied zone first, and how success is checked>"}}"""
+
+
+def _json(text):
+    match = re.search(r"\{.*\}", text, re.S)
+    return json.loads(match.group(0)) if match else {}
+
+
+def scene_summary(scene):
+    objects = []
+    for name, obj in scene["objects"].items():
+        on = [z for z in scene["zones"] if name in zone_occupants(scene, z)]
+        objects.append({"name": name, "kind": obj["kind"], "on_zone": on[0] if on else None})
+    return objects
+
+
+def refine(llm, instruction, preferences, scene):
+    raw = llm.chat([{"role": "user", "content": REFINE.format(
+        instruction=instruction, preferences=json.dumps(preferences) if preferences else "none",
+        objects=json.dumps(scene_summary(scene)), zones=sorted(scene["zones"]))}],
+        purpose="refine", max_tokens=1200)
+    try:
+        spec = _json(raw)
+    except json.JSONDecodeError:
+        spec = {}
+    pref_zone = {p["object"]: p["zone"] for p in preferences}
+    goals, dropped = [], []
+    for g in spec.get("goals", []):
+        obj, zone, source = g.get("object"), g.get("zone"), g.get("source")
+        reason = None
+        if obj not in scene["objects"] or zone not in scene["zones"]:
+            reason = "unknown object or zone"
+        elif source == "instruction" and str(g.get("evidence", "")).lower() not in instruction.lower():
+            reason = "instruction evidence is not a quote from the request"
+        elif source == "user_memory" and pref_zone.get(obj) != zone:
+            reason = "no stored preference says this"
+        elif source not in ("instruction", "user_memory", "assumption"):
+            reason = "missing source"
+        (dropped if reason else goals).append({**g, **({"rejected_because": reason} if reason else {})})
+    return {"goals": goals, "dropped": dropped, "already_done": spec.get("already_done", []),
+            "constraints": spec.get("constraints", []),
+            "refined_instruction": spec.get("refined_instruction") or instruction,
+            "sources": {s: sum(1 for g in goals if g["source"] == s) for s in ("instruction", "user_memory", "assumption")}}

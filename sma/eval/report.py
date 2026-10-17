@@ -24,13 +24,17 @@ def aggregate(rows):
 
 def main(run_dir):
     lines = [f"# Run {Path(run_dir).name}", ""]
-    data = {c: load(run_dir, c) for c in ("none", "memory")}
-    for suite in ("train", "heldout"):
-        lines += [f"## {suite}", "", "| metric | no memory | with memory |", "|---|---|---|"]
-        aggs = {c: aggregate([r for r in d["tasks"] if r["suite"] == suite]) if d else {} for c, d in data.items()}
+    data = {c: load(run_dir, c) for c in ("none", "skill", "user", "both", "memory")}
+    data = {c: d for c, d in data.items() if d}
+    if not data:
+        raise SystemExit("no summary.json found")
+    suites = sorted({r["suite"] for d in data.values() for r in d["tasks"]})
+    for suite in suites:
+        lines += [f"## {suite}", "", "| metric | " + " | ".join(data) + " |", "|---" * (len(data) + 1) + "|"]
+        aggs = {c: aggregate([r for r in d["tasks"] if r["suite"] == suite]) for c, d in data.items()}
         for key in ("tasks", "task_success_gt", "subgoals_verified", "code_generations", "failed_executions",
                     "skill_calls", "llm_calls", "completion_tokens", "control_steps", "wall_seconds"):
-            lines.append(f"| {key} | {aggs['none'].get(key, '-')} | {aggs['memory'].get(key, '-')} |")
+            lines.append(f"| {key} | " + " | ".join(str(aggs[c].get(key, "-")) for c in data) + " |")
         lines.append("")
     lines += ["## Per task", "", "| condition | task | GT success | subgoals ok | code gens | failed execs | skill calls |",
               "|---|---|---|---|---|---|---|"]
@@ -38,7 +42,7 @@ def main(run_dir):
         for r in (d or {}).get("tasks", []):
             lines.append(f"| {c} | {r['task']} | {r['success_gt']} | {r['subgoals_verified']}/{r['subgoals']} | "
                          f"{r['code_generations']} | {r['executions_failed']} | {r['skill_calls']} |")
-    log = (data.get("memory") or {}).get("applicability_log", [])
+    log = [e for c in ("skill", "both", "memory") for e in (data.get(c) or {}).get("applicability_log", [])]
     if log:
         right = sum((e["verdict"] == "applicable") == e["outcome"] for e in log)
         lines += ["", f"## Applicability checks", "",
@@ -46,9 +50,10 @@ def main(run_dir):
                   "(applicable -> success, uncertain/not_applicable -> failure)."]
         for e in log:
             lines.append(f"- {e['task']}: {e['function']} verdict={e['verdict']} outcome={'ok' if e['outcome'] else 'fail'}")
-    mem = Path(run_dir) / "memory" / "memory.json"
-    if mem.exists():
-        lines += ["", "## Skill memory at end of run", ""]
+    for mem in [Path(run_dir) / c / "memory.json" for c in ("skill", "both", "memory")]:
+        if not mem.exists():
+            continue
+        lines += ["", f"## Skill memory at end of run ({mem.parent.name})", ""]
         for s in json.loads(mem.read_text())["skills"]:
             kinds = {}
             for h in s["history"]:

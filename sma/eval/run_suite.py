@@ -9,10 +9,12 @@ from ..agent.llm import LLM
 from ..agent.loop import run_episode
 from ..env.tasks import suite
 from ..memory.store import SkillMemory
+from ..memory.user import UserMemory
 
 
 def summarize(record):
     subgoals = record.get("subgoals", [])
+    spec = record.get("task_spec", {})
     attempts = [a for s in subgoals for a in s["attempts"]]
     return {"task": record["task_id"], "family": record["family"],
             "success_gt": record["private_eval"]["success"],
@@ -23,19 +25,22 @@ def summarize(record):
             "control_steps": sum(a["control_steps"] for a in attempts),
             "llm_calls": record["llm_usage"]["calls"], "llm_seconds": record["llm_usage"]["seconds"],
             "completion_tokens": record["llm_usage"]["completion_tokens"],
-            "seconds": record["seconds"], "harness_error": record.get("harness_error")}
+            "seconds": record["seconds"], "harness_error": record.get("harness_error"),
+            "goal_sources": spec.get("sources"), "goals_dropped": len(spec.get("dropped", []))}
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--condition", choices=("memory", "none"), required=True)
+    # none | skill | user | both  ("memory" is kept as an alias of "skill")
+    p.add_argument("--condition", choices=("none", "skill", "user", "both", "memory"), required=True)
     p.add_argument("--suites", default="train,heldout")
     p.add_argument("--base-url", required=True)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--no-validate", action="store_true")
     args = p.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
-    memory = SkillMemory(args.out / "memory.json") if args.condition == "memory" else None
+    memory = SkillMemory(args.out / "memory.json") if args.condition in ("skill", "both", "memory") else None
+    user_memory = UserMemory(args.out / "user_memory.json") if args.condition in ("user", "both") else None
     log_file = (args.out / "run.log").open("a")
 
     def log(msg):
@@ -49,7 +54,8 @@ def main():
         for task in suite(suite_name):
             log(f"[{args.condition}] {suite_name} {task.task_id}: {task.instruction}")
             llm = LLM(args.base_url, log_dir=args.out / task.task_id / "llm")
-            record = run_episode(task, llm, memory, args.out / task.task_id, validate=not args.no_validate, log=log)
+            record = run_episode(task, llm, memory, args.out / task.task_id, user_memory=user_memory,
+                                 validate=not args.no_validate, log=log)
             row = {"suite": suite_name, **summarize(record)}
             rows.append(row)
             log(f"  -> {row}")
