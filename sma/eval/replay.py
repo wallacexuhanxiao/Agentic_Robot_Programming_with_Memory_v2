@@ -85,6 +85,7 @@ class Overlay:
         self.call, self.status, self.status_color = "", "", WHITE
         self.result = ""
         self.changed = set()  # line numbers that differ from the previous attempt's program
+        self.program, self.program_title = "", ""
         self.skill_codes = {}
         import os
         self.level = {"mid": "mid-level API", "task": "task-level API"}.get(os.environ.get("SMA_API_LEVEL", "task"), "")
