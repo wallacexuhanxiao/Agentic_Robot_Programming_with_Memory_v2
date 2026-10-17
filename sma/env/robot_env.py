@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation
 from .perception import object_on_zone, perceive
 from .scene import KINDS, TABLE_Z, TabletopOrganize, ZONE_HALF
 
-HOME = np.array([-0.26, 0.0, 1.08])
+HOME = np.array([-0.20, 0.0, 1.08])
 WORKSPACE = np.array([[-0.32, 0.30], [-0.36, 0.36], [TABLE_Z + 0.004, 1.30]])
 
 
@@ -109,11 +109,11 @@ class TabletopEnv:
     def _q(self):
         return self.env.sim.data._data.qpos[self.qadr].copy()
 
-    def _ik(self, position, rotation, iterations=300):
+    def _ik(self, position, rotation, q0=None, iterations=150):
         """Damped least squares on the robot model, within joint limits, biased toward the rest posture."""
         mj, model, d = self._mj, self._model, self._ik_data
         d.qpos[:] = self.env.sim.data._data.qpos
-        q = self._q()
+        q = self._q() if q0 is None else np.array(q0, float)
         jacp, jacr = np.zeros((3, model.nv)), np.zeros((3, model.nv))
         for _ in range(iterations):
             d.qpos[self.qadr] = q
@@ -130,7 +130,24 @@ class TabletopEnv:
             null = np.eye(len(q)) - J.T @ np.linalg.solve(JJt, J)
             dq += null @ (.05 * (self.q_rest - q))
             q = np.clip(q + np.clip(dq, -.15, .15), self.q_low, self.q_high)
-        return q, float(np.linalg.norm(ep))
+        return q, float(np.linalg.norm(ep) + .1 * np.linalg.norm(er))
+
+    def _plan(self, target, goal):
+        """Straight Cartesian line (with slerped orientation) as warm-started IK waypoints ~2 cm apart."""
+        from scipy.spatial.transform import Slerp
+        p0 = self._ee()
+        r0 = Rotation.from_quat(self.obs["robot0_eef_quat_site"])
+        angle = np.linalg.norm((goal * r0.inv()).as_rotvec())
+        n = max(1, int(np.ceil(np.linalg.norm(target - p0) / .02)), int(np.ceil(angle / .08)))
+        slerp = Slerp([0, 1], Rotation.concatenate([r0, goal]))
+        q, path = self._q(), []
+        for i in range(1, n + 1):
+            q, residual = self._ik(p0 + (target - p0) * i / n, slerp(i / n), q0=q)
+            if residual > .004:
+                return None, {"failed_at_fraction": round(i / n, 2), "ik_residual": round(residual, 4),
+                              "waypoint": (p0 + (target - p0) * i / n).round(4).tolist()}
+            path.append(q)
+        return path, None
 
     def _step(self, q_target):
         if self.steps >= self.step_budget:
@@ -182,21 +199,20 @@ class TabletopEnv:
                              workspace=WORKSPACE.tolist())
         yaw = self._yaw() if yaw is None else float(yaw)
         # The two fingers are symmetric: yaw and yaw + pi are the same grasp. Use the
-        # representative in [-pi/2, pi/2) so the wrist stays away from its joint limits.
-        yaw = (yaw + np.pi / 2) % np.pi - np.pi / 2
-        q_goal, residual = self._ik(target, self._target_rotation(yaw))
-        if residual > .005:
-            raise RobotError("unreachable_pose", target=target.round(4).tolist(), yaw=round(yaw, 3),
-                             ik_residual_m=round(residual, 4))
-        start, q_start = self.steps, self._q()
-        n = int(np.max(np.abs(q_goal - q_start)) / .025) + 1  # at most 0.5 rad/s per joint
-        for i in range(1, n + 1):
-            self._step(q_start + (q_goal - q_start) * i / n)
+        # representative closest to the rest-pose yaw so the wrist stays mid-range.
+        yaw = self.yaw0 + ((yaw - self.yaw0 + np.pi / 2) % np.pi - np.pi / 2)
+        path, failure = self._plan(target, self._target_rotation(yaw))
+        if path is None:
+            raise RobotError("unreachable_pose", target=target.round(4).tolist(), yaw=round(yaw, 3), **failure)
+        start = self.steps
+        for q in path:  # waypoints are ~2 cm apart: one control step (20 Hz) each, about 0.4 m/s
+            self._step(q)
+        q_goal = path[-1]
         for _ in range(max_steps):
             if np.linalg.norm(target - self._ee()) < tolerance:
                 return {"ok": True, "position": self._ee().round(4).tolist(), "steps": self.steps - start}
             self._step(q_goal)
-            if self.steps - start > n + 40 and np.linalg.norm(self.obs.get("robot0_joint_vel", np.zeros(7))) < 1e-3:
+            if self.steps - start > len(path) + 40 and np.linalg.norm(self.obs.get("robot0_joint_vel", np.zeros(7))) < 1e-3:
                 break
         raise RobotError("motion_blocked", target=target.round(4).tolist(),
                          reached=self._ee().round(4).tolist(),
