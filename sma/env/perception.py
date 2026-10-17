@@ -9,7 +9,7 @@ import numpy as np
 
 KIND_HEIGHT = {"block": .04, "book": .025, "mug": .07, "pen": .012}
 ZONE_NAMES = {"orange": "orange_tray", "cyan": "cyan_tray", "purple": "purple_box",
-              "lime": "lime_case"}  # receptacle catalogue
+              "green": "green_case"}  # receptacle catalogue
 
 
 def back_project(depth_m, K, world_from_camera):
@@ -25,7 +25,7 @@ def back_project(depth_m, K, world_from_camera):
 # from a calibration render (scripts/calibrate_hues.py). Objects and zones are segmented in
 # separate height bands, so the two sets only need to be distinct within themselves.
 OBJECT_HUES = {"red": 1, "yellow": 30, "green": 62, "blue": 113}
-ZONE_HUES = {"orange": 23, "cyan": 90, "purple": 144, "lime": 45}  # lime: pen case (calibrated by pen_gate)
+ZONE_HUES = {"orange": 23, "cyan": 90, "purple": 144, "green": 62}  # green: pen case floor (checked by pen_gate)
 
 
 def _palette_label(rgb, hues, tolerance=9, min_saturation=80):
