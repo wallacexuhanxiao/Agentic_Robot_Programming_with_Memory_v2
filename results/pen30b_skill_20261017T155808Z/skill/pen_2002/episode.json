@@ -1,0 +1,363 @@
+{
+ "task_id": "pen_2002",
+ "family": "pen",
+ "instruction": "Put the yellow pen in the green pen case.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "yellow_pen",
+   "zone": "green_case",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "candidates = grasp_candidates(\"yellow_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - 1.107) < 0.2 and abs(c[\"height\"] - 0.006) < 0.005:\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\ngrasp(best_candidate)\nspots = free_spots(\"green_case\", \"yellow_pen\")\ntarget_spot = None\nfor s in spots:\n    if abs(s[\"object_long_axis_yaw\"] - (-0.464)) < 0.1:\n        target_spot = s\n        break\n\ncarry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=target_spot[\"object_long_axis_yaw\"] + (best_candidate[\"yaw\"] - best_candidate[\"object_long_axis_yaw\"]))\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       10
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0267,
+       -0.2179
+      ],
+      "offset_along_across_zone_axis": [
+       0.0736,
+       -0.2068
+      ],
+      "zone_half_size": [
+       0.0774,
+       0.0212
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 85.8,
+      "object_long_axis_yaw": 1.033,
+      "zone_long_axis_yaw": -0.464,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 1.5,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "yellow_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 15,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": -0.538, \"score\": null, \"id\": 0, \"object\": \"yellow_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": [0.1383, 0.0119]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": 1.033, \"score\": null, \"id\": 1, \"object\": \"yellow_pen\", \"squeeze_width\": 0.133, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": ..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 16,
+       "source": "<program>",
+       "line": 10
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.475,
+      "zone_reach": 0.529
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      5,
+      6
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 10).\n- After the program yellow_pen is offset [-0.0267, -0.2179] m from the centre of green_case ([0.0736, -0.2068] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0774, 0.0212]); inside_zone=False, resting=True, gripper_holding=False.\n- yellow_pen's long axis is 85.8 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Use a grasp candidate with yaw close to the pen's long axis yaw (approximately 1.033 rad) and height 0.006 m to ensure proper orientation, and select a placement spot that aligns the pen's long axis with the green_case's long axis by rotating the gripper yaw to match the case's orientation during carry."
+    },
+    {
+     "n": 2,
+     "code": "candidates = grasp_candidates(\"yellow_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - 1.033) < 0.2 and abs(c[\"height\"] - 0.006) < 0.005:\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\ngrasp(best_candidate)\nspots = free_spots(\"green_case\", \"yellow_pen\")\ntarget_spot = None\nfor s in spots:\n    if abs(s[\"object_long_axis_yaw\"] - (-0.464)) < 0.1:\n        target_spot = s\n        break\n\n# Compute required gripper yaw to align pen's long axis with green_case's long axis\ndelta_yaw = (-0.464) - best_candidate[\"object_long_axis_yaw\"]\ncarry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=best_candidate[\"yaw\"] + delta_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       10
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0267,
+       -0.2179
+      ],
+      "offset_along_across_zone_axis": [
+       0.0736,
+       -0.2068
+      ],
+      "zone_half_size": [
+       0.0774,
+       0.0212
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 85.8,
+      "object_long_axis_yaw": 1.033,
+      "zone_long_axis_yaw": -0.464,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 1.2,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "yellow_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 17,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": -0.538, \"score\": null, \"id\": 0, \"object\": \"yellow_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": [0.1383, 0.0119]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": 1.033, \"score\": null, \"id\": 1, \"object\": \"yellow_pen\", \"squeeze_width\": 0.133, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": ..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 18,
+       "source": "<program>",
+       "line": 10
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.475,
+      "zone_reach": 0.529
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      6,
+      7
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 10).\n- After the program yellow_pen is offset [-0.0267, -0.2179] m from the centre of green_case ([0.0736, -0.2068] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0774, 0.0212]); inside_zone=False, resting=True, gripper_holding=False.\n- yellow_pen's long axis is 85.8 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Choose a grasp candidate with yaw close to the pen's long axis yaw (approximately 1.033 rad) and height 0.0119 m to match the object's actual height and orientation, and select a placement spot whose long axis yaw is aligned with the pen's long axis yaw to ensure proper orientation upon placement."
+    },
+    {
+     "n": 3,
+     "code": "candidates = grasp_candidates(\"yellow_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - 1.033) < 0.2 and abs(c[\"height\"] - 0.0119) < 0.005:\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\ngrasp(best_candidate)\nspots = free_spots(\"green_case\", \"yellow_pen\")\ntarget_spot = None\nfor s in spots:\n    if abs(s[\"object_long_axis_yaw\"] - 1.033) < 0.1:\n        target_spot = s\n        break\n\ncarry_to(target_spot[\"x\"], target_spot[\"y\"], height=0.18, yaw=best_candidate[\"yaw\"])\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"yellow_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "TypeError",
+      "message": "'NoneType' object is not iterable",
+      "location": [
+       "<program>",
+       10
+      ]
+     },
+     "check": {
+      "inside_zone": false,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0267,
+       -0.2179
+      ],
+      "offset_along_across_zone_axis": [
+       0.0736,
+       -0.2068
+      ],
+      "zone_half_size": [
+       0.0774,
+       0.0212
+      ],
+      "top_height_above_table": 0.0119,
+      "nominal_height": 0.012,
+      "object_axis_vs_zone_axis_deg": 85.8,
+      "object_long_axis_yaw": 1.033,
+      "zone_long_axis_yaw": -0.464,
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 3.0,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "yellow_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 19,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": -0.538, \"score\": null, \"id\": 0, \"object\": \"yellow_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": [0.1383, 0.0119]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.0871, \"y\": -0.0446, \"height\": 0.006, \"yaw\": 1.033, \"score\": null, \"id\": 1, \"object\": \"yellow_pen\", \"squeeze_width\": 0.133, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": 1.033, \"object_footprint\": ..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        null
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 20,
+       "source": "<program>",
+       "line": 10
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.475,
+      "zone_reach": 0.529
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      7,
+      8
+     ],
+     "diagnosis": "- The program did not run as written: 'NoneType' object is not iterable TypeError ('<program>', 10).\n- After the program yellow_pen is offset [-0.0267, -0.2179] m from the centre of green_case ([0.0736, -0.2068] m along / across the zone's long axis) (the zone half size along / across its long axis is [0.0774, 0.0212]); inside_zone=False, resting=True, gripper_holding=False.\n- yellow_pen's long axis is 85.8 degrees from green_case's long axis; its top is 0.0119 m above the table (lying flat on the floor would be about 0.012 m).",
+     "lesson": "Use a grasp candidate with yaw close to the pen's long axis yaw (approximately 1.107 rad) at a height of 0.006 m, and select a placement spot that aligns the pen's long axis with the green_case's long axis by rotating the gripper yaw to match the case's orientation during carry."
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "yellow_pen",
+    "zone": "green_case",
+    "source": "instruction",
+    "evidence": "Put the yellow pen in the green pen case."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The green_case must be empty before placing the yellow_pen inside.",
+   "The yellow_pen must be picked up from its current location before being placed in the green_case.",
+   "The robot must verify that the green_case is accessible and not obstructed."
+  ],
+  "refined_instruction": "The robot must first confirm that the green_case is empty and accessible. If the green_case is occupied, the robot must clear it before proceeding. The yellow_pen must be picked up from its current location (which is not on any zone, so it is likely on a surface or in the robot's workspace) and placed inside the green_case. Success is confirmed when the yellow_pen is fully inside the green_case and the green_case is closed (if applicable), with no other objects obstructing it.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "yellow_pen",
+   "zone": "green_case"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "yellow_pen",
+   "zone": "green_case"
+  }
+ ],
+ "final_perception": {
+  "yellow_pen": {
+   "inside_zone": false,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0267,
+    -0.2179
+   ],
+   "offset_along_across_zone_axis": [
+    0.0736,
+    -0.2068
+   ],
+   "zone_half_size": [
+    0.0774,
+    0.0212
+   ],
+   "top_height_above_table": 0.0119,
+   "nominal_height": 0.012,
+   "object_axis_vs_zone_axis_deg": 85.8,
+   "object_long_axis_yaw": 1.033,
+   "zone_long_axis_yaw": -0.464,
+   "gripper_holding": false,
+   "satisfied": false
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "yellow_pen": {
+    "zone": "green_case",
+    "inside": false,
+    "resting": true,
+    "upright": true,
+    "position": [
+     -0.0854,
+     -0.0473,
+     0.8059
+    ]
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9821094870567322,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 13.2,
+ "llm_usage": {
+  "calls": 11,
+  "prompt_tokens": 14888,
+  "completion_tokens": 1410,
+  "seconds": 6.7,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}
