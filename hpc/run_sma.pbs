@@ -109,9 +109,9 @@ MODEL=${SMA_GENERAL_MODEL:-$(cat "$PROJECT/qwen35_checkpoint_path.txt")}
 GENERAL_NAME=${SMA_GENERAL_NAME:-Qwen/Qwen3.5-9B}
 "$PROJECT/vllm_qwen35_venv/bin/python" -m vllm.entrypoints.openai.api_server \
   --model "$MODEL" --served-model-name "$GENERAL_NAME" --host 127.0.0.1 --port "$PORT" \
-  --dtype bfloat16 --max-model-len 16384 --gpu-memory-utilization ${SMA_GENERAL_GPU_UTIL:-.80} --max-num-seqs 2 \
-  --generation-config vllm --reasoning-parser qwen3 --limit-mm-per-prompt '{"image":0,"video":0}' \
-  > "$OUT/model.log" 2>&1 &
+  --dtype bfloat16 --max-model-len ${SMA_MAX_LEN:-16384} --gpu-memory-utilization ${SMA_GENERAL_GPU_UTIL:-.80} --max-num-seqs 2 \
+  --generation-config vllm --reasoning-parser qwen3 --limit-mm-per-prompt "{\"image\":${SMA_MM_IMAGES:-0},\"video\":0}" \
+  ${SMA_VLLM_EXTRA//@/ } > "$OUT/model.log" 2>&1 &
 PIDS+=("$!")
 for i in $(seq 1 240); do
   if curl -sf "http://127.0.0.1:$PORT/v1/models" > /dev/null; then break; fi
@@ -134,6 +134,17 @@ if [[ -n "${SMA_CODER:-}" ]]; then
   done
   echo "coder $SMA_CODER ready after $((i*2))s" >> "$OUT/model_ready.txt"
   CODER_ARGS=(--coder-url "http://127.0.0.1:$CPORT/v1" --coder-model coder)
+fi
+
+if [[ "${SMA_MODE:-dev}" == campaign ]]; then
+  # ASPIRE-style campaign (worker / verifier / coordinator). Resumes from campaign.json in the same root.
+  for lib in ${SMA_CAMPAIGN_ARMS//:/ }; do
+    CROOT="$ROOT/outputs/${SMA_CAMPAIGN_ROOT:?}/$lib"
+    EXTRA=(); [[ "$lib" == nolib ]] && EXTRA=(--no-library)
+    "$SIM_PY" -m sma.campaign.coordinator --root "$CROOT" --base-url "http://127.0.0.1:$PORT/v1" \
+      --model "$GENERAL_NAME" --deadline-min "${SMA_DEADLINE_MIN:-75}" "${EXTRA[@]}" >> "$OUT/campaign_$lib.log" 2>&1 || true
+  done
+  exit 0
 fi
 
 if [[ "${SMA_MODE:-dev}" == dev ]]; then
