@@ -23,7 +23,16 @@ open_gripper() / close_gripper() -> {"width": float, "holding_something": bool}.
   the open fingers. holding_something tells whether something ended up between the fingers.
 go_home() moves the arm up and out of the camera view.   wait(steps) holds still (20 steps = 1 s).
 Math: the module math is available. Write plain top-level code; a robot error stops the program
-and is reported back to you."""
+and is reported back to you.
+
+Generic pick-and-place sequencing (human-provided prior, the same for every task; it does NOT give
+object-specific grasp heights or orientations, you must choose those):
+1. Open the gripper before approaching an object.
+2. Approach from above: first move well above the object, then descend vertically to the grasp pose.
+3. After closing, check holding_something, then lift vertically before any sideways motion, and carry
+   the object high enough to clear other objects.
+4. To place: move above the target, descend vertically until the object is just above the table,
+   open the gripper, then lift vertically."""
 
 PLANNER = """You are the planning module of a tabletop robot. Instruction: {instruction}
 
