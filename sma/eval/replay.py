@@ -66,7 +66,12 @@ def brief_result(call, v):
     return "ok" if v is None else _num(v)
 
 
+ASCII = {"≈": "~", "π": "pi", "°": "deg", "×": "x", "−": "-", "→": "->", "–": "-", "—": "-", "≤": "<=", "≥": ">="}
+
+
 def put(img, text, xy, color=WHITE, scale=.38, thick=1):
+    # OpenCV's Hershey fonts are ASCII only; model comments sometimes contain symbols such as "≈".
+    text = "".join(ASCII.get(ch, ch if ord(ch) < 128 else "?") for ch in text)
     cv2.putText(img, text, xy, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
 
 
