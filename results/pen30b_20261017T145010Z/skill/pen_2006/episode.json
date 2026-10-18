@@ -1,0 +1,400 @@
+{
+ "task_id": "pen_2006",
+ "family": "pen",
+ "instruction": "Put the red pen in the green pen case.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "red_pen",
+   "zone": "green_case",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "candidates = grasp_candidates(\"red_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - (-1.335)) < 0.1:  # align with pen's long axis\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\nif best_candidate is None:\n    best_candidate = candidates[0]  # fallback\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]  # align pen with case\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "program_error",
+      "exception": "KeyError",
+      "message": "0",
+      "location": [
+       "<program>",
+       21
+      ]
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 286,
+     "seconds": 4.4,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 16,
+       "source": "<program>",
+       "line": 1,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.0268, \"y\": 0.242, \"height\": 0.006, \"yaw\": 0.236, \"score\": null, \"id\": 0, \"object\": \"red_pen\", \"squeeze_width\": 0.0115, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_long_axis_yaw\": -1.335, \"object_footprint\": [0.1392, 0.012]}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.0268, \"y\": 0.242, \"height\": 0.006, \"yaw\": -1.335, \"score\": null, \"id\": 1, \"object\": \"red_pen\", \"squeeze_width\": 0.134, \"fits_open_fingers\": false, \"object_height\": 0.0119, \"object_long_axis_yaw\": -1.335, \"object_footprint\": [0.1392, ..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.0268,
+         "y": 0.242,
+         "height": 0.006,
+         "yaw": 0.236,
+         "score": null,
+         "id": 0,
+         "object": "red_pen",
+         "squeeze_width": 0.0115,
+         "fits_open_fingers": true,
+         "object_height": 0.0119,
+         "object_long_axis_yaw": -1.335,
+         "object_footprint": [
+          0.1392,
+          0.012
+         ]
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 17,
+       "source": "<program>",
+       "line": 13,
+       "result": {
+        "holding_something": true,
+        "finger_gap": 0.0119,
+        "finger_gap_when_closed": 0.012,
+        "expected_squeeze_width": 0.0115,
+        "stopped_above_target_m": null
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 198,
+       "frame": 82,
+       "source": "<program>",
+       "line": 14
+      },
+      {
+       "call": "free_spots",
+       "args": [
+        "green_case",
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 198,
+       "frame": 82,
+       "source": "<program>",
+       "line": 17,
+       "result": {
+        "zone": "green_case",
+        "center": [
+         0.0248,
+         -0.0877,
+         0.8
+        ],
+        "half_size": [
+         0.0767,
+         0.021
+        ],
+        "long_axis_yaw": -0.444,
+        "occupants": [],
+        "spots": [
+         {
+          "x": 0.0248,
+          "y": -0.0877,
+          "object_long_axis_yaw": -0.444,
+          "clearance": 0.1
+         },
+         {
+          "x": 0.0267,
+          "y": -0.0886,
+          "object_long_axis_yaw": -0.444,
+          "clearance": 0.1
+         },
+         {
+          "x": 0.0229,
+          "y": -0.0868,
+          "object_long_axis_yaw": -0.444,
+          "clearance": 0.1
+         },
+         {
+          "x": 0.0211,
+          "y": -0.0859,
+          "object_long_axis_yaw": -0.444,
+          "clearance": 0.1
+         },
+         {
+          "x": 0.0285,
+          "y": -0.0895,
+          "object_long_axis_yaw": -0.444,
+          "clearance": 0.1
+         }
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": {
+      "kind": "pen",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.586,
+      "zone_reach": 0.591
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.1392,
+        0.012
+       ],
+       "grasp_height": 0.006,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "lessons_shown": [
+      15,
+      16
+     ],
+     "diagnosis": "- The program did not run as written: 0 KeyError ('<program>', 21).\n- grasp({'source': 'geometry (fingers across the short side)', 'x': -0.0268, 'y': 0.242, 'height': 0.006, 'yaw': 0.236, 'score': None, 'id': 0, 'object': 'red_pen', 'squeeze_width': 0.0115, 'fits_open_fingers': True, 'object_height': 0.0119, 'object_long_axis_yaw': -1.335, 'object_footprint': [0.1392, 0.012]},) -> holding_something=True.\n- The grip point was -0.006 m relative to the object's top surface (grasp_height 0.006 vs object height 0.012); the fingers only grip what is below the grip point.\n- The fingertip line (yaw) was 90 degrees from the object's long axis, so the fingers squeezed across a 0.012 m extent of the object (the open fingers are 0.08 m apart; footprint is 0.139 along long_axis_yaw x 0.012 along short_axis_yaw).\n- At the grasp the gripper yaw (finger direction) was 0.236 rad while red_pen's long axis was -1.335 rad: 90.0 degrees apart.\n- After the program the camera could not see red_pen or green_case.",
+     "lesson": "Choose a grasp candidate with gripper yaw aligned to the pen's long axis (approximately -1.335 rad), grasp height equal to the object's height (0.0119 m), and select a placement spot on the green_case where the pen's long axis matches the case's long axis to ensure proper alignment and prevent rotational offset."
+    },
+    {
+     "n": 2,
+     "code": "candidates = grasp_candidates(\"red_pen\")\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"] and abs(c[\"yaw\"] - (-1.335)) < 0.1:  # align with long axis\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\nif best_candidate is None:\n    best_candidate = candidates[0]\n\n# Adjust grasp height to match object height and yaw to align with long axis\nbest_candidate[\"height\"] = 0.0119\nbest_candidate[\"yaw\"] = -1.335\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "object_not_visible",
+      "details": {
+       "object": "red_pen",
+       "visible": [
+        "red_mug"
+       ]
+      }
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 8,
+     "seconds": 0.1,
+     "trace": [
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 111,
+       "source": "<program>",
+       "line": 1,
+       "error": {
+        "reason": "object_not_visible",
+        "object": "red_pen",
+        "visible": [
+         "red_mug"
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [],
+     "diagnosis": "- Call 0 grasp_candidates('red_pen',) failed: {'reason': 'object_not_visible', 'object': 'red_pen', 'visible': ['red_mug']}.\n- The program never grasped anything.\n- After the program the camera could not see red_pen or green_case.",
+     "lesson": null
+    },
+    {
+     "n": 3,
+     "code": "go_home()\nobs = observe()\ncandidates = grasp_candidates(\"red_pen\")\nif not candidates:\n    raise RuntimeError(\"No grasp candidates for red_pen\")\n\nbest_candidate = None\nbest_score = -1\nfor c in candidates:\n    if c[\"fits_open_fingers\"]:\n        if c[\"score\"] > best_score:\n            best_score = c[\"score\"]\n            best_candidate = c\n\nif best_candidate is None:\n    raise RuntimeError(\"No valid grasp candidate found\")\n\nbest_candidate[\"height\"] = 0.0119\nbest_candidate[\"yaw\"] = -1.335\n\ngrasp(best_candidate)\nif not observe()[\"gripper\"][\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp red_pen\")\n\nspots = free_spots(\"green_case\", \"red_pen\")\nif not spots:\n    raise RuntimeError(\"No free spot in green_case\")\n\nspot = spots[0]\ntarget_x, target_y = spot[\"x\"], spot[\"y\"]\ntarget_yaw = spot[\"object_long_axis_yaw\"]\n\ncarry_to(target_x, target_y, height=0.18, yaw=target_yaw)\nlower_until_contact()\nopen_gripper()\nretreat()\ncheck(\"red_pen\", \"green_case\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "object_not_visible",
+      "details": {
+       "object": "red_pen",
+       "visible": [
+        "red_mug"
+       ]
+      }
+     },
+     "check": {
+      "satisfied": false,
+      "reason": "not_visible",
+      "object_visible": false,
+      "zone_visible": true
+     },
+     "used_skills": [],
+     "control_steps": 12,
+     "seconds": 0.1,
+     "trace": [
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 113,
+       "source": "<program>",
+       "line": 1,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.2,
+         0.0001,
+         1.0799
+        ],
+        "steps": 4
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 114,
+       "source": "<program>",
+       "line": 2
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "red_pen"
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 114,
+       "source": "<program>",
+       "line": 3,
+       "error": {
+        "reason": "object_not_visible",
+        "object": "red_pen",
+        "visible": [
+         "red_mug"
+        ]
+       }
+      }
+     ],
+     "retrieved": [],
+     "features": null,
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [],
+     "diagnosis": "- Call 2 grasp_candidates('red_pen',) failed: {'reason': 'object_not_visible', 'object': 'red_pen', 'visible': ['red_mug']}.\n- The program never grasped anything.\n- After the program the camera could not see red_pen or green_case.",
+     "lesson": null
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "red_pen",
+    "zone": "green_case",
+    "source": "instruction",
+    "evidence": "Put the red pen in the green pen case."
+   }
+  ],
+  "dropped": [],
+  "already_done": [],
+  "blocking_left": [],
+  "constraints": [
+   "The green_case must be empty before placing the red_pen inside.",
+   "The red_pen must be picked up from its current location before being placed in the green_case.",
+   "The robot must verify that the red_pen is successfully placed inside the green_case."
+  ],
+  "refined_instruction": "The robot must first confirm that the green_case is empty. If it is occupied, the robot must clear the zone by removing any object currently inside. Then, the robot must locate and pick up the red_pen. Finally, the robot must place the red_pen into the green_case. Success is confirmed when the red_pen is fully inside the green_case and no other object is occupying the green_case.",
+  "sources": {
+   "instruction": 1,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "red_pen",
+   "zone": "green_case"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "red_pen",
+   "zone": "green_case"
+  }
+ ],
+ "final_perception": {
+  "red_pen": {
+   "satisfied": false,
+   "reason": "not_visible",
+   "object_visible": false,
+   "zone_visible": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "red_pen": {
+    "zone": "green_case",
+    "inside": false,
+    "resting": false,
+    "upright": true,
+    "position": [
+     -0.199,
+     -0.0038,
+     1.076
+    ]
+   }
+  },
+  "gripper_holding": true
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9819020628929138,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 10.6,
+ "llm_usage": {
+  "calls": 7,
+  "prompt_tokens": 10689,
+  "completion_tokens": 1146,
+  "seconds": 5.2,
+  "by_purpose": {
+   "code": 3,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 2
+  },
+  "models": [
+   "qwen3-30b-a3b"
+  ]
+ }
+}

@@ -1,70 +1,115 @@
-# Skill Memory Agent — online robot coding agent with execution-grounded skill memory
+# Agentic Robot Programming with Memory (v2)
 
-Rebuild that follows the CS6244 TeamB proposal *"Online Agentic Robot Programming with Memory and Reusable
-Skills for Tabletop Organization"*. Separate from the earlier ASPIRE pen-in-holder experiments.
-It reuses the existing Hopper environments: `vision_venv` (robosuite 1.5.2 / MuJoCo 3.3.3) and
-Qwen3.5-9B served by vLLM.
+An online robot-programming agent for tabletop organization with two persistent memories. It follows the CS6244 TeamB proposal *"Online Agentic Robot Programming with Memory and Reusable Skills for Tabletop Organization"*.
 
-## What the system does
+- **User memory.** Long-term preferences and standing requests, stored with the user's own words as evidence. A request refiner uses them to turn vague requests ("Tidy up my desk") into explicit, sourced goals.
+- **Skill memory.** Executable skills extracted from camera-verified executions, validated on new layouts, and stored with applicability conditions (goal, state, physical) and execution history. Failure lessons are tracked and flagged when they do not help.
+
+The simulator is Robosuite/MuJoCo with a Franka Panda. One open-weight model, Qwen3-30B-A3B-Instruct-2507 served by vLLM, plays every role. Experiments run on the NUS Hopper cluster.
+
+## Midterm results
+
+Full write-up: [`results/main_experiment/MIDTERM_RESULTS.md`](results/main_experiment/MIDTERM_RESULTS.md).
+
+| Memory | Task | No memory | With the memory |
+|---|---|---|---|
+| User memory | 10-task tidy-up session with 6 vague requests | 42% of planned destinations correct; 4/10 (task-level API), 5/10 (mid-level) | **100%** correct; **9/10**, **8/10** |
+| Skill memory | Pen into a narrow, randomly oriented case; 3 layout sets × 10 tasks | 2.7/10 solved; 22.7 failed executions; 90.7 LLM calls | **7.3/10**; **8.3**; **47.7** |
+
+- Combining both memories was **not** better than skill memory alone on the pen task (`results/main_experiment/REPORT.md`). Combining them on tasks that are both long-horizon and manipulation-heavy is the next step.
+- Videos are in `results/demo/`:
+  - `skill_memory_pairs.mp4` and `user_memory_pairs.mp4`: side by side, no memory vs memory, on the same task.
+  - `pen_repair_with_code.mp4`: failure, measured feedback, corrected program, new skill.
+  - `mid_level_with_code.mp4`: a session replay with the executing code shown beside the robot.
+
+## How it works
 
 ```
-instruction ──► planner (LLM) ──► ordered subgoals  place_on_zone(object, zone)
-                                     │ for each subgoal (online, in the current physical state)
-                                     ▼
-       memory.retrieve ──► applicability check (goal / state / physical) ──► coder prompt
-                                     ▼
-              LLM writes pose-level Python ──► sandbox executes on the robot
-                                     ▼
-              perception verifier (top-down RGB-D) ──► success? ── no ──► structured feedback ──► repair (≤3)
-                                     │ yes
-                                     ▼
-     fresh code? ──► LLM parameterizes it into a skill function ──► static check (no scene literals)
-                                     ▼
-              validation on controlled scene variations (no LLM) ──► memory entry + history
+user message ─► user memory (learn rules with evidence) ─► refiner: explicit goals, each with a source
+                                                                  (instruction / user_memory / assumption)
+            ─► planner: ordered subgoals ─► for each subgoal, in the current physical state:
+                 skill memory: retrieve + applicability check ─► applicable: run the skill as is
+                                                              └► otherwise: the LLM writes or adapts code
+                 sandboxed execution ─► camera check (top-down RGB-D) ─► success?
+                   no  ─► measured diagnosis + one-line lesson ─► repair (up to 3 attempts)
+                   yes ─► new code? extract a parameterized skill ─► validate on new layouts ─► store
 ```
 
-| Proposal component | Implementation |
+### Information policy
+
+The agent sees only top-down RGB-D perception (colour segmentation plus depth), proprioception, and the results of its own calls. Simulator ground truth is read only by `private_evaluate` for scoring; it never reaches prompts or memory.
+
+## Robot API levels
+
+Select the level with `SMA_API_LEVEL`.
+
+| Level | What the model calls | Notes |
+|---|---|---|
+| `task` | `pick(obj, grasp_height, yaw)`, `place(zone)`, `release()` | Midterm fallback |
+| `mid` | `grasp_candidates`, `grasp`, `free_spots`, `carry_to`, `rotate_by`, `lower_until_contact`, `open_gripper`, `retreat`, `check` | Main level. The system does perception, grasp proposals (geometry and Contact-GraspNet) and motion; the model chooses grasp, placement, orientation, order and recovery. See [`docs/MID_LEVEL_API_zh.md`](docs/MID_LEVEL_API_zh.md) |
+| `pose` | `move_to(x, y, z, yaw)` plus the gripper | Too low for 30B models (0/26) |
+| `aspire` | ASPIRE CapApi (poses, point clouds, cuRobo/PyRoki) | Open models scored 0 in an ASPIRE-style campaign |
+
+## Repository layout
+
+| Path | Contents |
 |---|---|
-| Tabletop physics simulation | `sma/env/scene.py`: Panda + randomized layouts of colored cubes, books and cups, plus colored zones |
-| Robot primitives (pose level) | `sma/env/robot_env.py`: `observe`, `move_to(x,y,z,yaw)`, `open/close_gripper`, `go_home`, `wait` |
-| Structured feedback | `sma/agent/sandbox.py`: traced calls with arguments/results, robot errors with details, and the verifier's numbers; `try` is rejected so failures cannot be hidden |
-| Subgoal verification | `perception.object_on_zone`: perception only. Ground truth is used only in `private_evaluate` for scoring |
-| Online execution loop | `sma/agent/loop.py`: plan, then per subgoal code → execute → verify → repair, without resetting the scene |
-| Skill extraction | `loop.extract_skill`: an LLM parameterizes the successful code into `place_on_zone_vN(obj_name, zone_name)`; skills that hard-code scene coordinates are rejected |
-| Applicability conditions | `memory/store.py SkillMemory.check`: goal match (record per object kind), state (zone free, gripper empty), physical (reach range seen in successes). One isolated failure only makes it *uncertain* |
-| Execution history | Every origin/validation/use is stored with scene features, outcome, failure reason and repair |
-| Retrieval / adaptation / composition | Skills ranked by verdict; the coder may call `skills.<fn>()` or adapt the shown code |
-| Evaluation | `sma/eval/run_suite.py`, `report.py`: same task sequence with and without memory; held-out layouts (seeds ≥ 1000) |
+| `sma/env/` | Scene (blocks, mugs, notebooks, pens; trays, toy box, pen case); perception; robot environment with every API level; task families and suites |
+| `sma/agent/` | Online loop (refine, plan, code, execute, check, diagnose, reflect, repair); prompts; sandbox; LLM client |
+| `sma/memory/` | `store.py` (skill memory and lessons), `user.py` (user memory) |
+| `sma/eval/` | Suite runner (resumable), report, deterministic replay with code panel, demo videos |
+| `sma/aspire_level/`, `sma/campaign/` | ASPIRE-backend adapter and the ASPIRE-style campaign |
+| `scripts/` | Scripted gates (`mid_gate.py`, `pen_gate.py`, no LLM), aggregation, video tools |
+| `hpc/` | PBS script and submit wrapper |
+| `results/` | Every run used in the reports: `summary.json`, per-task `episode.json` (prompts, programs, traces, diagnoses), memory files, logs, reports |
 
-## Information policy
+Per-task recordings are excluded except for the examples cited in the reports; ask for the rest.
 
-The agent sees the top-down RGB-D perception output (object/zone poses estimated from color + depth),
-proprioception, and the results of its own commands. Simulator object poses are read only by
-`private_evaluate` (scoring) and are never put in prompts or memory.
+## Running on Hopper
 
-## Running (Hopper only)
+All simulation and model inference run inside PBS jobs. Example:
 
 ```bash
-# on Hopper, in /scratch/e0985859/agentic_robot_programming/skill_memory_agent
-SMA_RUN_NAME=dev_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=dev bash hpc/submit.sh
-SMA_RUN_NAME=suite_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=suite SMA_CONDITIONS=memory:none SMA_SUITES=train+heldout bash hpc/submit.sh
+cd /scratch/e0985859/agentic_robot_programming/skill_memory_agent
+SMA_RUN_NAME=pen_$(date -u +%Y%m%dT%H%M%SZ) SMA_MODE=suite SMA_API_LEVEL=mid \
+  SMA_CONDITIONS=none:skill:user:both SMA_SUITES=pen_teach@3000 \
+  SMA_GENERAL_MODEL=/scratch/Projects/CFP-04/CFP04-CF-057/hf_cache/Qwen3-30B-A3B-Instruct-2507 \
+  SMA_GENERAL_NAME=qwen3-30b-a3b SMA_GENERAL_GPU_UTIL=0.70 bash hpc/submit.sh
 ```
 
-Outputs go to `outputs/<run>/`. Each task directory holds `episode.json` (plan, every attempt's code, trace,
-verifier result, ground-truth evaluation), `video.mp4` and `llm/` (every prompt and response).
-Run `python -m sma.eval.report outputs/<run>` for a comparison table.
+**Modes (`SMA_MODE`).**
 
-## Status (2026-10-17)
+| Mode | What it runs |
+|---|---|
+| `suite` | The model on the suites |
+| `midsuite` / `pensuite` | A scripted gate first, then the suites |
+| `mid_gate` / `pen_gate` | The scripted gate only |
+| `replay` | `SMA_REPLAY_RUN` with `SMA_REPLAY_ITEMS` |
+| `campaign` | The ASPIRE-style campaign |
 
-Midterm result: [`results/final_20261017T084229Z/README.md`](results/final_20261017T084229Z/README.md),
-video `results/demo/final_memory_comparison.mp4`. Qwen3-30B-A3B in the realistic scene:
+**Suites (`SMA_SUITES`).**
 
-| | none | skill only | user only | both |
-|---|---|---|---|---|
-| tasks fully successful | 4/10 | 5/10 | 9/10 | 9/10 |
-| failed executions | 20 | 17 | 18 | 11 |
-| LLM calls | 87 | 66 | 95 | 70 |
+- `session`: the tidy-up session;
+- `pen`, `pen_teach`: layout set A;
+- `pen@N`, `pen_teach@N`: other layout sets.
 
-The flow also has a user long-term memory and a prompt refiner placed before the code agent
-(`sma/memory/user.py`, `sma/agent/refine.py`). The default API level is task (parameterized `pick`/`place`/`release`).
-The pose-level API (`SMA_API_LEVEL=pose`) remains, but Qwen3.5-9B could not use it reliably.
+**Conditions (`SMA_CONDITIONS`).** `none`, `skill`, `user`, `both`.
+
+**Other options.**
+
+- `SMA_QUEUE=auto` routes to the small queue, which allows parallel jobs.
+- A crashed simulator process is resumed automatically with `--resume`.
+
+**Outputs.** Results go to `outputs/<run>/<condition>/`.
+
+```bash
+python -m sma.eval.report outputs/<run>
+python scripts/aggregate_pen_memory.py results results/main_experiment/runs.json out.md
+```
+
+## Limitations
+
+- Single runs per condition on the tidy-up session; three layout sets on the pen task.
+- One simulated user; a small object set; colour-based perception (no SAM-family segmentation).
+- A 30B open-weight model only.
+- Failure lessons can mislead when no verified success exists. Skill extraction does not yet reject hard-coded scene angles.
