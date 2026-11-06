@@ -1,0 +1,93 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    zone = obs[\"zones\"][zone_name]\n    zx, zy, _ = zone[\"center\"]\n    rim_h = zone.get(\"rim_height\", 0.08)\n\n    if not obs[\"gripper\"][\"holding_something\"]:\n        cands = grasp_candidates(obj_name)\n        cand = min(cands, key=lambda c: c[\"squeeze_width\"])\n        grasp(cand)\n\n    target_z = table_z + rim_h + 0.10\n    best_pose = None\n    best_score = 0.0\n\n    for angle in [\n        math.pi / 4,\n        math.pi / 3,\n        math.pi / 2,\n        2 * math.pi / 3,\n        3 * math.pi / 4,\n    ]:\n        for yaw_rot in [\n            0.0,\n            math.pi / 4,\n            math.pi / 2,\n            3 * math.pi / 4,\n            math.pi,\n            -math.pi / 4,\n            -math.pi / 2,\n        ]:\n            app = [\n                math.sin(angle) * math.cos(yaw_rot),\n                math.sin(angle) * math.sin(yaw_rot),\n                -math.cos(angle),\n            ]\n            fx = -math.sin(yaw_rot)\n            fy = math.cos(yaw_rot)\n            fz = 0.0\n            ik = solve_ik(zx, zy, target_z, approach=app, finger_axis=[fx, fy, fz])\n            if ik.get(\"reachable\"):\n                score = abs(math.sin(angle))\n                if score > best_score:\n                    best_score = score\n                    best_pose = (app, [fx, fy, fz], target_z)\n\n    if best_pose is not None:\n        app, fax, tz = best_pose\n        move_gripper(zx, zy, tz + 0.08, approach=app, finger_axis=fax, path=\"joint\")\n        move_gripper(zx, zy, tz, approach=app, finger_axis=fax, path=\"line\")\n        move_by(dz=-0.04)\n    else:\n        carry_to(zx, zy, height=rim_h + 0.10)\n        lower_until_contact()\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": false
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker",
+     "utensil"
+    ],
+    "notes": "Tilts elongated objects into a near-vertical orientation to place them inside a holder or cup zone."
+   },
+   "origin": {
+    "task": "penholder_6000",
+    "object": "yellow_pen",
+    "zone": "magenta_holder",
+    "attempt": 2,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy, hz = holder[\"center\"]\nrim_h = holder.get(\"rim_height\", 0.08)\n\n# The gripper is already holding the yellow pen!\n# Check gripper state\nif not obs[\"gripper\"][\"holding_something\"]:\n    cands = grasp_candidates(\"yellow_pen\")\n    cand = min(cands, key=lambda c: c[\"squeeze_width\"])\n    grasp(cand)\n\n# Tilt gripper so the pen (along side vector) becomes vertical.\n# Side = approach x finger_axis.\n# If approach = [0, 0, -1], side is horizontal.\n# To make side vertical (pointing along -z), approach can be [cos(a), sin(a), 0] or tilted downwards.\n# Let's test IK with tilted approach or pitch.\n# A downward-slanted approach: e.g. approach=[0, 0.707, -0.707], finger_axis=[1, 0, 0] -> side = [-0.707, 0, -0.707] (partially vertical).\n# Even better: pitch around finger axis or test candidate orientations using solve_ik.\ntarget_z = table_z + rim_h + 0.10\n\n# Search for a reachable orientation where the pen is nearly vertical (side_z is large negative)\nbest_pose = None\nbest_score = 0.0\n\nfor angle in [math.pi / 4, math.pi / 3, math.pi / 2, 2 * math.pi / 3, 3 * math.pi / 4]:\n    # approach tilted down/forward, or approach down with roll/pitch\n    for yaw_rot in [0.0, math.pi / 4, math.pi / 2, 3 * math.pi / 4, math.pi, -math.pi / 4, -math.pi / 2]:\n        # Let approach point horizontally or at an angle\n        # If approach is tilted by theta from vertical down [0, 0, -1]:\n        app = [math.sin(angle) * math.cos(yaw_rot), math.sin(angle) * math.sin(yaw_rot), -math.cos(angle)]\n        # choose finger axis perpendicular to approach in horizontal plane\n        fx = -math.sin(yaw_rot)\n        fy = math.cos(yaw_rot)\n        fz = 0.0\n        # side = app x finger\n        # side_z = app_x * fy - app_y * fx = math.sin(angle)*(cos^2 + sin^2) = math.sin(angle)\n        # So pen tilts by angle from horizontal! If angle=pi/2, side is fully vertical!\n        ik = solve_ik(hx, hy, target_z, approach=app, finger_axis=[fx, fy, fz])\n        if ik.get(\"reachable\"):\n            score = abs(math.sin(angle))\n            if score > best_score:\n                best_score = score\n                best_pose = (app, [fx, fy, fz], target_z)\n\nif best_pose is not None:\n    app, fax, tz = best_pose\n    move_gripper(hx, hy, tz + 0.08, approach=app, finger_axis=fax, path=\"joint\")\n    move_gripper(hx, hy, tz, approach=app, finger_axis=fax, path=\"line\")\n    move_by(dz=-0.04)\nelse:\n    # Fallback to direct carry above holder rim and release\n    carry_to(hx, hy, height=rim_h + 0.10)\n    lower_until_contact()\n\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"yellow_pen\", \"magenta_holder\")"
+   },
+   "history": [
+    {
+     "task": "penholder_6000",
+     "source": "origin",
+     "features": null,
+     "outcome": true
+    },
+    {
+     "task": "penholder_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0096,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "penholder_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.565,
+      "zone_reach": 0.548
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0111
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6000"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "Avoid using horizontal approach vectors when reorienting above the holder, and instead tilt or lower the pen using reachable downward or standard approach orientations.",
+   "task": "penholder_6000",
+   "shown_then": []
+  }
+ ]
+}

@@ -1,0 +1,6391 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zone_center = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.0)\n    table_z = obs.get(\"table_z\", 0.0)\n\n    # Grasp the object\n    cands = grasp_candidates(obj_name)\n    cands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n    grasped = False\n    for cand in cands:\n        grasp_res = grasp(cand)\n        if grasp_res.get(\"holding_something\", False):\n            grasped = True\n            break\n    if not grasped:\n        return False\n\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Try orientation candidates to orient elongated object vertically into holder\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n\n    selected_approach = None\n    selected_finger_axis = None\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            selected_approach = app\n            selected_finger_axis = fa\n            break\n\n    if selected_approach is None:\n        selected_approach, selected_finger_axis = candidate_orientations[0]\n\n    move_gripper(zone_center[0], zone_center[1], safe_z, approach=selected_approach, finger_axis=selected_finger_axis, path=\"line\")\n\n    lower_target_z = table_z + rim_height + 0.04\n    move_gripper(zone_center[0], zone_center[1], lower_target_z, approach=selected_approach, finger_axis=selected_finger_axis, path=\"line\")\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    return check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker",
+     "straw",
+     "stick"
+    ],
+    "notes": "Inserts an elongated object vertically into a container or holder by reorienting the gripper horizontally."
+   },
+   "origin": {
+    "task": "penholder_6000",
+    "object": "yellow_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "# Observe and get candidates for the pen\nobs = observe()\nholder = obs[\"zones\"][\"magenta_holder\"]\nholder_center = holder[\"center\"]\nrim_height = holder[\"rim_height\"]\ntable_z = obs[\"table_z\"]\n\ncands = grasp_candidates(\"yellow_pen\")\n# Filter for geometry or highest score grasp across the short axis\ncand = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)[0]\ngrasp_res = grasp(cand)\n\nif grasp_res[\"holding_something\"]:\n    # Move above the holder safely cleared of the rim\n    safe_z = table_z + rim_height + 0.15\n    carry_to(holder_center[0], holder_center[1], height=safe_z - table_z)\n\n    # To place it upright into the holder, orient the held pen vertically.\n    # The pen is held horizontally along the gripper's side vector (approach x finger_axis).\n    # Gripper pointing down with horizontal finger axis holds the pen horizontally.\n    # To make the pen point vertically (down into the holder), we rotate the gripper so its 'side' points down,\n    # i.e. pitch the gripper 90 degrees (approach horizontal, finger_axis horizontal or vertical).\n    # Pitching: approach = [1, 0, 0] or [0, 1, 0] makes the side vector vertical ([0, 0, -1]).\n    # Check IK for horizontal approach:\n    # If approach = [1, 0, 0] and finger_axis = [0, 1, 0], then side = [0, 0, 1] (or [0, 0, -1] with finger_axis = [0, -1, 0]).\n    # When side is vertical, the pen is oriented vertically.\n    approach = [1, 0, 0]\n    finger_axis = [0, 1, 0]\n    ik_res = solve_ik(holder_center[0], holder_center[1], safe_z, approach=approach, finger_axis=finger_axis)\n    if not ik_res[\"reachable\"]:\n        approach = [0, 1, 0]\n        finger_axis = [1, 0, 0]\n\n    move_gripper(holder_center[0], holder_center[1], safe_z, approach=approach, finger_axis=finger_axis, path=\"line\")\n\n    # Lower down into the holder opening\n    lower_target_z = table_z + rim_height + 0.04\n    move_gripper(holder_center[0], holder_center[1], lower_target_z, approach=approach, finger_axis=finger_axis, path=\"line\")\n\n    # Release the pen so it drops/stands in the holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"yellow_pen\", \"magenta_holder\")"
+   },
+   "history": [
+    {
+     "task": "penholder_6000",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0111,
+      "object_reach": 0.533,
+      "zone_reach": 0.679
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0096,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.565,
+      "zone_reach": 0.548
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.545,
+      "zone_reach": 0.636
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.65,
+      "zone_reach": 0.57
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.541,
+      "zone_reach": 0.601
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.592,
+      "zone_reach": 0.531
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9000",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0107,
+      "object_reach": 0.687,
+      "zone_reach": 0.638
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0105,
+      "object_reach": 0.566,
+      "zone_reach": 0.504
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.01,
+      "object_reach": 0.693,
+      "zone_reach": 0.499
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.1377,
+      "footprint_short": 0.0095,
+      "object_reach": 0.516,
+      "zone_reach": 0.498
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.1052,
+      "footprint_short": 0.0138,
+      "object_reach": 0.508,
+      "zone_reach": 0.498
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.692,
+      "zone_reach": 0.684
+     },
+     "outcome": false,
+     "failure": "unreachable_pose",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0117,
+      "object_reach": 0.698,
+      "zone_reach": 0.475
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0118,
+      "object_reach": 0.508,
+      "zone_reach": 0.581
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    }
+   ],
+   "status": "superseded",
+   "superseded_by": "place_on_zone_v7"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zone_center = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.0)\n\n    if not pick_object(obj_name):\n        return False\n\n    place_at_position(zone_center[0], zone_center[1], clear_height=rim_height + 0.15, retreat_height=0.15)\n    go_home()\n    return check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug",
+     "cup",
+     "bottle",
+     "can",
+     "block",
+     "small_object"
+    ],
+    "notes": "Grasps the target object by best candidate score and places it safely over any rim height at the center of the target zone."
+   },
+   "origin": {
+    "task": "desk_9000",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"cyan_tray\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.0)\n\ncands = grasp_candidates(\"yellow_mug\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"yellow_mug\", \"cyan_tray\")",
+    "skill": "place_on_zone_v2"
+   },
+   "history": [
+    {
+     "task": "desk_9000",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "zone_style": "tray",
+      "height": 0.07,
+      "footprint_short": 0.0464,
+      "object_reach": 0.533,
+      "zone_reach": 0.638
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "box",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.507,
+      "zone_reach": 0.568
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "box",
+      "height": 0.07,
+      "footprint_short": 0.0467,
+      "object_reach": 0.657,
+      "zone_reach": 0.646
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9001",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "tray",
+      "height": 0.074,
+      "footprint_short": 0.0452,
+      "object_reach": 0.517,
+      "zone_reach": 0.654
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "tray",
+      "height": 0.07,
+      "footprint_short": 0.045,
+      "object_reach": 0.681,
+      "zone_reach": 0.662
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "pick_object",
+    "place_at_position"
+   ]
+  },
+  {
+   "function": "place_on_zone_v3",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v3(obj_name, zone_name):\n    obs = observe()\n    obj_info = obs[\"objects\"][obj_name]\n    zone_info = obs[\"zones\"][zone_name]\n\n    # Use object height/thickness if available to bound grasp height above table\n    obj_height = obj_info.get(\"height\", 0.025)\n    min_h = max(0.02, obj_height * 0.8)\n\n    grasped = pick_thin_object(obj_name, min_grasp_height=min_h)\n    if not grasped:\n        raise RuntimeError(f\"Failed to grasp object {obj_name}\")\n\n    place_in_zone(zone_info)\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "book",
+     "plate",
+     "box",
+     "thin_object"
+    ],
+    "notes": "Grasps a low or flat object near its top surface to prevent table collision and places it gently into the target zone using contact detection."
+   },
+   "origin": {
+    "task": "desk_9001",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbook = obs[\"objects\"][\"red_book\"]\ntray = obs[\"zones\"][\"orange_tray\"]\n\ncands = grasp_candidates(\"red_book\")\n# Filter or sort candidates; we want a grasp across the short side (squeeze footprint_short) or top grasp\n# Book height is 0.025 m. Grasp height around 0.025 - 0.03 m prevents collision with table.\nvalid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\nvalid_cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in valid_cands:\n    # Ensure grasp height is near top of book to avoid colliding with table\n    cand_copy = dict(cand)\n    if cand_copy[\"height\"] < 0.025:\n        cand_copy[\"height\"] = 0.025\n    res = grasp(cand_copy)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif not grasped and valid_cands:\n    grasp(valid_cands[0])\n\n# Move above orange_tray\ntarget_x, target_y = tray[\"center\"][0], tray[\"center\"][1]\ncarry_to(target_x, target_y, height=0.18)\n\n# Lower down into the tray\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"red_book\", \"orange_tray\")",
+    "skill": "place_on_zone_v3"
+   },
+   "history": [
+    {
+     "task": "desk_9001",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.683,
+      "zone_reach": 0.529
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5030",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.576,
+      "zone_reach": 0.659
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5031",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0527,
+      "object_reach": 0.567,
+      "zone_reach": 0.517
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0546,
+      "object_reach": 0.678,
+      "zone_reach": 0.549
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "pick_thin_object",
+    "place_in_zone"
+   ]
+  },
+  {
+   "function": "place_on_zone_v4",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v4(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zone_center = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.05)\n\n    if not pick_object_v2(obj_name):\n        return False\n\n    approach_height = rim_height + 0.15\n    place_in_container(zone_center, clearance_height=approach_height)\n    wait(100)\n    go_home()\n    return check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "block",
+     "small_object"
+    ],
+    "notes": "Picks an object by highest-scoring grasp candidate and lowers it into a specified zone or container with clearance above its rim."
+   },
+   "origin": {
+    "task": "desk_9003",
+    "object": "red_block",
+    "zone": "purple_box",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"purple_box\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.05)\n\ncands = grasp_candidates(\"red_block\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    wait(100)\n    go_home()\n    check(\"red_block\", \"purple_box\")",
+    "skill": "place_on_zone_v4"
+   },
+   "history": [
+    {
+     "task": "desk_9003",
+     "source": "origin",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0439,
+      "footprint_short": 0.039,
+      "object_reach": 0.483,
+      "zone_reach": 0.532
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5040",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0399,
+      "footprint_short": 0.038,
+      "object_reach": 0.644,
+      "zone_reach": 0.632
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5041",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "zone_style": "tray",
+      "height": 0.0399,
+      "footprint_short": 0.038,
+      "object_reach": 0.477,
+      "zone_reach": 0.536
+     },
+     "outcome": true
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0399,
+      "footprint_short": 0.0385,
+      "object_reach": 0.589,
+      "zone_reach": 0.502
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0837,
+      "footprint_short": 0.0384,
+      "object_reach": 0.523,
+      "zone_reach": 0.502
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "zone_style": "tray",
+      "height": 0.0426,
+      "footprint_short": 0.0326,
+      "object_reach": 0.593,
+      "zone_reach": 0.609
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "features": {
+      "kind": "block",
+      "zone_style": "tray",
+      "height": 0.0429,
+      "footprint_short": 0.0363,
+      "object_reach": 0.598,
+      "zone_reach": 0.549
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "pick_object_v2",
+    "place_in_container"
+   ]
+  },
+  {
+   "function": "place_on_zone_v5",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v5(obj_name, zone_name):\n    \"\"\"Picks an object and places it centered onto a target zone based on zone observations.\"\"\"\n    pick_object(obj_name)\n    \n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    cx, cy = zone[\"center\"][0], zone[\"center\"][1]\n    rim_h = zone.get(\"rim_height\", 0.0)\n    \n    clear_h = max(0.18, rim_h + 0.12)\n    retreat_h = 0.12\n    \n    place_at_position(cx, cy, clear_height=clear_h, retreat_height=retreat_h)\n    go_home()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug",
+     "cup",
+     "bottle",
+     "can",
+     "bowl",
+     "block"
+    ],
+    "notes": "Grasps an object, computes clearance from zone rim height, and places it centered at the zone."
+   },
+   "origin": {
+    "task": "realdesk_11002",
+    "object": "yellow_mug",
+    "zone": "blue_coaster",
+    "attempt": 1,
+    "source_code": "# Grasp yellow_mug and place onto blue_coaster\ncands = grasp_candidates(\"yellow_mug\")\n# Filter or sort candidates by score\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    obs = observe()\n    coaster = obs[\"zones\"][\"blue_coaster\"]\n    cx, cy = coaster[\"center\"][0], coaster[\"center\"][1]\n    rim_h = coaster.get(\"rim_height\", 0.006)\n\n    carry_to(cx, cy, height=max(0.18, rim_h + 0.12))\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.12)\n    go_home()\n    check(\"yellow_mug\", \"blue_coaster\")",
+    "skill": "place_on_zone_v5"
+   },
+   "history": [
+    {
+     "task": "realdesk_11002",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0468,
+      "object_reach": 0.433,
+      "zone_reach": 0.679
+     },
+     "outcome": true
+    },
+    {
+     "task": "single_mug_coaster_5050",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0398,
+      "object_reach": 0.661,
+      "zone_reach": 0.555
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "single_mug_coaster_5051",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0346,
+      "object_reach": 0.489,
+      "zone_reach": 0.604
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11003",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.437,
+      "zone_reach": 0.608
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12000",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0461,
+      "object_reach": 0.474,
+      "zone_reach": 0.657
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.047,
+      "object_reach": 0.447,
+      "zone_reach": 0.611
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0221,
+      "object_reach": 0.493,
+      "zone_reach": 0.586
+     },
+     "outcome": false,
+     "failure": "motion_blocked",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0266,
+      "object_reach": 0.459,
+      "zone_reach": 0.663
+     },
+     "outcome": false,
+     "failure": "motion_blocked",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0447,
+      "object_reach": 0.506,
+      "zone_reach": 0.606
+     },
+     "outcome": false,
+     "failure": "motion_blocked",
+     "repaired_by": "later attempt"
+    }
+   ],
+   "status": "superseded",
+   "helpers": [],
+   "superseded_by": "place_on_zone_v8"
+  },
+  {
+   "function": "place_on_zone_v6",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v6(obj_name, zone_name):\n    \"\"\"Picks an object using viable grasp candidates and deposits it into a container zone.\"\"\"\n    obs = observe()\n    zone_info = obs[\"zones\"][zone_name]\n\n    if pick_object_with_candidates(obj_name, preferred_source=\"contact-graspnet\"):\n        drop_into_container(zone_info, clear_offset=0.12, retreat_height=0.15)\n        check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "paper",
+     "small_object",
+     "deformable"
+    ],
+    "notes": "Picks an object using ranked grasp candidates and drops it safely from above a container's rim."
+   },
+   "origin": {
+    "task": "realdesk_11004",
+    "object": "green_paper",
+    "zone": "red_bin",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbin_zone = obs[\"zones\"][\"red_bin\"]\nbin_center = bin_zone[\"center\"]\nbin_rim = bin_zone.get(\"rim_height\", 0.12)\n\n# Pick paper using contact-graspnet candidate (or sorted candidates)\ncands = grasp_candidates(\"green_paper\")\ncg_cands = [c for c in cands if c.get(\"source\") == \"contact-graspnet\" and c.get(\"fits_open_fingers\", True)]\nif not cg_cands:\n    cg_cands = cands\ncg_cands = sorted(cg_cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cg_cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    # Carry above red_bin rim safely\n    carry_height = bin_rim + 0.12\n    carry_to(bin_center[0], bin_center[1], height=carry_height)\n    # Crumpled paper ball can be dropped into the wastebasket\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"green_paper\", \"red_bin\")",
+    "skill": "place_on_zone_v6"
+   },
+   "history": [
+    {
+     "task": "realdesk_11004",
+     "source": "origin",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0361,
+      "object_reach": 0.427,
+      "zone_reach": 0.53
+     },
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5060",
+     "source": "validation",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0367,
+      "object_reach": 0.447,
+      "zone_reach": 0.586
+     },
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5061",
+     "source": "validation",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0382,
+      "footprint_short": 0.0383,
+      "object_reach": 0.608,
+      "zone_reach": 0.583
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0385,
+      "footprint_short": 0.0361,
+      "object_reach": 0.491,
+      "zone_reach": 0.606
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0403,
+      "footprint_short": 0.0304,
+      "object_reach": 0.513,
+      "zone_reach": 0.586
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0366,
+      "object_reach": 0.43,
+      "zone_reach": 0.558
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0384,
+      "footprint_short": 0.0392,
+      "object_reach": 0.526,
+      "zone_reach": 0.636
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0349,
+      "object_reach": 0.431,
+      "zone_reach": 0.601
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0358,
+      "object_reach": 0.46,
+      "zone_reach": 0.651
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0384,
+      "footprint_short": 0.0364,
+      "object_reach": 0.487,
+      "zone_reach": 0.646
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13004",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.105,
+      "footprint_short": 0.0361,
+      "object_reach": 0.568,
+      "zone_reach": 0.586
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0384,
+      "footprint_short": 0.0359,
+      "object_reach": 0.535,
+      "zone_reach": 0.573
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0385,
+      "footprint_short": 0.0356,
+      "object_reach": 0.508,
+      "zone_reach": 0.677
+     },
+     "outcome": false,
+     "failure": "check_failed",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0384,
+      "footprint_short": 0.0356,
+      "object_reach": 0.459,
+      "zone_reach": 0.583
+     },
+     "outcome": false,
+     "failure": "motion_blocked",
+     "repaired_by": "later attempt"
+    }
+   ],
+   "status": "superseded",
+   "helpers": [
+    "pick_object_with_candidates",
+    "drop_into_container"
+   ],
+   "superseded_by": "place_on_zone_v10"
+  },
+  {
+   "function": "place_on_zone_v7",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v7(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zone_center = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.08)\n    table_z = obs[\"table_z\"]\n\n    if not grasp_elongated_object(obj_name, min_height=0.012):\n        return False\n\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    if not reorient_held_object_upright(zone_center[0], zone_center[1], safe_z):\n        return False\n\n    return drop_into_container_v2(obj_name, zone_name, safe_z_offset=0.15)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker",
+     "stylus"
+    ],
+    "notes": "Grasps an elongated object, reorients it upright using reachable horizontal approaches, and drops it into a tall rimmed holder or container."
+   },
+   "origin": {
+    "task": "realdesk_12001",
+    "object": "cyan_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\n# Grasp pen across short side at height ~ 0.012m\ncands = grasp_candidates(\"cyan_pen\")\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    cand[\"height\"] = max(cand.get(\"height\", 0.012), 0.012)\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Reorient pen upright (approach horizontal)\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            move_gripper(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa, path=\"line\")\n            break\n\n    # Release from above the rim height so pen drops upright into holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"cyan_pen\", \"magenta_holder\")",
+    "skill": "place_on_zone_v7"
+   },
+   "history": [
+    {
+     "task": "realdesk_12001",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0109,
+      "object_reach": 0.469,
+      "zone_reach": 0.584
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5070",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.448,
+      "zone_reach": 0.606
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5071",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0112,
+      "object_reach": 0.463,
+      "zone_reach": 0.636
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0118,
+      "object_reach": 0.454,
+      "zone_reach": 0.586
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.433,
+      "zone_reach": 0.618
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.449,
+      "zone_reach": 0.63
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.012,
+      "object_reach": 0.476,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.456,
+      "zone_reach": 0.62
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.092,
+      "footprint_short": 0.0147,
+      "object_reach": 0.548,
+      "zone_reach": 0.553
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.01,
+      "object_reach": 0.446,
+      "zone_reach": 0.612
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0116,
+      "object_reach": 0.441,
+      "zone_reach": 0.631
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.492,
+      "zone_reach": 0.577
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.472,
+      "zone_reach": 0.531
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "grasp_elongated_object",
+    "reorient_held_object_upright",
+    "drop_into_container_v2"
+   ]
+  },
+  {
+   "function": "place_on_zone_v8",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v8(obj_name, zone_name):\n    \"\"\"Picks up an object (prioritizing rim grasps for mug-like items) and places it on a target zone.\"\"\"\n    obs = observe()\n    if zone_name not in obs.get(\"zones\", {}):\n        raise ValueError(f\"Zone {zone_name} not found in observation.\")\n\n    zone = obs[\"zones\"][zone_name]\n    target_x, target_y = zone[\"center\"][0], zone[\"center\"][1]\n\n    # Attempt specialized grasp, fallback to general pick if needed\n    grasped = grasp_mug_by_rim(obj_name)\n    if not grasped:\n        pick_object(obj_name)\n\n    place_at_position(target_x, target_y, clear_height=0.18, retreat_height=0.12)\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug",
+     "cup"
+    ],
+    "notes": "Grasps mug near rim avoiding finger collisions and places it onto a flat zone."
+   },
+   "origin": {
+    "task": "realdesk_13000",
+    "object": "green_mug",
+    "zone": "blue_coaster",
+    "attempt": 1,
+    "source_code": "# Subgoal: Move green_mug to blue_coaster\nobs = observe()\ncoaster = obs[\"zones\"][\"blue_coaster\"]\ntarget_x, target_y = coaster[\"center\"][0], coaster[\"center\"][1]\n\ncandidates = grasp_candidates(\"green_mug\")\n# Filter and sort candidates: prefer clear hand/fingers and grasping near the rim (~0.055 - 0.06m)\nvalid_cands = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\nvalid_cands.sort(\n    key=lambda c: (\n        c.get(\"hand_clear\", False),\n        c.get(\"fingers_clear\", False),\n        c.get(\"height\", 0) > 0.05,\n        c.get(\"score\", 0),\n    ),\n    reverse=True,\n)\n\nchosen_cand = valid_cands[0]\nres = grasp(chosen_cand)\n\nif res[\"holding_something\"]:\n    carry_to(target_x, target_y, height=0.18)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.12)\n    check(\"green_mug\", \"blue_coaster\")",
+    "skill": "place_on_zone_v8"
+   },
+   "history": [
+    {
+     "task": "realdesk_13000",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0243,
+      "object_reach": 0.476,
+      "zone_reach": 0.6
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5080",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0456,
+      "object_reach": 0.417,
+      "zone_reach": 0.577
+     },
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_mug_5081",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0353,
+      "object_reach": 0.456,
+      "zone_reach": 0.612
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0364,
+      "object_reach": 0.501,
+      "zone_reach": 0.639
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0451,
+      "object_reach": 0.493,
+      "zone_reach": 0.648
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0471,
+      "object_reach": 0.491,
+      "zone_reach": 0.637
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13004",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0342,
+      "object_reach": 0.458,
+      "zone_reach": 0.678
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0507,
+      "object_reach": 0.472,
+      "zone_reach": 0.68
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0474,
+      "object_reach": 0.456,
+      "zone_reach": 0.631
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0474,
+      "object_reach": 0.427,
+      "zone_reach": 0.681
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0315,
+      "object_reach": 0.485,
+      "zone_reach": 0.674
+     },
+     "outcome": false,
+     "failure": "check_failed",
+     "repaired_by": "later attempt"
+    }
+   ],
+   "status": "superseded",
+   "helpers": [
+    "grasp_mug_by_rim"
+   ],
+   "superseded_by": "place_on_zone_v9"
+  },
+  {
+   "function": "place_on_zone_v9",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v9(obj_name: str, zone_name: str):\n    \"\"\"Picks up an object (especially mugs) and places it centered on a target zone.\"\"\"\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    target_x, target_y = zone[\"center\"][0], zone[\"center\"][1]\n\n    obj_info = obs.get(\"objects\", {}).get(obj_name, {})\n    if obj_info.get(\"kind\") == \"mug\":\n        grasp_mug_robust(obj_name)\n    else:\n        pick_object(obj_name)\n\n    place_at_position(target_x, target_y, clear_height=0.18, retreat_height=0.12)\n    go_home()",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "mug",
+     "cup",
+     "small_object"
+    ],
+    "notes": "Grasps a mug prioritizing clear short-side grasp candidates near target height before placing on the zone center."
+   },
+   "origin": {
+    "task": "realdesk_13009",
+    "object": "cyan_mug",
+    "zone": "blue_coaster",
+    "attempt": 2,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"blue_coaster\"]\ntarget_x, target_y = zone[\"center\"][0], zone[\"center\"][1]\n\ncands = grasp_candidates(\"cyan_mug\")\n# Filter for clear grasps across the short side (or highest score / hand_clear)\nvalid = [c for c in cands if c.get(\"hand_clear\", True) and c.get(\"fingers_clear\", True)]\nif not valid:\n    valid = cands\n\n# Sort to prefer across short side and stable lower grasp height (around 0.035 m)\ndef score_cand(c):\n    is_short = \"short side\" in c.get(\"source\", \"\")\n    h_dist = abs(c.get(\"height\", 0.04) - 0.035)\n    return (1 if is_short else 0, -h_dist, c.get(\"score\", 0))\n\nbest_cand = max(valid, key=score_cand)\nres = grasp(best_cand)\n\nif not res.get(\"holding_something\", False):\n    # fallback\n    best_cand = max(cands, key=lambda c: c.get(\"score\", 0))\n    grasp(best_cand)\n\ncarry_to(target_x, target_y, height=0.18)\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.12)\ngo_home()\ncheck(\"cyan_mug\", \"blue_coaster\")",
+    "skill": "place_on_zone_v9"
+   },
+   "history": [
+    {
+     "task": "realdesk_13009",
+     "source": "origin",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.048,
+      "footprint_short": 0.0588,
+      "object_reach": 0.446,
+      "zone_reach": 0.674
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5100",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0245,
+      "object_reach": 0.419,
+      "zone_reach": 0.65
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5101",
+     "source": "validation",
+     "features": {
+      "kind": "mug",
+      "zone_style": "coaster",
+      "height": 0.07,
+      "footprint_short": 0.0465,
+      "object_reach": 0.44,
+      "zone_reach": 0.681
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "grasp_mug_robust"
+   ]
+  },
+  {
+   "function": "place_on_zone_v10",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v10(obj_name, zone_name):\n    \"\"\"Grasps an object robustly avoiding nearby obstacles and drops it into a target container zone.\"\"\"\n    success = select_and_execute_grasp(obj_name)\n    if not success:\n        return False\n\n    obs = observe()\n    zone = obs.get(\"zones\", {}).get(zone_name)\n    if not zone:\n        return False\n\n    drop_into_container(zone, clear_offset=0.12, retreat_height=0.15)\n    return check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "paper",
+     "small_object",
+     "container_item"
+    ],
+    "notes": "Grasps thin or standard objects using yaw fallback and height retry before safely releasing them into a target receptacle zone."
+   },
+   "origin": {
+    "task": "realdesk_13009",
+    "object": "purple_paper",
+    "zone": "red_bin",
+    "attempt": 2,
+    "source_code": "# Look at grasp candidates for purple_paper and select one that is hand_clear or orient fingers appropriately\ncands = grasp_candidates(\"purple_paper\")\nclear_cands = [c for c in cands if c.get(\"hand_clear\", False) and c.get(\"fingers_clear\", True)]\n\nif clear_cands:\n    chosen = clear_cands[0]\nelse:\n    # Rotate yaw by 90 degrees or pick candidate with alternate yaw to avoid yellow_pen obstacle\n    chosen = cands[0].copy()\n    if len(cands) > 1 and cands[1].get(\"yaw\") != chosen.get(\"yaw\"):\n        chosen = cands[1]\n    else:\n        chosen[\"yaw\"] = chosen[\"yaw\"] + 1.5708\n\nres = grasp(chosen)\nif not res.get(\"holding_something\", False):\n    # Retry with adjusted height if not held\n    chosen[\"height\"] = 0.022\n    grasp(chosen)\n\nobs = observe()\nzone = obs[\"zones\"][\"red_bin\"]\ndrop_into_container(zone, clear_offset=0.12, retreat_height=0.15)\ncheck(\"purple_paper\", \"red_bin\")",
+    "skill": "place_on_zone_v10"
+   },
+   "history": [
+    {
+     "task": "realdesk_13009",
+     "source": "origin",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0384,
+      "footprint_short": 0.0356,
+      "object_reach": 0.459,
+      "zone_reach": 0.583
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5100",
+     "source": "validation",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0388,
+      "object_reach": 0.501,
+      "zone_reach": 0.607
+     },
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5101",
+     "source": "validation",
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0368,
+      "object_reach": 0.474,
+      "zone_reach": 0.62
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "select_and_execute_grasp"
+   ]
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0111
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0114
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1399,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1387,
+    0.0115
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1337,
+    0.0107
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.075,
+    0.0528
+   ],
+   "grasp_height": 0.015,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0542,
+    0.0464
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0338,
+   "footprint": [
+    0.0683,
+    0.0508
+   ],
+   "grasp_height": 0.017,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0338,
+   "footprint": [
+    0.0683,
+    0.0508
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.0338,
+   "footprint": [
+    0.0683,
+    0.0508
+   ],
+   "grasp_height": 0.03,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.074,
+   "footprint": [
+    0.058,
+    0.0452
+   ],
+   "grasp_height": 0.037,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0734,
+    0.0549
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.138,
+    0.0105
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.04,
+    0.0392
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.04
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0837,
+   "footprint": [
+    0.0413,
+    0.0384
+   ],
+   "grasp_height": 0.0737,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0838,
+   "footprint": [
+    0.0413,
+    0.0384
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0559,
+    0.045
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1365,
+    0.01
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1331,
+   "footprint": [
+    0.0653,
+    0.0235
+   ],
+   "grasp_height": 0.067,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1319,
+   "footprint": [
+    0.0649,
+    0.0235
+   ],
+   "grasp_height": 0.12,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1319,
+   "footprint": [
+    0.0649,
+    0.0235
+   ],
+   "grasp_height": 0.12,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0838,
+   "footprint": [
+    0.0405,
+    0.0385
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0838,
+   "footprint": [
+    0.0402,
+    0.0389
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0837,
+   "footprint": [
+    0.0413,
+    0.0384
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1377,
+   "footprint": [
+    0.0533,
+    0.0095
+   ],
+   "grasp_height": 0.069,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1377,
+   "footprint": [
+    0.0533,
+    0.0095
+   ],
+   "grasp_height": 0.126,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1377,
+   "footprint": [
+    0.0533,
+    0.0095
+   ],
+   "grasp_height": 0.069,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1393,
+    0.0162
+   ],
+   "grasp_height": 0.08,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1393,
+    0.0162
+   ],
+   "grasp_height": 0.046,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1393,
+    0.0162
+   ],
+   "grasp_height": 0.08,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1393,
+    0.0162
+   ],
+   "grasp_height": 0.046,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1052,
+   "footprint": [
+    0.1346,
+    0.0138
+   ],
+   "grasp_height": 0.053,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1052,
+   "footprint": [
+    0.1346,
+    0.0138
+   ],
+   "grasp_height": 0.093,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0475
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.04,
+    0.039
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0563,
+    0.0468
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.028,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.028,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.0409,
+    0.038
+   ],
+   "grasp_height": 0.032,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0399,
+    0.0385
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0838,
+   "footprint": [
+    0.0399,
+    0.0399
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0838,
+   "footprint": [
+    0.0399,
+    0.0399
+   ],
+   "grasp_height": 0.068,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0743,
+    0.0533
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.0117
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0837,
+   "footprint": [
+    0.0398,
+    0.0384
+   ],
+   "grasp_height": 0.042,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0837,
+   "footprint": [
+    0.0398,
+    0.0384
+   ],
+   "grasp_height": 0.072,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0837,
+   "footprint": [
+    0.04,
+    0.0389
+   ],
+   "grasp_height": 0.072,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1343,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0565,
+    0.0473
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0746,
+    0.0544
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.03,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.032,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.027,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0386,
+   "footprint": [
+    0.0382,
+    0.0366
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_11000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1373,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1373,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0116
+   ],
+   "grasp_height": 0.003,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "grasp_height_out_of_range",
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0116
+   ],
+   "grasp_height": 0.005,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0116
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0733,
+    0.0546
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0459,
+    0.0349
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.139,
+    0.0116
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.056,
+    0.0468
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0734,
+    0.055
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0385,
+   "footprint": [
+    0.0395,
+    0.0362
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.139,
+    0.0118
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0559,
+    0.0471
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11003"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0728,
+    0.0546
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11003"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0382,
+   "footprint": [
+    0.0387,
+    0.0361
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1396,
+    0.01
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11004"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0745,
+    0.0548
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0396,
+    0.0361
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_11004"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.053,
+    0.0461
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0747,
+    0.054
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0369,
+    0.0367
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0369,
+    0.0367
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1376,
+    0.0109
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.055,
+    0.047
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0745,
+    0.0546
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12001"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0385,
+   "footprint": [
+    0.0408,
+    0.0361
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1374,
+    0.0118
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0454,
+    0.0221
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0473,
+    0.0284
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0732,
+    0.0536
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0403,
+   "footprint": [
+    0.0396,
+    0.0304
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0402,
+   "footprint": [
+    0.0395,
+    0.0305
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0402,
+   "footprint": [
+    0.0405,
+    0.0305
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0402,
+   "footprint": [
+    0.0402,
+    0.0305
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0402,
+   "footprint": [
+    0.0402,
+    0.0305
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0402,
+   "footprint": [
+    0.0402,
+    0.0305
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 1,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1355,
+    0.01
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1311,
+   "footprint": [
+    0.0678,
+    0.0099
+   ],
+   "grasp_height": 0.008,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1317,
+   "footprint": [
+    0.069,
+    0.0099
+   ],
+   "grasp_height": 0.12,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0371,
+    0.0366
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0555,
+    0.0469
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1308,
+   "footprint": [
+    0.0674,
+    0.0099
+   ],
+   "grasp_height": 0.0785,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1306,
+   "footprint": [
+    0.067,
+    0.0099
+   ],
+   "grasp_height": 0.065,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1296,
+   "footprint": [
+    0.0723,
+    0.0102
+   ],
+   "grasp_height": 0.118,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.1296,
+   "footprint": [
+    0.0723,
+    0.0102
+   ],
+   "grasp_height": 0.125,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1362,
+    0.0105
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12004"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0747,
+    0.0549
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0387,
+    0.0374
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1342,
+    0.0118
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12005"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0545,
+    0.0465
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12005"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0399,
+    0.0392
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.012
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12006"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0562,
+    0.0466
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12006"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.055
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12006"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1373,
+    0.0119
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "unreachable_pose",
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1373,
+    0.0119
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "unreachable_pose",
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0475,
+    0.0266
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0453,
+    0.0251
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.073,
+    0.055
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.073,
+    0.055
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12007"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0426,
+   "footprint": [
+    0.0474,
+    0.0326
+   ],
+   "grasp_height": 0.021,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0524,
+   "footprint": [
+    0.0438,
+    0.0326
+   ],
+   "grasp_height": 0.026,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0453,
+   "footprint": [
+    0.0395,
+    0.0362
+   ],
+   "grasp_height": 0.04,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0453,
+    0.0447
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0453,
+    0.0447
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0454,
+   "footprint": [
+    0.0394,
+    0.0362
+   ],
+   "grasp_height": 0.023,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0454,
+   "footprint": [
+    0.0394,
+    0.0362
+   ],
+   "grasp_height": 0.038,
+   "yaw_from_long_axis_deg": 45,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0454,
+   "footprint": [
+    0.0394,
+    0.0362
+   ],
+   "grasp_height": 0.088,
+   "yaw_from_long_axis_deg": 45,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0738,
+    0.0546
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0388,
+    0.0349
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12008"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0429,
+   "footprint": [
+    0.0466,
+    0.0363
+   ],
+   "grasp_height": 0.021,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.12,
+   "footprint": [
+    0.0393,
+    0.0361
+   ],
+   "grasp_height": 0.105,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.12,
+   "footprint": [
+    0.0396,
+    0.0358
+   ],
+   "grasp_height": 0.12,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1359,
+    0.012
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0527,
+    0.0468
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0527,
+    0.0468
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0527,
+    0.0468
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0692,
+    0.0546
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.12,
+   "footprint": [
+    0.0359,
+    0.0357
+   ],
+   "grasp_height": 0.06,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.12,
+   "footprint": [
+    0.0359,
+    0.0357
+   ],
+   "grasp_height": 0.1,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.12,
+   "footprint": [
+    0.0359,
+    0.0357
+   ],
+   "grasp_height": 0.08,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0382,
+   "footprint": [
+    0.0398,
+    0.0359
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_12009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0441,
+    0.0243
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0394,
+   "footprint": [
+    0.0406,
+    0.0352
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 89,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_13000"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0404,
+   "footprint": [
+    0.0391,
+    0.0331
+   ],
+   "grasp_height": 0.01,
+   "yaw_from_long_axis_deg": 89,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0748,
+    0.0527
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.0104
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1358,
+    0.0104
+   ],
+   "grasp_height": 0.0119,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.139,
+    0.0155
+   ],
+   "grasp_height": 0.046,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0453,
+    0.0364
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0747,
+    0.0546
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0388,
+    0.0358
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.139,
+    0.0155
+   ],
+   "grasp_height": 0.08,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.012
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0514,
+    0.0451
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13002"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0745,
+    0.053
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0565,
+    0.0471
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13003"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0393,
+    0.0364
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0475,
+    0.0342
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0746,
+    0.0546
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0383,
+   "footprint": [
+    0.0362,
+    0.0357
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.105,
+   "footprint": [
+    0.0375,
+    0.0361
+   ],
+   "grasp_height": 0.052,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.1125,
+   "footprint": [
+    0.0375,
+    0.0361
+   ],
+   "grasp_height": 0.056,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.1125,
+   "footprint": [
+    0.0375,
+    0.0361
+   ],
+   "grasp_height": 0.1,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.1125,
+   "footprint": [
+    0.0375,
+    0.0361
+   ],
+   "grasp_height": 0.056,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.12,
+   "footprint": [
+    0.0371,
+    0.0361
+   ],
+   "grasp_height": 0.12,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.12,
+   "footprint": [
+    0.0371,
+    0.0361
+   ],
+   "grasp_height": 0.1,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.134,
+    0.0107
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1363,
+    0.024
+   ],
+   "grasp_height": 0.09,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1387,
+    0.0147
+   ],
+   "grasp_height": 0.046,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0512,
+    0.0507
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 45,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0747,
+    0.0534
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1387,
+    0.0147
+   ],
+   "grasp_height": 0.088,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1396,
+    0.0242
+   ],
+   "grasp_height": 0.088,
+   "yaw_from_long_axis_deg": 0,
+   "holding": false,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.092,
+   "footprint": [
+    0.1387,
+    0.0144
+   ],
+   "grasp_height": 0.088,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.01
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13006"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0567,
+    0.0474
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13006"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.075,
+    0.0547
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13006"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1386,
+    0.0116
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13007"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0736,
+    0.0548
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13007"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0364,
+    0.0359
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1388,
+    0.0119
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0537,
+    0.0474
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0746,
+    0.0541
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0385,
+   "footprint": [
+    0.0397,
+    0.0356
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.1184,
+   "footprint": [
+    0.0381,
+    0.0373
+   ],
+   "grasp_height": 0.059,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.1184,
+   "footprint": [
+    0.0381,
+    0.0373
+   ],
+   "grasp_height": 0.1,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1362,
+    0.0119
+   ],
+   "grasp_height": 0.012,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13009"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0745,
+    0.055
+   ],
+   "grasp_height": 0.025,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0528,
+    0.0315
+   ],
+   "grasp_height": 0.058,
+   "yaw_from_long_axis_deg": 0,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13009"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.048,
+   "footprint": [
+    0.0697,
+    0.0588
+   ],
+   "grasp_height": 0.036,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13009"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0388,
+    0.0356
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "realdesk_13009"
+  },
+  {
+   "kind": "paper",
+   "object_height": 0.0384,
+   "footprint": [
+    0.0388,
+    0.0356
+   ],
+   "grasp_height": 0.019,
+   "yaw_from_long_axis_deg": 45,
+   "holding": true,
+   "error": null,
+   "task": "realdesk_13009"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "book",
+   "lesson": "Increase the grasp height on the book or select a higher grasp candidate to prevent the gripper fingers from colliding with the table surface.",
+   "task": "desk_9000",
+   "shown_then": [
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "book",
+   "lesson": "Do not lower the grasp height to 0.022 m, but instead grasp the book closer to its top height (around 0.03 m) to prevent the gripper from colliding with the table or book surface.",
+   "task": "desk_9000",
+   "shown_then": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "block",
+   "lesson": "Grasp the block higher near its top surface so the fingers do not extend below the bottom of the block and prevent it from being placed flat and stably on the surface.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "block",
+   "lesson": "Grasp the block near its vertical center rather than overriding the grasp height near the top to ensure a stable grip and stable placement.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "block",
+   "lesson": "Lower the block to a safe height inside the box and release it rather than using lower_until_contact, which stops prematurely on the container rim and causes the block to be dropped.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "pen",
+   "lesson": "Insert the green pen into the magenta holder vertically or align the placement orientation with the holder rather than using a flat top-down surface placement.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 7,
+   "kind": "pen",
+   "lesson": "When grasping a pen standing in or leaning on a holder, grasp near its top end above the holder rim rather than near its center to avoid colliding with the container.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 8,
+   "kind": "pen",
+   "lesson": "When lowering the pen into the holder, set the gripper target height based on the grasp height along the pen (e.g., table_z plus the grasp height) so the pen's bottom reaches the holder base without colliding into it.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 9,
+   "kind": "block",
+   "lesson": "Lower the gripper until the bottom of the block reaches the container floor near table_z before opening the gripper, rather than releasing it from above the rim height where dropping it causes it to bounce or tumble.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 10,
+   "kind": "block",
+   "lesson": "Add a wait after opening the gripper and retreating so the block has time to come to a complete rest before calling check.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 11,
+   "kind": "block",
+   "lesson": "Increase the wait duration after releasing the block to at least 100 steps so the block can fully settle to a resting state before evaluation.",
+   "task": "desk_9002",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ]
+  },
+  {
+   "id": 12,
+   "kind": "pen",
+   "lesson": "Grasp the pen near the top of the object using the grasp candidate across the long side so the fingers do not collide with the holder during placement.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 13,
+   "kind": "pen",
+   "lesson": "Select grasp candidates whose fingers squeeze across the short side (fits_open_fingers is True) and grasp at a lower height or avoid candidates with yaw along the long axis which exceed the gripper opening width.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 14,
+   "kind": "pen",
+   "lesson": "Grasp the pen with the fingers aligned along its long axis (fingers across the short side) lower along its body, or grasp with fingers parallel to the long axis so that the lower portion of the pen does not collide or drop during placement.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 15,
+   "kind": "block",
+   "lesson": "Grasp the block higher near its top surface (such as slightly below top_z) to prevent the gripper fingers from colliding with the table during the grasp approach.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 16,
+   "kind": "block",
+   "lesson": "Select the grasp candidate with fingers aligned across the object's long axis to avoid kinematic limits or collisions during the grasp descent.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 17,
+   "kind": "block",
+   "lesson": "Grasp the block at a height between 0.025 m and 0.035 m (slightly below the top surface of 0.04 m but high enough to clear the table collision around z=0.85 m) so the gripper fingers envelop the object body rather than gripping air above it.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 18,
+   "kind": "pen",
+   "lesson": "When placing the pen into a holder, reduce the approach and clearance height above the holder so the gripper stays within its reachable workspace limits.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 19,
+   "kind": "pen",
+   "lesson": "Ensure the robot detects and grasps the yellow pen using a valid grasp candidate before attempting any transport or insertion into the holder.",
+   "task": "desk_9003",
+   "shown_then": [
+    true,
+    false,
+    false,
+    true
+   ]
+  },
+  {
+   "id": 20,
+   "kind": "block",
+   "lesson": "Use the candidate's default height from grasp_candidates directly instead of overriding it to low absolute height values that collide with the table.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 21,
+   "kind": "block",
+   "lesson": "Call open_gripper() before calling grasp() so the fingers are open during the grasp approach and do not collide with the top of the block.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 22,
+   "kind": "block",
+   "lesson": "Choose grasp candidates with height close to the block's top surface (e.g. height around 0.04 m) rather than lower heights that cause the gripper to collide with the supporting surface at z=0.85 m.",
+   "task": "desk_9003",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 23,
+   "kind": "block",
+   "lesson": "Lower the block until it makes stable contact with the bottom of the purple_box before releasing the gripper rather than dropping it from above so it does not bounce and fail the resting check.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 24,
+   "kind": "block",
+   "lesson": "For a tall or stacked block, increase the grasp height above the candidate's default (e.g., to 0.06\u20130.07 m) so the gripper grasps near the top of the block without colliding lower down.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 25,
+   "kind": "block",
+   "lesson": "Grasp the block lower down on its body, around half its height (grasp_height ~0.04 m to 0.05 m), so the gripper securely holds the object vertically without tipping or resting instability when placed.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 26,
+   "kind": "block",
+   "lesson": "For tall blocks, grasp higher along the vertical axis (e.g., at a height around 0.06 m to 0.07 m above the base) to prevent the gripper from colliding with the table or neighboring obstacles during the descent.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 27,
+   "kind": "block",
+   "lesson": "Increase the settling wait time after placing the block in the container (e.g. wait(1000) or longer) before checking so that the block finishes moving and satisfies the resting check.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 28,
+   "kind": "block",
+   "lesson": "Increase the wait time after placing the block in the container (e.g., to wait(2000) or wait(3000)) to allow the object sufficient time to come to a complete rest before checking.",
+   "task": "desk_9004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 29,
+   "kind": "pen",
+   "lesson": "Reorient the gripper to the horizontal approach orientation at a safe height before moving horizontally over the holder rather than reorienting directly above the holder rim.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 30,
+   "kind": "pen",
+   "lesson": "When placing a held pen into a holder, release the pen from above the rim height (e.g., safe_z or table_z + rim_height + 0.15) rather than lowering the gripper close to the rim.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 31,
+   "kind": "paper",
+   "lesson": "Increase the grasp height closer to the top of the paper (or adjust candidate height above the table surface) to prevent the grasp motion from being blocked by the supporting surface.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 32,
+   "kind": "paper",
+   "lesson": "Select a grasp candidate with fingers oriented across the long axis rather than the short side to avoid gripper collision with the adjacent bin rim during approach.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 33,
+   "kind": "paper",
+   "lesson": "Select or set the grasp candidate yaw across the short side (using object_short_axis_yaw) instead of aligning with the long axis to avoid collision during grasp approach.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 34,
+   "kind": "paper",
+   "lesson": "Filter or sort grasp candidates to select those with grasp height set higher (e.g. at or near the object's top_z) or modify the candidate target height to be near the top surface of the paper to avoid motion_blocked table collisions.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 35,
+   "kind": "paper",
+   "lesson": "Filter grasp candidates for paper to only use contact-graspnet candidates rather than geometry candidates to avoid kinematic or environment collisions when the object is near a bin rim.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    false,
+    true,
+    true,
+    true,
+    false,
+    true
+   ]
+  },
+  {
+   "id": 36,
+   "kind": "paper",
+   "lesson": "Shift the grasp candidate position away from the adjacent bin towards the outer edge or corner of the paper so the gripper avoids colliding with the bin rim during descent.",
+   "task": "realdesk_11000",
+   "shown_then": [
+    true,
+    true,
+    true,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 37,
+   "kind": "pen",
+   "lesson": "Grasp the pen across its short side with a lower grasp height closer to the table surface (below 0.006 m) so the gripper fingers envelop enough of the thin profile to maintain hold.",
+   "task": "realdesk_11001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 38,
+   "kind": "pen",
+   "lesson": "Keep the grasp height within the allowed range (at least 0.004 m above the table) when modifying grasp candidates for the pen.",
+   "task": "realdesk_11001",
+   "shown_then": [
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 39,
+   "kind": "pen",
+   "lesson": "Grasp the pen across its short side at a higher grasp height equal to or slightly above its object height (e.g., around 0.012 m) so the fingers extend fully down to the table surface and envelop the thin pen.",
+   "task": "realdesk_11001",
+   "shown_then": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 40,
+   "kind": "paper",
+   "lesson": "Filter grasp candidates strictly to require hand_clear == True so the robot does not attempt grasps where the hand body collides with an adjacent bin rim.",
+   "task": "realdesk_12000",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 41,
+   "kind": "mug",
+   "lesson": "Grasp higher near the rim of the mug or increase the grasp height to avoid the gripper colliding with the mug body during the grasp approach.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 42,
+   "kind": "paper",
+   "lesson": "Filter candidate grasps to require hand_clear and fingers_clear to be True (or where highest_obstacle_under_hand_m does not exceed the grasp approach height) so the gripper does not collide with adjacent obstacles.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 43,
+   "kind": "paper",
+   "lesson": "Before calling grasp on cyan_paper when it is adjacent to a container, shift the grasp x/y position slightly away from the bin or use an angled/offset approach to avoid the hand colliding with the container rim.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 44,
+   "kind": "paper",
+   "lesson": "Do not manually shift grasp candidates away from the object center or alter their target height when grasping paper near a container rim, as modifying the coordinates causes motion planning to be blocked.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 45,
+   "kind": "paper",
+   "lesson": "When selecting grasp candidates for paper near obstacles, choose a candidate oriented along the short axis yaw or with finger direction parallel to nearby container walls rather than across them to prevent the gripper body from colliding with the obstacle during descent.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 46,
+   "kind": "paper",
+   "lesson": "When grasping paper near a container rim, select candidates where fingers are oriented along the long axis or with fingers_clear True to prevent the gripper fingers from colliding with the obstacle during descent.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    false,
+    true,
+    true,
+    false,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 47,
+   "kind": "paper",
+   "lesson": "When dropping paper into a container, lower the release position inside the bin or use a smaller retreat clearance so the light object is released directly into the container cavity rather than bouncing or catching on the rim.",
+   "task": "realdesk_12002",
+   "shown_then": [
+    true,
+    true,
+    false,
+    true,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 48,
+   "kind": "pen",
+   "lesson": "Lower the grasp height below the object top surface (such as 0.005 m to 0.008 m) when grasping across the short axis so the fingers envelop the pen securely before reorienting upright.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 49,
+   "kind": "pen",
+   "lesson": "When the pen is standing or leaning upright, grasp it at a higher position along its height (closer to its center or top) rather than clamping the grasp height down near the table to avoid hand or finger collisions with the tall profile.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 50,
+   "kind": "pen",
+   "lesson": "Grasp the pen across its short side near its vertical midpoint (grasp height around 0.05 to 0.07 m above the table) so the fingers extend sufficiently below the grip point to envelop the thin body without grasping off the very top tip.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 51,
+   "kind": "pen",
+   "lesson": "Select a grasp candidate oriented along the pen's long axis (fingers squeezing along the footprint rather than across the thin 0.010 m cross-section) or grasp higher near the object's top surface so the fingers fully engage the pen.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 52,
+   "kind": "pen",
+   "lesson": "Select a grasp candidate that squeezes across the pen's short side with clearance for the fingers and hand rather than attempting to clamp along the long axis.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    false,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 53,
+   "kind": "pen",
+   "lesson": "Grasp the pen across its short side lower down along its height (grasp height around 0.08 to 0.10 m) so the gripper fingers descend deep enough to securely envelop the pen's body rather than slipping off the top tip.",
+   "task": "realdesk_12003",
+   "shown_then": [
+    true,
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 54,
+   "kind": "pen",
+   "lesson": "When grasping a thin pen lying on the table, use a top-down grasp helper or standard grasp with a lower approach and lift clearance instead of grasp_elongated_object whose 1.0 m lift/approach waypoint causes IK reachability failures.",
+   "task": "realdesk_12007",
+   "shown_then": [
+    false,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 55,
+   "kind": "pen",
+   "lesson": "Specify a lower safe approach height when calling grasp (e.g., safe_height=0.90) to avoid reaching the unreachable 1.0 m pre-grasp waypoint.",
+   "task": "realdesk_12007",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "id": 56,
+   "kind": "mug",
+   "lesson": "Grasp the mug higher near its rim rather than halfway down its height to avoid collision between the gripper and the mug.",
+   "task": "realdesk_12007",
+   "shown_then": [
+    true,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 57,
+   "kind": "book",
+   "lesson": "Use standard pick instead of pick_thin_object or grasp across the long axis with sufficient clearance so the gripper hand does not collide with obstacles.",
+   "task": "realdesk_12007",
+   "shown_then": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 58,
+   "kind": "block",
+   "lesson": "Select a grasp candidate oriented across the long side or with hand_clear=True to avoid colliding with nearby tall obstacles during the descent.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 59,
+   "kind": "block",
+   "lesson": "When grasping an object inside a high-rimmed container like a bin, choose grasp candidates oriented with fingers across the long side (aligned with the bin's open dimensions) or with higher grasp height to avoid hand collision with the container rim.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 60,
+   "kind": "block",
+   "lesson": "Rotate the grasp yaw to 45 degrees (e.g., math.pi / 4) so the elongated gripper body aligns with the container's diagonal to avoid colliding with the rim.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 61,
+   "kind": "mug",
+   "lesson": "Grasp the mug higher near its rim instead of midway down to prevent the gripper or hand from colliding with the mug or table.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    true,
+    false,
+    false,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 62,
+   "kind": "block",
+   "lesson": "When grasping an object inside a container, prioritize grasp candidates with fingers_clear=True rather than hand_clear=True so the fingers fit inside the container walls without collision.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 63,
+   "kind": "block",
+   "lesson": "When an object sits deep inside a tall container causing hand collision, grasp at or above the object's top surface (e.g., height equal to or slightly exceeding object_height) or use a top-edge pinch to prevent the gripper body from descending below the rim.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 64,
+   "kind": "block",
+   "lesson": "Do not manually raise the grasp height above the object's top surface; keep the grasp height at or below the object height (e.g. using the candidate's original height or around half the object height) so the fingers actually close on the object.",
+   "task": "realdesk_12008",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 65,
+   "kind": "block",
+   "lesson": "When grasping a block located inside a deep container or near high obstacles, increase the grasp height to grasp near the top of the block so the gripper does not collide with the surrounding rim.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 66,
+   "kind": "block",
+   "lesson": "Select a grasp candidate where fingers_clear is True and set its yaw aligned with the container or free of obstacle collisions, or grasp at a height equal to the object's full height to keep the gripper above the rim.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 67,
+   "kind": "block",
+   "lesson": "Select a grasp candidate whose grasp height is slightly below the object top surface (for example, object height minus 0.015 m to 0.02 m) so the finger pads grip the top portion of the block without the grip point resting above or flush with the top surface.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 68,
+   "kind": "mug",
+   "lesson": "Select grasp candidates with a higher grasp height near the rim (e.g., around 0.055 to 0.06 m) or with hand_clear=True to avoid downward motion blocking against obstacles or the mug itself.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 69,
+   "kind": "mug",
+   "lesson": "Select a grasp candidate with hand_clear=True or oriented along the object's long axis to avoid collisions between the gripper hand and nearby obstacles or the mug's handle.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 70,
+   "kind": "block",
+   "lesson": "When a tall standing block fails to reach the grasp height due to hand collision (motion_blocked), choose or adjust the grasp height to grasp near the top of the block, around 0.09 to 0.11 m.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 71,
+   "kind": "block",
+   "lesson": "Select a grasp candidate with hand_clear True, or increase the grasp height above the highest obstacle under the hand (e.g. at or above 0.12 m) so the gripper hand does not collide with the obstacle during grasp execution.",
+   "task": "realdesk_12009",
+   "shown_then": [
+    false
+   ]
+  },
+  {
+   "id": 72,
+   "kind": "block",
+   "lesson": "When grasping near an obstacle like a bin, filter for grasp candidates that have hand_clear=True or rotate the yaw 180 degrees away from the obstacle direction so the hand body does not collide with the obstacle rim.",
+   "task": "realdesk_12009",
+   "shown_then": []
+  },
+  {
+   "id": 73,
+   "kind": "paper",
+   "lesson": "For thin objects like paper, set the grasp height closer to the bottom surface or table level (e.g. at or near 0.005\u20130.01 m) so the gripper fingers reach far enough below the top surface to establish contact.",
+   "task": "realdesk_13000",
+   "shown_then": [
+    true,
+    true,
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 74,
+   "kind": "pen",
+   "lesson": "When grasping a pen lying flat, set the grasp height to the object's top surface (around its full height of 0.012 m) so the gripper can engage the pen below the grip point.",
+   "task": "realdesk_13001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 75,
+   "kind": "pen",
+   "lesson": "When grasping a pen lying flat on the table, set the grasp height lower around half its height (about 0.005\u20130.006 m) instead of at or above its top surface so the fingers descend enough to firmly envelop the thin body.",
+   "task": "realdesk_13001",
+   "shown_then": [
+    false,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "id": 76,
+   "kind": "pen",
+   "lesson": "When a pen is leaning on a holder, choose a grasp candidate near the upper end or set the grasp height above the surrounding holder rim (at least 0.09 m) to prevent the hand or fingers from colliding with the holder.",
+   "task": "realdesk_13001",
+   "shown_then": [
+    true,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ]
+  },
+  {
+   "id": 77,
+   "kind": "paper",
+   "lesson": "When grasping paper near a container, filter candidate grasps to require hand_clear and fingers_clear to be True to prevent the gripper from colliding with the container rim during descent.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 78,
+   "kind": "paper",
+   "lesson": "When selecting grasp candidates for paper near obstacles, prefer candidates with higher grasp height or grasp near the top edge rather than descending deeply into the obstacle clearance zone.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 79,
+   "kind": "paper",
+   "lesson": "When paper is resting on or against a container rim, select or adjust the grasp height to grasp above the highest obstacle under the hand (e.g. at or near the paper's top_z / object_height) rather than descending to 0.10 m or lower.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 80,
+   "kind": "paper",
+   "lesson": "When grasping paper resting in or near a container where default candidates report hand_clear or fingers_clear as False, choose or adjust the grasp height to grasp above the highest_obstacle_under_hand_m rather than descending below the obstacle rim.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 81,
+   "kind": "paper",
+   "lesson": "When grasping paper, set the grasp height sufficiently below the object's top surface (e.g. object_height minus 0.015 to 0.02 m) rather than clamping at or above the object height, ensuring the fingers close around paper material.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 82,
+   "kind": "paper",
+   "lesson": "Filter grasp candidates for paper to require fingers_clear and hand_clear to be True, or select candidates with highest_obstacle_under_hand_m below the target grasp height to avoid motion blockage.",
+   "task": "realdesk_13004",
+   "shown_then": [
+    false,
+    true
+   ]
+  },
+  {
+   "id": 83,
+   "kind": "pen",
+   "lesson": "Lower the pen into the holder before releasing it instead of dropping it from 0.15 m above the rim so it does not bounce or fall outside.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 84,
+   "kind": "pen",
+   "lesson": "When putting a grasped pen into a holder, use place() inside the container or lower the pen below the rim height before releasing rather than dropping it with a positive z-offset above the rim.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 85,
+   "kind": "pen",
+   "lesson": "Select a grasp candidate for the pen where both hand_clear and fingers_clear are true to avoid colliding with obstacles under the hand during descent.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 86,
+   "kind": "pen",
+   "lesson": "Grasp the pen with the gripper yaw aligned with the pen's long axis rather than across it, and lower the gripper far enough below the rim height before releasing so the pen is properly deposited into the holder.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 87,
+   "kind": "pen",
+   "lesson": "Grasp the pen across its short axis by aligning the gripper yaw with pen['short_axis_yaw'] (or perpendicular to the long axis) so the squeeze width fits within the finger opening.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    false,
+    true
+   ]
+  },
+  {
+   "id": 88,
+   "kind": "pen",
+   "lesson": "Grasp the pen lower along its body\u2014such as near the middle of its height rather than near the top edge\u2014to ensure the fingers have sufficient contact area for a secure grip.",
+   "task": "realdesk_13005",
+   "shown_then": [
+    true
+   ]
+  },
+  {
+   "id": 89,
+   "kind": "paper",
+   "lesson": "When placing paper into a bin, release it directly over the bin center with a lower placement height or controlled descent so it settles inside the zone rather than bouncing or sliding outside.",
+   "task": "realdesk_13008",
+   "shown_then": [
+    false,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 90,
+   "kind": "paper",
+   "lesson": "When grasping paper near an obstacle where candidates have hand_clear or fingers_clear as False, grasp near the top edge by setting the grasp height to slightly below the object height (e.g., around 0.10 m) to clear the obstacle while still securely pinching the paper.",
+   "task": "realdesk_13008",
+   "shown_then": [
+    true,
+    true
+   ]
+  },
+  {
+   "id": 91,
+   "kind": "mug",
+   "lesson": "Grasp the mug across its short axis rather than along its long side, and lower the grasp height further down the mug body to prevent it from slipping and toppling during transfer and placement.",
+   "task": "realdesk_13009",
+   "shown_then": [
+    true
+   ]
+  },
+  {
+   "id": 92,
+   "kind": "paper",
+   "lesson": "When grasping paper, select a grasp candidate with hand_clear=True or orient the gripper across the long side rather than using a candidate where the hand is blocked by adjacent obstacles.",
+   "task": "realdesk_13009",
+   "shown_then": [
+    true
+   ]
+  }
+ ],
+ "helpers": [
+  {
+   "name": "pick_object",
+   "code": "def pick_object(obj_name):\n    \"\"\"Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is grasped in gripper.\"\"\"\n    cands = grasp_candidates(obj_name)\n    cands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n    for cand in cands:\n        res = grasp(cand)\n        if res.get(\"holding_something\", False):\n            return True\n    return False",
+   "doc": "Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is grasped in gripper.",
+   "object_kinds": [
+    "mug"
+   ],
+   "origin": {
+    "task": "desk_9000",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"cyan_tray\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.0)\n\ncands = grasp_candidates(\"yellow_mug\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"yellow_mug\", \"cyan_tray\")",
+    "skill": "place_on_zone_v2"
+   },
+   "history": [
+    {
+     "task": "desk_9000",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "desk_9003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "single_mug_coaster_5050",
+     "source": "validation",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "single_mug_coaster_5051",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "place_at_position",
+   "code": "def place_at_position(x, y, clear_height=0.15, retreat_height=0.15):\n    \"\"\"Precondition: An object is held in gripper; Postcondition: Object is released at (x, y) and arm retreats.\"\"\"\n    carry_to(x, y, height=clear_height)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=retreat_height)",
+   "doc": "Precondition: An object is held in gripper; Postcondition: Object is released at (x, y) and arm retreats.",
+   "object_kinds": [
+    "mug"
+   ],
+   "origin": {
+    "task": "desk_9000",
+    "object": "yellow_mug",
+    "zone": "cyan_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"cyan_tray\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.0)\n\ncands = grasp_candidates(\"yellow_mug\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"yellow_mug\", \"cyan_tray\")",
+    "skill": "place_on_zone_v2"
+   },
+   "history": [
+    {
+     "task": "desk_9000",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "desk_9002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "desk_9003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "single_mug_coaster_5051",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5081",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_mug_5100",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5101",
+     "source": "validation",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "pick_thin_object",
+   "code": "def pick_thin_object(obj_name, min_grasp_height=0.025):\n    \"\"\"Gripper is empty; grasps the object above min_grasp_height to avoid table collision, ending with object held.\"\"\"\n    cands = grasp_candidates(obj_name)\n    valid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\n    valid_cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\n    for cand in valid_cands:\n        cand_copy = dict(cand)\n        if cand_copy.get(\"height\", 0) < min_grasp_height:\n            cand_copy[\"height\"] = min_grasp_height\n        res = grasp(cand_copy)\n        if res.get(\"holding_something\", False):\n            return True\n\n    if valid_cands:\n        cand_copy = dict(valid_cands[0])\n        if cand_copy.get(\"height\", 0) < min_grasp_height:\n            cand_copy[\"height\"] = min_grasp_height\n        res = grasp(cand_copy)\n        return res.get(\"holding_something\", False)\n    return False",
+   "doc": "Gripper is empty; grasps the object above min_grasp_height to avoid table collision, ending with object held.",
+   "object_kinds": [
+    "book"
+   ],
+   "origin": {
+    "task": "desk_9001",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbook = obs[\"objects\"][\"red_book\"]\ntray = obs[\"zones\"][\"orange_tray\"]\n\ncands = grasp_candidates(\"red_book\")\n# Filter or sort candidates; we want a grasp across the short side (squeeze footprint_short) or top grasp\n# Book height is 0.025 m. Grasp height around 0.025 - 0.03 m prevents collision with table.\nvalid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\nvalid_cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in valid_cands:\n    # Ensure grasp height is near top of book to avoid colliding with table\n    cand_copy = dict(cand)\n    if cand_copy[\"height\"] < 0.025:\n        cand_copy[\"height\"] = 0.025\n    res = grasp(cand_copy)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif not grasped and valid_cands:\n    grasp(valid_cands[0])\n\n# Move above orange_tray\ntarget_x, target_y = tray[\"center\"][0], tray[\"center\"][1]\ncarry_to(target_x, target_y, height=0.18)\n\n# Lower down into the tray\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"red_book\", \"orange_tray\")",
+    "skill": "place_on_zone_v3"
+   },
+   "history": [
+    {
+     "task": "desk_9001",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "place_5030",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5031",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "place_in_zone",
+   "code": "def place_in_zone(zone_info, carry_clearance=0.18, retreat_dz=0.15):\n    \"\"\"Holding an object above table; carries to zone center, lowers to contact, releases, and retreats.\"\"\"\n    center = zone_info[\"center\"]\n    target_x, target_y = center[0], center[1]\n    carry_to(target_x, target_y, height=carry_clearance)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=retreat_dz)\n    go_home()",
+   "doc": "Holding an object above table; carries to zone center, lowers to contact, releases, and retreats.",
+   "object_kinds": [
+    "book"
+   ],
+   "origin": {
+    "task": "desk_9001",
+    "object": "red_book",
+    "zone": "orange_tray",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbook = obs[\"objects\"][\"red_book\"]\ntray = obs[\"zones\"][\"orange_tray\"]\n\ncands = grasp_candidates(\"red_book\")\n# Filter or sort candidates; we want a grasp across the short side (squeeze footprint_short) or top grasp\n# Book height is 0.025 m. Grasp height around 0.025 - 0.03 m prevents collision with table.\nvalid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\nvalid_cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in valid_cands:\n    # Ensure grasp height is near top of book to avoid colliding with table\n    cand_copy = dict(cand)\n    if cand_copy[\"height\"] < 0.025:\n        cand_copy[\"height\"] = 0.025\n    res = grasp(cand_copy)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif not grasped and valid_cands:\n    grasp(valid_cands[0])\n\n# Move above orange_tray\ntarget_x, target_y = tray[\"center\"][0], tray[\"center\"][1]\ncarry_to(target_x, target_y, height=0.18)\n\n# Lower down into the tray\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"red_book\", \"orange_tray\")",
+    "skill": "place_on_zone_v3"
+   },
+   "history": [
+    {
+     "task": "desk_9001",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "place_5030",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5031",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_11004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13000",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "pick_object_v2",
+   "code": "def pick_object_v2(obj_name):\n    \"\"\"Pre: gripper is empty and obj_name is visible. Post: robot is holding obj_name if a grasp candidate succeeded.\"\"\"\n    cands = grasp_candidates(obj_name)\n    cands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n    for cand in cands:\n        res = grasp(cand)\n        if res.get(\"holding_something\", False):\n            return True\n    return False",
+   "doc": "Pre: gripper is empty and obj_name is visible. Post: robot is holding obj_name if a grasp candidate succeeded.",
+   "object_kinds": [
+    "block"
+   ],
+   "origin": {
+    "task": "desk_9003",
+    "object": "red_block",
+    "zone": "purple_box",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"purple_box\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.05)\n\ncands = grasp_candidates(\"red_block\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    wait(100)\n    go_home()\n    check(\"red_block\", \"purple_box\")",
+    "skill": "place_on_zone_v4"
+   },
+   "history": [
+    {
+     "task": "desk_9003",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "desk_9003",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "place_5040",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5041",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "place_in_container",
+   "code": "def place_in_container(target_pos, clearance_height, retreat_dz=0.15):\n    \"\"\"Pre: robot is holding an object. Post: object is released at target_pos and arm has retreated upward.\"\"\"\n    carry_to(target_pos[0], target_pos[1], height=clearance_height)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=retreat_dz)",
+   "doc": "Pre: robot is holding an object. Post: object is released at target_pos and arm has retreated upward.",
+   "object_kinds": [
+    "block"
+   ],
+   "origin": {
+    "task": "desk_9003",
+    "object": "red_block",
+    "zone": "purple_box",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"purple_box\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.05)\n\ncands = grasp_candidates(\"red_block\")\ncands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    carry_to(zone_center[0], zone_center[1], height=rim_height + 0.15)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    wait(100)\n    go_home()\n    check(\"red_block\", \"purple_box\")",
+    "skill": "place_on_zone_v4"
+   },
+   "history": [
+    {
+     "task": "desk_9003",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "place_5040",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "place_5041",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "desk_9004",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "pick_object_with_candidates",
+   "code": "def pick_object_with_candidates(obj_name, preferred_source=\"contact-graspnet\"):\n    \"\"\"Picks an object by evaluating grasp candidates, returning True if successfully grasped.\"\"\"\n    cands = grasp_candidates(obj_name)\n    if not cands:\n        return False\n\n    filtered_cands = [\n        c for c in cands\n        if (preferred_source is None or c.get(\"source\") == preferred_source)\n        and c.get(\"fits_open_fingers\", True)\n    ]\n    if not filtered_cands:\n        filtered_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)] or cands\n\n    sorted_cands = sorted(filtered_cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\n    for cand in sorted_cands:\n        res = grasp(cand)\n        if res.get(\"holding_something\", False):\n            return True\n    return False",
+   "doc": "Picks an object by evaluating grasp candidates, returning True if successfully grasped.",
+   "object_kinds": [
+    "paper"
+   ],
+   "origin": {
+    "task": "realdesk_11004",
+    "object": "green_paper",
+    "zone": "red_bin",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbin_zone = obs[\"zones\"][\"red_bin\"]\nbin_center = bin_zone[\"center\"]\nbin_rim = bin_zone.get(\"rim_height\", 0.12)\n\n# Pick paper using contact-graspnet candidate (or sorted candidates)\ncands = grasp_candidates(\"green_paper\")\ncg_cands = [c for c in cands if c.get(\"source\") == \"contact-graspnet\" and c.get(\"fits_open_fingers\", True)]\nif not cg_cands:\n    cg_cands = cands\ncg_cands = sorted(cg_cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cg_cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    # Carry above red_bin rim safely\n    carry_height = bin_rim + 0.12\n    carry_to(bin_center[0], bin_center[1], height=carry_height)\n    # Crumpled paper ball can be dropped into the wastebasket\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"green_paper\", \"red_bin\")",
+    "skill": "place_on_zone_v6"
+   },
+   "history": [
+    {
+     "task": "realdesk_11004",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5060",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5061",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13004",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "drop_into_container",
+   "code": "def drop_into_container(zone_info, clear_offset=0.12, retreat_height=0.15):\n    \"\"\"Transports the held object above a container zone and releases it safely.\"\"\"\n    center = zone_info[\"center\"]\n    rim_height = zone_info.get(\"rim_height\", 0.0)\n    carry_height = rim_height + clear_offset\n\n    carry_to(center[0], center[1], height=carry_height)\n    open_gripper()\n    retreat(dz=retreat_height)\n    go_home()",
+   "doc": "Transports the held object above a container zone and releases it safely.",
+   "object_kinds": [
+    "paper"
+   ],
+   "origin": {
+    "task": "realdesk_11004",
+    "object": "green_paper",
+    "zone": "red_bin",
+    "attempt": 1,
+    "source_code": "obs = observe()\nbin_zone = obs[\"zones\"][\"red_bin\"]\nbin_center = bin_zone[\"center\"]\nbin_rim = bin_zone.get(\"rim_height\", 0.12)\n\n# Pick paper using contact-graspnet candidate (or sorted candidates)\ncands = grasp_candidates(\"green_paper\")\ncg_cands = [c for c in cands if c.get(\"source\") == \"contact-graspnet\" and c.get(\"fits_open_fingers\", True)]\nif not cg_cands:\n    cg_cands = cands\ncg_cands = sorted(cg_cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cg_cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    # Carry above red_bin rim safely\n    carry_height = bin_rim + 0.12\n    carry_to(bin_center[0], bin_center[1], height=carry_height)\n    # Crumpled paper ball can be dropped into the wastebasket\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"green_paper\", \"red_bin\")",
+    "skill": "place_on_zone_v6"
+   },
+   "history": [
+    {
+     "task": "realdesk_11004",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5060",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "single_paper_bin_5061",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5100",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5101",
+     "source": "validation",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "grasp_elongated_object",
+   "code": "def grasp_elongated_object(obj_name, min_height=0.012):\n    \"\"\"Assumes gripper is empty and object is reachable; grasps object across short axis and leaves it held.\"\"\"\n    cands = grasp_candidates(obj_name)\n    cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\n    cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\n    for cand in cands:\n        cand[\"height\"] = max(cand.get(\"height\", min_height), min_height)\n        res = grasp(cand)\n        if res.get(\"holding_something\", False):\n            return True\n    return False",
+   "doc": "Assumes gripper is empty and object is reachable; grasps object across short axis and leaves it held.",
+   "object_kinds": [
+    "pen"
+   ],
+   "origin": {
+    "task": "realdesk_12001",
+    "object": "cyan_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\n# Grasp pen across short side at height ~ 0.012m\ncands = grasp_candidates(\"cyan_pen\")\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    cand[\"height\"] = max(cand.get(\"height\", 0.012), 0.012)\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Reorient pen upright (approach horizontal)\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            move_gripper(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa, path=\"line\")\n            break\n\n    # Release from above the rim height so pen drops upright into holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"cyan_pen\", \"magenta_holder\")",
+    "skill": "place_on_zone_v7"
+   },
+   "history": [
+    {
+     "task": "realdesk_12001",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5070",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5071",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": false,
+     "failure": "unreachable_pose"
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "reorient_held_object_upright",
+   "code": "def reorient_held_object_upright(target_x, target_y, target_z):\n    \"\"\"Assumes an object is held; reorients it to an upright pose at (target_x, target_y, target_z) via feasible IK.\"\"\"\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(target_x, target_y, target_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            move_gripper(target_x, target_y, target_z, approach=app, finger_axis=fa, path=\"line\")\n            return True\n    return False",
+   "doc": "Assumes an object is held; reorients it to an upright pose at (target_x, target_y, target_z) via feasible IK.",
+   "object_kinds": [
+    "pen"
+   ],
+   "origin": {
+    "task": "realdesk_12001",
+    "object": "cyan_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\n# Grasp pen across short side at height ~ 0.012m\ncands = grasp_candidates(\"cyan_pen\")\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    cand[\"height\"] = max(cand.get(\"height\", 0.012), 0.012)\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Reorient pen upright (approach horizontal)\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            move_gripper(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa, path=\"line\")\n            break\n\n    # Release from above the rim height so pen drops upright into holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"cyan_pen\", \"magenta_holder\")",
+    "skill": "place_on_zone_v7"
+   },
+   "history": [
+    {
+     "task": "realdesk_12001",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5070",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5071",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_12004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "drop_into_container_v2",
+   "code": "def drop_into_container_v2(obj_name, zone_name, safe_z_offset=0.15):\n    \"\"\"Assumes object is held above container; releases object to fall upright inside and retreats gripper.\"\"\"\n    open_gripper()\n    retreat(dz=safe_z_offset)\n    go_home()\n    return check(obj_name, zone_name)",
+   "doc": "Assumes object is held above container; releases object to fall upright inside and retreats gripper.",
+   "object_kinds": [
+    "pen"
+   ],
+   "origin": {
+    "task": "realdesk_12001",
+    "object": "cyan_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\n# Grasp pen across short side at height ~ 0.012m\ncands = grasp_candidates(\"cyan_pen\")\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    cand[\"height\"] = max(cand.get(\"height\", 0.012), 0.012)\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Reorient pen upright (approach horizontal)\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            move_gripper(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa, path=\"line\")\n            break\n\n    # Release from above the rim height so pen drops upright into holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"cyan_pen\", \"magenta_holder\")",
+    "skill": "place_on_zone_v7"
+   },
+   "history": [
+    {
+     "task": "realdesk_12001",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5070",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_pen_5071",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12003",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_12004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_12009",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13007",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "grasp_mug_by_rim",
+   "code": "def grasp_mug_by_rim(obj_name):\n    \"\"\"Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is grasped near the rim.\"\"\"\n    candidates = grasp_candidates(obj_name)\n    valid_cands = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\n    valid_cands.sort(\n        key=lambda c: (\n            c.get(\"hand_clear\", False),\n            c.get(\"fingers_clear\", False),\n            c.get(\"height\", 0) > 0.05,\n            c.get(\"score\", 0),\n        ),\n        reverse=True,\n    )\n\n    for cand in valid_cands:\n        res = grasp(cand)\n        if res.get(\"holding_something\", False):\n            return True\n    return False",
+   "doc": "Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is grasped near the rim.",
+   "object_kinds": [
+    "mug"
+   ],
+   "origin": {
+    "task": "realdesk_13000",
+    "object": "green_mug",
+    "zone": "blue_coaster",
+    "attempt": 1,
+    "source_code": "# Subgoal: Move green_mug to blue_coaster\nobs = observe()\ncoaster = obs[\"zones\"][\"blue_coaster\"]\ntarget_x, target_y = coaster[\"center\"][0], coaster[\"center\"][1]\n\ncandidates = grasp_candidates(\"green_mug\")\n# Filter and sort candidates: prefer clear hand/fingers and grasping near the rim (~0.055 - 0.06m)\nvalid_cands = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\nvalid_cands.sort(\n    key=lambda c: (\n        c.get(\"hand_clear\", False),\n        c.get(\"fingers_clear\", False),\n        c.get(\"height\", 0) > 0.05,\n        c.get(\"score\", 0),\n    ),\n    reverse=True,\n)\n\nchosen_cand = valid_cands[0]\nres = grasp(chosen_cand)\n\nif res[\"holding_something\"]:\n    carry_to(target_x, target_y, height=0.18)\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.12)\n    check(\"green_mug\", \"blue_coaster\")",
+    "skill": "place_on_zone_v8"
+   },
+   "history": [
+    {
+     "task": "realdesk_13000",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5080",
+     "source": "validation",
+     "outcome": false,
+     "failure": "motion_blocked"
+    },
+    {
+     "task": "realdesk_mug_5081",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13001",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13002",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13003",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13004",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13005",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13006",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13008",
+     "source": "use",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_13009",
+     "source": "use",
+     "outcome": false,
+     "failure": "check_failed"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "grasp_mug_robust",
+   "code": "def grasp_mug_robust(obj_name: str):\n    \"\"\"Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is held in gripper.\"\"\"\n    cands = grasp_candidates(obj_name)\n    if not cands:\n        return pick_object(obj_name)\n\n    valid = [c for c in cands if c.get(\"hand_clear\", True) and c.get(\"fingers_clear\", True)]\n    if not valid:\n        valid = cands\n\n    def score_cand(c):\n        is_short = \"short side\" in c.get(\"source\", \"\")\n        h_dist = abs(c.get(\"height\", 0.04) - 0.035)\n        return (1 if is_short else 0, -h_dist, c.get(\"score\", 0))\n\n    best_cand = max(valid, key=score_cand)\n    res = grasp(best_cand)\n    if not res.get(\"holding_something\", False):\n        fallback_cand = max(cands, key=lambda c: c.get(\"score\", 0))\n        grasp(fallback_cand)",
+   "doc": "Precondition: Gripper is empty and obj_name is visible; Postcondition: obj_name is held in gripper.",
+   "object_kinds": [
+    "mug"
+   ],
+   "origin": {
+    "task": "realdesk_13009",
+    "object": "cyan_mug",
+    "zone": "blue_coaster",
+    "attempt": 2,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"blue_coaster\"]\ntarget_x, target_y = zone[\"center\"][0], zone[\"center\"][1]\n\ncands = grasp_candidates(\"cyan_mug\")\n# Filter for clear grasps across the short side (or highest score / hand_clear)\nvalid = [c for c in cands if c.get(\"hand_clear\", True) and c.get(\"fingers_clear\", True)]\nif not valid:\n    valid = cands\n\n# Sort to prefer across short side and stable lower grasp height (around 0.035 m)\ndef score_cand(c):\n    is_short = \"short side\" in c.get(\"source\", \"\")\n    h_dist = abs(c.get(\"height\", 0.04) - 0.035)\n    return (1 if is_short else 0, -h_dist, c.get(\"score\", 0))\n\nbest_cand = max(valid, key=score_cand)\nres = grasp(best_cand)\n\nif not res.get(\"holding_something\", False):\n    # fallback\n    best_cand = max(cands, key=lambda c: c.get(\"score\", 0))\n    grasp(best_cand)\n\ncarry_to(target_x, target_y, height=0.18)\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.12)\ngo_home()\ncheck(\"cyan_mug\", \"blue_coaster\")",
+    "skill": "place_on_zone_v9"
+   },
+   "history": [
+    {
+     "task": "realdesk_13009",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5100",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_mug_5101",
+     "source": "validation",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "select_and_execute_grasp",
+   "code": "def select_and_execute_grasp(obj_name, height_retry_offset=0.022):\n    \"\"\"Grasps obj_name by prioritizing collision-clear candidates with yaw fallback and retry height; holds object on success.\"\"\"\n    cands = grasp_candidates(obj_name)\n    if not cands:\n        return False\n\n    clear_cands = [c for c in cands if c.get(\"hand_clear\", False) and c.get(\"fingers_clear\", True)]\n    if clear_cands:\n        chosen = clear_cands[0]\n    else:\n        chosen = cands[0].copy()\n        if len(cands) > 1 and cands[1].get(\"yaw\") != chosen.get(\"yaw\"):\n            chosen = cands[1]\n        else:\n            chosen[\"yaw\"] = chosen.get(\"yaw\", 0.0) + 1.5708\n\n    res = grasp(chosen)\n    if not res.get(\"holding_something\", False):\n        chosen[\"height\"] = height_retry_offset\n        res = grasp(chosen)\n\n    return res.get(\"holding_something\", False)",
+   "doc": "Grasps obj_name by prioritizing collision-clear candidates with yaw fallback and retry height; holds object on success.",
+   "object_kinds": [
+    "paper"
+   ],
+   "origin": {
+    "task": "realdesk_13009",
+    "object": "purple_paper",
+    "zone": "red_bin",
+    "attempt": 2,
+    "source_code": "# Look at grasp candidates for purple_paper and select one that is hand_clear or orient fingers appropriately\ncands = grasp_candidates(\"purple_paper\")\nclear_cands = [c for c in cands if c.get(\"hand_clear\", False) and c.get(\"fingers_clear\", True)]\n\nif clear_cands:\n    chosen = clear_cands[0]\nelse:\n    # Rotate yaw by 90 degrees or pick candidate with alternate yaw to avoid yellow_pen obstacle\n    chosen = cands[0].copy()\n    if len(cands) > 1 and cands[1].get(\"yaw\") != chosen.get(\"yaw\"):\n        chosen = cands[1]\n    else:\n        chosen[\"yaw\"] = chosen[\"yaw\"] + 1.5708\n\nres = grasp(chosen)\nif not res.get(\"holding_something\", False):\n    # Retry with adjusted height if not held\n    chosen[\"height\"] = 0.022\n    grasp(chosen)\n\nobs = observe()\nzone = obs[\"zones\"][\"red_bin\"]\ndrop_into_container(zone, clear_offset=0.12, retreat_height=0.15)\ncheck(\"purple_paper\", \"red_bin\")",
+    "skill": "place_on_zone_v10"
+   },
+   "history": [
+    {
+     "task": "realdesk_13009",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5100",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "realdesk_paper_5101",
+     "source": "validation",
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ]
+}

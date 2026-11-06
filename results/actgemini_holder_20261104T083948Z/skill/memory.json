@@ -1,0 +1,351 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    candidates = grasp_candidates(obj_name)\n    best_cand = None\n    for c in candidates:\n        if c.get(\"fits_open_fingers\", True):\n            best_cand = c\n            break\n    if best_cand is None and candidates:\n        best_cand = candidates[0]\n\n    grasp(best_cand)\n\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    hx, hy, hz = zone[\"center\"]\n    rim_h = zone.get(\"rim_height\", 0.08)\n\n    carry_to(hx, hy, height=rim_h + 0.15)\n\n    target_z = hz + rim_h + 0.06\n    ik_pitch = solve_ik(hx, hy, target_z, approach=[1, 0, 0], finger_axis=[0, 1, 0])\n    if ik_pitch.get(\"reachable\", False):\n        move_gripper(hx, hy, target_z, approach=[1, 0, 0], finger_axis=[0, 1, 0])\n    else:\n        move_gripper(hx, hy, target_z, approach=[0, 1, 0], finger_axis=[-1, 0, 0])\n\n    move_by(dz=-0.04)\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker"
+    ],
+    "notes": "Reorients an elongated writing utensil vertically to insert it into a pen holder cup."
+   },
+   "origin": {
+    "task": "penholder_6000",
+    "object": "yellow_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "# Grasp the yellow pen\ncandidates = grasp_candidates(\"yellow_pen\")\n# Choose a candidate that fits and squeezes across the pen's width\nbest_cand = None\nfor c in candidates:\n    if c[\"fits_open_fingers\"]:\n        best_cand = c\n        break\nif best_cand is None:\n    best_cand = candidates[0]\n\nres = grasp(best_cand)\n\n# Move above the magenta pen holder\nobs = observe()\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy, hz = holder[\"center\"]\nrim_h = holder.get(\"rim_height\", 0.08)\n\n# Position high above holder\ncarry_to(hx, hy, height=rim_h + 0.15)\n\n# Orient pen vertically:\n# The pen is held horizontally across the gripper fingers (finger_axis is along squeeze, pen is along 'side').\n# Pitching the gripper by 90 degrees puts the held pen vertical.\n# Approach horizontally into the holder while pointing the pen down.\n# An approach vector [1, 0, 0] or [0, 1, 0] tilts the hand sideways/forward so side vector becomes vertical.\n# Specifically, we can pitch the gripper so fingers point horizontally and the held object is along z.\n# Check IK for a vertical pen orientation:\ntarget_z = hz + rim_h + 0.06\nik_pitch = solve_ik(hx, hy, target_z, approach=[1, 0, 0], finger_axis=[0, 1, 0])\nif ik_pitch.get(\"reachable\", False):\n    move_gripper(hx, hy, target_z, approach=[1, 0, 0], finger_axis=[0, 1, 0])\nelse:\n    # Try another horizontal approach direction\n    move_gripper(hx, hy, target_z, approach=[0, 1, 0], finger_axis=[-1, 0, 0])\n\n# Lower slightly into holder\nmove_by(dz=-0.04)\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"yellow_pen\", \"magenta_holder\")"
+   },
+   "history": [
+    {
+     "task": "penholder_6000",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0111,
+      "object_reach": 0.533,
+      "zone_reach": 0.679
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0096,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": false,
+     "failure": "carry_height_out_of_range"
+    },
+    {
+     "task": "penholder_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.565,
+      "zone_reach": 0.548
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.545,
+      "zone_reach": 0.636
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.541,
+      "zone_reach": 0.601
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.592,
+      "zone_reach": 0.531
+     },
+     "outcome": false,
+     "failure": "'magenta_holder'",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "penholder_6007",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0116,
+      "object_reach": 0.553,
+      "zone_reach": 0.559
+     },
+     "outcome": false,
+     "failure": "check_failed"
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0111
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0114
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1399,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1387,
+    0.0115
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6005"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1384,
+    0.0115
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6006"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1386,
+    0.0116
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "penholder_6007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1362,
+    0.0119
+   ],
+   "grasp_height": 0.003,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "grasp_height_out_of_range",
+   "task": "penholder_6007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1362,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": null,
+   "task": "penholder_6007"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6008"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1389,
+    0.0118
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6009"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "Ensure the target container 'magenta_holder' is registered as a valid zone or place into it using place_in_container instead of place_on_zone_v1.",
+   "task": "penholder_6004",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "pen",
+   "lesson": "Grasp the pen near its upper end rather than at the center so the lower end can be lowered deeply into the holder without the gripper colliding with the rim.",
+   "task": "penholder_6005",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "pen",
+   "lesson": "Avoid pitching the gripper horizontally to tilt the pen upright into the holder; instead, carry the pen above the holder center and lower it vertically using standard downward approach before releasing.",
+   "task": "penholder_6006",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "pen",
+   "lesson": "Lower the grasp height closer to the supporting surface so the fingers descend deeper around the thin pen body to ensure a secure grip.",
+   "task": "penholder_6007",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "pen",
+   "lesson": "Keep the grasp height at or above 0.004 m above the table (or retain the candidate's default height) rather than lowering it below the allowed range.",
+   "task": "penholder_6007",
+   "shown_then": [
+    false,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "pen",
+   "lesson": "Select a grasp candidate oriented along the pen's long axis or filter for candidates that squeeze along the length rather than across the thin 0.012 m cross-section.",
+   "task": "penholder_6007",
+   "shown_then": [
+    true,
+    true
+   ]
+  }
+ ]
+}

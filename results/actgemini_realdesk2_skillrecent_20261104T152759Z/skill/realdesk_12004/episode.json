@@ -1,0 +1,2227 @@
+{
+ "task_id": "realdesk_12004",
+ "family": "realdesk",
+ "instruction": "Tidy up my desk: pens stand upright in the magenta pen holder, the mug goes on the blue coaster, notebooks go on the orange tray, and crumpled paper balls go into the red wastebasket. Some things are already where they belong; leave them there.",
+ "skill_memory": true,
+ "user_memory": false,
+ "subgoals": [
+  {
+   "object": "purple_pen",
+   "zone": "magenta_holder",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_h = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\ncands = grasp_candidates(\"purple_pen\")\n# Grasp pen across short side at height ~ 0.012 m\nbest_cand = None\nfor c in cands:\n    if abs(c.get(\"squeeze_width\", 0.0) - 0.01) < 0.02 and c.get(\"fits_open_fingers\", True):\n        best_cand = c\n        break\nif best_cand is None and cands:\n    best_cand = max(cands, key=lambda c: c.get(\"score\", 0))\n\nbest_cand[\"height\"] = 0.012\ngrasp(best_cand)\n\n# Carry above magenta_holder\nsafe_h = rim_h + 0.12\ncarry_to(zone_center[0], zone_center[1], height=safe_h)\n\n# Orient pen vertically into holder using a reachable horizontal approach\ncandidate_orientations = [\n    ([1, 0, 0], [0, 1, 0]),\n    ([0, 1, 0], [1, 0, 0]),\n    ([-1, 0, 0], [0, 1, 0]),\n    ([0, -1, 0], [1, 0, 0]),\n]\napp, fa = candidate_orientations[0]\nfor a, f in candidate_orientations:\n    if solve_ik(zone_center[0], zone_center[1], table_z + safe_h, approach=a, finger_axis=f).get(\"reachable\", False):\n        app, fa = a, f\n        break\n\nmove_gripper(zone_center[0], zone_center[1], table_z + safe_h, approach=app, finger_axis=fa)\n# Lower slightly above rim and drop inside\nmove_gripper(zone_center[0], zone_center[1], table_z + rim_h + 0.04, approach=app, finger_axis=fa)\nopen_gripper()\n\nretreat(0.12)\ngo_home()\ncheck(\"purple_pen\", \"magenta_holder\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.0294,
+        -0.0329,
+        0.92
+       ],
+       "reached": [
+        -0.0331,
+        -0.0336,
+        0.9498
+       ],
+       "remaining_error_m": 0.03
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 496,
+     "seconds": 13.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 16,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 16,
+       "source": "<program>",
+       "line": 7,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": 0.1399, \"height\": 0.006, \"yaw\": 1.265, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.0102, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, 0.1399], \"object_long_axis_yaw\": -0.306, \"object_footprint\": [0.1362, 0.0105], \"hand_clear\": true, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": null}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": 0.1399, \"height\": 0.006, \"yaw\": -0.306, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_widt..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1418,
+         "y": 0.1399,
+         "height": 0.012,
+         "yaw": 1.265,
+         "score": 0.5,
+         "id": 0,
+         "object": "purple_pen",
+         "squeeze_width": 0.0102,
+         "fits_open_fingers": true,
+         "object_height": 0.0119,
+         "object_center": [
+          -0.1418,
+          0.1399
+         ],
+         "object_long_axis_yaw": -0.306,
+         "object_footprint": [
+          0.1362,
+          0.0105
+         ],
+         "hand_clear": true,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": null
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 17,
+       "source": "<program>",
+       "line": 18,
+       "result": {
+        "holding_something": true,
+        "finger_gap": 0.0094,
+        "finger_gap_when_closed": 0.0102,
+        "expected_squeeze_width": 0.0102,
+        "stopped_above_target_m": null,
+        "object_in_hand": {
+         "source": "grasp estimate",
+         "centre_offset_from_grip_point_m": [
+          0.0006,
+          -0.0003
+         ],
+         "object_long_axis_minus_gripper_yaw_deg": 90.0
+        }
+       }
+      },
+      {
+       "call": "carry_to",
+       "args": [
+        -0.0294,
+        -0.0329
+       ],
+       "kwargs": {
+        "height": 0.2
+       },
+       "control_step": 174,
+       "frame": 74,
+       "source": "<program>",
+       "line": 22,
+       "result": {
+        "position": [
+         -0.0308,
+         -0.0316,
+         1.0
+        ],
+        "holding_something": true,
+        "planner": "straight line"
+       }
+      },
+      {
+       "call": "solve_ik",
+       "args": [
+        -0.0294,
+        -0.0329,
+        1.0
+       ],
+       "kwargs": {
+        "approach": [
+         1,
+         0,
+         0
+        ],
+        "finger_axis": [
+         0,
+         1,
+         0
+        ]
+       },
+       "control_step": 226,
+       "frame": 91,
+       "source": "<program>",
+       "line": 33,
+       "result": {
+        "reachable": false,
+        "ik_residual_m": 0.1155
+       }
+      },
+      {
+       "call": "solve_ik",
+       "args": [
+        -0.0294,
+        -0.0329,
+        1.0
+       ],
+       "kwargs": {
+        "approach": [
+         0,
+         1,
+         0
+        ],
+        "finger_axis": [
+         1,
+         0,
+         0
+        ]
+       },
+       "control_step": 226,
+       "frame": 91,
+       "source": "<program>",
+       "line": 33,
+       "result": {
+        "reachable": true,
+        "ik_residual_m": 0.0
+       }
+      },
+      {
+       "call": "move_gripper",
+       "args": [
+        -0.0294,
+        -0.0329,
+        1.0
+       ],
+       "kwargs": {
+        "approach": [
+         0,
+         1,
+         0
+        ],
+        "finger_axis": [
+         1,
+         0,
+         0
+        ]
+       },
+       "control_step": 226,
+       "frame": 91,
+       "source": "<program>",
+       "line": 37,
+       "result": {
+        "position": [
+         -0.0294,
+         -0.033,
+         0.9998
+        ],
+        "approach": [
+         -0.0051,
+         0.9999,
+         -0.0091
+        ],
+        "finger_axis": [
+         1.0,
+         0.0052,
+         0.0067
+        ],
+        "side": [
+         0.0068,
+         -0.0091,
+         -0.9999
+        ],
+        "yaw": 0.005,
+        "holding_something": true
+       }
+      },
+      {
+       "call": "move_gripper",
+       "args": [
+        -0.0294,
+        -0.0329,
+        0.92
+       ],
+       "kwargs": {
+        "approach": [
+         0,
+         1,
+         0
+        ],
+        "finger_axis": [
+         1,
+         0,
+         0
+        ]
+       },
+       "control_step": 326,
+       "frame": 124,
+       "source": "<program>",
+       "line": 39,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.0294,
+         -0.0329,
+         0.92
+        ],
+        "reached": [
+         -0.0331,
+         -0.0336,
+         0.9498
+        ],
+        "remaining_error_m": 0.03
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0105,
+      "object_reach": 0.441,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.1362,
+        0.0105
+       ],
+       "grasp_height": 0.012,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "lessons_shown": [
+      39,
+      57,
+      58
+     ],
+     "diagnosis": "- grasp({'source': 'geometry (fingers across the short side)', 'x': -0.1418, 'y': 0.1399, 'height': 0.012, 'yaw': 1.265, 'score': 0.5, 'id': 0, 'object': 'purple_pen', 'squeeze_width': 0.0102, 'fits_open_fingers': True, 'object_height': 0.0119, 'object_center': [-0.1418, 0.1399], 'object_long_axis_yaw': -0.306, 'object_footprint': [0.1362, 0.0105], 'hand_clear': True, 'fingers_clear': True, 'highest_obstacle_under_hand_m': None},) -> holding_something=True.\n- The grip point was +0.000 m relative to the object's top surface (grasp_height 0.012 vs object height 0.012); the fingers only grip what is below the grip point.\n- The fingertip line (yaw) was 90 degrees from the object's long axis, so the fingers squeezed across a 0.011 m extent of the object (the open fingers are 0.08 m apart; footprint is 0.136 along long_axis_yaw x 0.011 along short_axis_yaw).\n- Call 7 move_gripper(-0.0294, -0.0329, 0.92) failed: {'reason': 'motion_blocked', 'target': [-0.0294, -0.0329, 0.92], 'reached': [-0.0331, -0.0336, 0.9498], 'remaining_error_m': 0.03}.\n- At the grasp the gripper yaw (finger direction) was 1.265 rad while purple_pen's long axis was -0.306 rad: 90.0 degrees apart.\n- The last carry_to used gripper yaw 1.265 rad.",
+     "lesson": "When dropping a grasped pen into a holder cup, maintain a downward approach ([0, 0, -1]) and release it well above the rim rather than pitching the gripper horizontally or lowering the hand to near-rim height where the gripper collides with the cup."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_h = zone.get(\"rim_height\", 0.08)\ntable_z = obs[\"table_z\"]\n\ncands = grasp_candidates(\"purple_pen\")\nbest_cand = None\nfor c in cands:\n    if abs(c.get(\"squeeze_width\", 0.0) - 0.01) < 0.02 and c.get(\"fits_open_fingers\", True):\n        best_cand = c\n        break\nif best_cand is None and cands:\n    best_cand = max(cands, key=lambda c: c.get(\"score\", 0))\n\nbest_cand[\"height\"] = 0.012\ngrasp(best_cand)\n\n# Carry above magenta_holder at a safe height keeping standard downward orientation\ndrop_height = rim_h + 0.10\ncarry_to(zone_center[0], zone_center[1], height=drop_height)\n\n# Release pen into holder\nopen_gripper()\nretreat(0.12)\ngo_home()\ncheck(\"purple_pen\", \"magenta_holder\")",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.1418,
+        -0.0147,
+        0.812
+       ],
+       "reached": [
+        -0.1316,
+        -0.0158,
+        0.8381
+       ],
+       "remaining_error_m": 0.0281
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 411,
+     "seconds": 9.8,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 181,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 181,
+       "source": "<program>",
+       "line": 7,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": 0.0, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.011, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, -0.0147], \"object_long_axis_yaw\": -1.571, \"object_footprint\": [0.1326, 0.011], \"hand_clear\": false, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": 0.08}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": -1.571, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_widt..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1418,
+         "y": -0.0147,
+         "height": 0.012,
+         "yaw": 0.0,
+         "score": 0.5,
+         "id": 0,
+         "object": "purple_pen",
+         "squeeze_width": 0.011,
+         "fits_open_fingers": true,
+         "object_height": 0.0119,
+         "object_center": [
+          -0.1418,
+          -0.0147
+         ],
+         "object_long_axis_yaw": -1.571,
+         "object_footprint": [
+          0.1326,
+          0.011
+         ],
+         "hand_clear": false,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": 0.08
+        }
+       ],
+       "kwargs": {},
+       "control_step": 88,
+       "frame": 210,
+       "source": "<program>",
+       "line": 17,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.1418,
+         -0.0147,
+         0.812
+        ],
+        "reached": [
+         -0.1316,
+         -0.0158,
+         0.8381
+        ],
+        "remaining_error_m": 0.0281
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.421,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.0663,
+        0.011
+       ],
+       "grasp_height": 0.012,
+       "yaw_from_long_axis_deg": 90,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "lessons_shown": [
+      57,
+      58,
+      59
+     ],
+     "diagnosis": "- Call 2 grasp({'source': 'geometry (fingers across the short side)', 'x': -0.1418, 'y': -0.0147, 'height': 0.012, 'yaw': 0.0, 'score': 0.5, 'id': 0, 'object': 'purple_pen', 'squeeze_width': 0.011, 'fits_open_fingers': True, 'object_height': 0.0119, 'object_center': [-0.1418, -0.0147], 'object_long_axis_yaw': -1.571, 'object_footprint': [0.1326, 0.011], 'hand_clear': False, 'fingers_clear': True, 'highest_obstacle_under_hand_m': 0.08},) failed: {'reason': 'motion_blocked', 'target': [-0.1418, -0.0147, 0.812], 'reached': [-0.1316, -0.0158, 0.8381], 'remaining_error_m': 0.0281}.\n- The program never grasped anything.",
+     "lesson": "When selecting a grasp candidate for a pen, require `c.get('hand_clear', True)` so the gripper hand does not collide with nearby obstacles like a holder rim."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\nzone = obs[\"zones\"][\"magenta_holder\"]\nzone_center = zone[\"center\"]\nrim_h = zone.get(\"rim_height\", 0.08)\n\ncands = grasp_candidates(\"purple_pen\")\n\n# Prioritize candidates with hand_clear and fingers_clear to avoid holder rim collisions\nbest_cand = None\nclear_cands = [\n    c\n    for c in cands\n    if c.get(\"hand_clear\", False) and c.get(\"fingers_clear\", True)\n]\nif clear_cands:\n    # Prefer grasp across the short side (width ~ 0.011)\n    best_cand = min(\n        clear_cands,\n        key=lambda c: (\n            abs(c.get(\"squeeze_width\", 0.0) - 0.011),\n            -c.get(\"score\", 0),\n        ),\n    )\nelse:\n    # If none are strictly hand_clear, choose one with lowest obstacle or shift grip point along the pen\n    # Pen footprint is 0.1326 m along yaw -1.571 (y-direction)\n    # The holder is at [-0.0294, -0.0329], pen center at [-0.1418, -0.0147]\n    # Grab the side of the pen away from the obstacle or adjust x/y\n    best_cand = cands[0].copy()\n    # Grasp towards the far end (y > 0 or x < -0.14) away from holder\n    best_cand[\"y\"] = best_cand[\"y\"] + 0.035\n\nbest_cand[\"height\"] = 0.012\ngrasp(best_cand)\n\n# Move above holder and drop from safe height\ndrop_height = rim_h + 0.09\ncarry_to(zone_center[0], zone_center[1], height=drop_height)\n\nopen_gripper()\nretreat(0.12)\ngo_home()\ncheck(\"purple_pen\", \"magenta_holder\")",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 281,
+     "seconds": 7.0,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 318,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 318,
+       "source": "<program>",
+       "line": 6,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": 0.0, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.011, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, -0.0147], \"object_long_axis_yaw\": -1.571, \"object_footprint\": [0.1326, 0.011], \"hand_clear\": false, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": 0.08}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": -1.571, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_widt..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the long side)",
+         "x": -0.1418,
+         "y": -0.0147,
+         "height": 0.012,
+         "yaw": -1.571,
+         "score": 0.3,
+         "id": 1,
+         "object": "purple_pen",
+         "squeeze_width": 0.1309,
+         "fits_open_fingers": false,
+         "object_height": 0.0119,
+         "object_center": [
+          -0.1418,
+          -0.0147
+         ],
+         "object_long_axis_yaw": -1.571,
+         "object_footprint": [
+          0.1326,
+          0.011
+         ],
+         "hand_clear": true,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": null
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 319,
+       "source": "<program>",
+       "line": 34,
+       "result": {
+        "holding_something": false,
+        "finger_gap": 0.001,
+        "finger_gap_when_closed": 0.0108,
+        "expected_squeeze_width": 0.1309,
+        "stopped_above_target_m": null
+       }
+      },
+      {
+       "call": "carry_to",
+       "args": [
+        -0.0294,
+        -0.0329
+       ],
+       "kwargs": {
+        "height": 0.16999999999999998
+       },
+       "control_step": 152,
+       "frame": 368,
+       "source": "<program>",
+       "line": 38,
+       "result": {
+        "position": [
+         -0.0341,
+         -0.0324,
+         0.9686
+        ],
+        "holding_something": false,
+        "planner": "straight line"
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 176,
+       "frame": 376,
+       "source": "<program>",
+       "line": 40,
+       "result": {
+        "width": 0.0785,
+        "closed_command": false,
+        "holding_something": false,
+        "gripper_yaw": 1.57
+       }
+      },
+      {
+       "call": "retreat",
+       "args": [
+        0.12
+       ],
+       "kwargs": {},
+       "control_step": 201,
+       "frame": 385,
+       "source": "<program>",
+       "line": 41,
+       "result": {
+        "position": [
+         -0.034,
+         -0.0324,
+         1.0872
+        ],
+        "holding_something": false
+       }
+      },
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 237,
+       "frame": 397,
+       "source": "<program>",
+       "line": 42,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1975,
+         -0.0004,
+         1.0803
+        ],
+        "steps": 36
+       }
+      },
+      {
+       "call": "check",
+       "args": [
+        "purple_pen",
+        "magenta_holder"
+       ],
+       "kwargs": {},
+       "control_step": 273,
+       "frame": 409,
+       "source": "<program>",
+       "line": 43,
+       "result": {
+        "inside_zone": false,
+        "standing": false,
+        "compact": false,
+        "pen_pixels_high_in_holder": 0,
+        "top_height_above_table": null,
+        "rim_height": 0.08,
+        "horizontal_span_m": 0.1326,
+        "zone_half_size": [
+         0.0284,
+         0.0284
+        ],
+        "gripper_holding": false,
+        "satisfied": false
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.418,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.1326,
+        0.011
+       ],
+       "grasp_height": 0.012,
+       "yaw_from_long_axis_deg": 0,
+       "holding": false,
+       "error": null
+      }
+     ],
+     "lessons_shown": [
+      58,
+      59,
+      60
+     ],
+     "diagnosis": "- grasp({'source': 'geometry (fingers across the long side)', 'x': -0.1418, 'y': -0.0147, 'height': 0.012, 'yaw': -1.571, 'score': 0.3, 'id': 1, 'object': 'purple_pen', 'squeeze_width': 0.1309, 'fits_open_fingers': False, 'object_height': 0.0119, 'object_center': [-0.1418, -0.0147], 'object_long_axis_yaw': -1.571, 'object_footprint': [0.1326, 0.011], 'hand_clear': True, 'fingers_clear': True, 'highest_obstacle_under_hand_m': None},) -> holding_something=False.\n- The grip point was +0.000 m relative to the object's top surface (grasp_height 0.012 vs object height 0.012); the fingers only grip what is below the grip point.\n- The fingertip line (yaw) was 0 degrees from the object's long axis, so the fingers squeezed across a 0.133 m extent of the object (the open fingers are 0.08 m apart; footprint is 0.133 along long_axis_yaw x 0.011 along short_axis_yaw).",
+     "lesson": "Select a grasp candidate that satisfies fits_open_fingers with yaw aligned to the object's long axis (fingers squeezing across the short axis), and set the grasp height to half the pen's height or lower so the fingers descend below the top surface."
+    }
+   ],
+   "zone_occupied_at_start": []
+  },
+  {
+   "object": "green_book",
+   "zone": "orange_tray",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "# Subgoal: place green_book onto orange_tray\npick_thin_object(\"green_book\", min_grasp_height=0.025)\n\nobs = observe()\nzone_info = obs[\"zones\"][\"orange_tray\"]\n\n# Carry to orange_tray, lower until contact, open gripper and retreat\nplace_in_zone(zone_info, carry_clearance=0.15, retreat_dz=0.12)\ngo_home()",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.003,
+       -0.0005
+      ],
+      "offset_along_across_zone_axis": [
+       -0.003,
+       -0.0005
+      ],
+      "zone_half_size": [
+       0.0665,
+       0.0647
+      ],
+      "top_height_above_table": 0.0289,
+      "nominal_height": 0.025,
+      "object_axis_vs_zone_axis_deg": 12.5,
+      "object_long_axis_yaw": -0.219,
+      "zone_long_axis_yaw": 0.0,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "used_helpers": [
+      "pick_thin_object",
+      "place_in_zone"
+     ],
+     "control_steps": 427,
+     "seconds": 10.7,
+     "trace": [
+      {
+       "call": "helpers.pick_thin_object",
+       "args": [
+        "green_book"
+       ],
+       "kwargs": {
+        "min_grasp_height": 0.025
+       },
+       "control_step": 0,
+       "frame": 413,
+       "source": "<program>",
+       "line": 2,
+       "result": true
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "green_book"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 413,
+       "source": "<helper pick_thin_object>",
+       "line": 3,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1156, \"y\": -0.2566, \"height\": 0.013, \"yaw\": 1.359, \"score\": 0.5, \"id\": 0, \"object\": \"green_book\", \"squeeze_width\": 0.0533, \"fits_open_fingers\": true, \"object_height\": 0.025, \"object_center\": [-0.1156, -0.2566], \"object_long_axis_yaw\": -0.212, \"object_footprint\": [0.0747, 0.0549], \"hand_clear\": true, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": null}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1156, \"y\": -0.2566, \"height\": 0.013, \"yaw\": -0.212, \"score\": 0.3, \"id\": 1, \"object\": \"green_book\", \"squeeze_wi..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1156,
+         "y": -0.2566,
+         "height": 0.025,
+         "yaw": 1.359,
+         "score": 0.5,
+         "id": 0,
+         "object": "green_book",
+         "squeeze_width": 0.0533,
+         "fits_open_fingers": true,
+         "object_height": 0.025,
+         "object_center": [
+          -0.1156,
+          -0.2566
+         ],
+         "object_long_axis_yaw": -0.212,
+         "object_footprint": [
+          0.0747,
+          0.0549
+         ],
+         "hand_clear": true,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": null
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 414,
+       "source": "<helper pick_thin_object>",
+       "line": 11,
+       "result": {
+        "holding_something": true,
+        "finger_gap": 0.0554,
+        "finger_gap_when_closed": 0.0554,
+        "expected_squeeze_width": 0.0533,
+        "stopped_above_target_m": null,
+        "object_in_hand": {
+         "source": "grasp estimate",
+         "centre_offset_from_grip_point_m": [
+          -0.0003,
+          -0.0009
+         ],
+         "object_long_axis_minus_gripper_yaw_deg": 90.0
+        }
+       }
+      },
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 182,
+       "frame": 473,
+       "source": "<program>",
+       "line": 4
+      },
+      {
+       "call": "helpers.place_in_zone",
+       "args": [
+        {
+         "name": "orange_tray",
+         "center": [
+          0.1109,
+          -0.0499,
+          0.8
+         ],
+         "half_size": [
+          0.0665,
+          0.0647
+         ],
+         "long_axis_yaw": 0.0,
+         "rim_height": 0.008
+        }
+       ],
+       "kwargs": {
+        "carry_clearance": 0.15,
+        "retreat_dz": 0.12
+       },
+       "control_step": 182,
+       "frame": 473,
+       "source": "<program>",
+       "line": 8,
+       "result": null
+      },
+      {
+       "call": "carry_to",
+       "args": [
+        0.1109,
+        -0.0499
+       ],
+       "kwargs": {
+        "height": 0.15
+       },
+       "control_step": 182,
+       "frame": 473,
+       "source": "<helper place_in_zone>",
+       "line": 5,
+       "result": {
+        "position": [
+         0.1082,
+         -0.0511,
+         0.9489
+        ],
+        "holding_something": true,
+        "planner": "straight line"
+       }
+      },
+      {
+       "call": "lower_until_contact",
+       "args": [],
+       "kwargs": {},
+       "control_step": 246,
+       "frame": 495,
+       "source": "<helper place_in_zone>",
+       "line": 6,
+       "result": {
+        "stopped_by_contact": false,
+        "grip_point_height": 0.0315,
+        "held_object_bottom_above_table": 0.0065,
+        "holding_something": true
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 270,
+       "frame": 503,
+       "source": "<helper place_in_zone>",
+       "line": 7,
+       "result": {
+        "width": 0.0785,
+        "closed_command": false,
+        "holding_something": false,
+        "gripper_yaw": 1.359
+       }
+      },
+      {
+       "call": "retreat",
+       "args": [],
+       "kwargs": {
+        "dz": 0.12
+       },
+       "control_step": 295,
+       "frame": 511,
+       "source": "<helper place_in_zone>",
+       "line": 8,
+       "result": {
+        "position": [
+         0.1082,
+         -0.0511,
+         0.9499
+        ],
+        "holding_something": false
+       }
+      },
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 327,
+       "frame": 522,
+       "source": "<helper place_in_zone>",
+       "line": 9,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1972,
+         -0.0003,
+         1.0803
+        ],
+        "steps": 64
+       }
+      },
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 419,
+       "frame": 552,
+       "source": "<program>",
+       "line": 9,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.1998,
+         -0.0,
+         1.08
+        ],
+        "steps": 4
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": true
+        },
+        "reasons": [
+         "goal: book into tray record 0 success / 0 failure"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": true
+        },
+        "reasons": [
+         "goal: book into tray record 0 success / 0 failure"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0549,
+      "object_reach": 0.513,
+      "zone_reach": 0.673
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "book",
+       "object_height": 0.025,
+       "footprint": [
+        0.0747,
+        0.0549
+       ],
+       "grasp_height": 0.025,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "lessons_shown": [
+      1,
+      2
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extraction_skipped_covered_by": [
+    "place_on_zone_v3"
+   ]
+  },
+  {
+   "object": "yellow_paper",
+   "zone": "red_bin",
+   "success": true,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\nzone = obs[\"zones\"][\"red_bin\"]\nzone_center = zone[\"center\"]\nrim_height = zone.get(\"rim_height\", 0.12)\n\ncands = grasp_candidates(\"yellow_paper\")\n# Sort by score and prefer candidates where fingers/hand are clear of high obstacles\ncands = sorted(cands, key=lambda c: (c.get(\"hand_clear\", True), c.get(\"score\", 0)), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    # Carry above red_bin rim and drop paper ball inside\n    drop_height = rim_height + 0.08\n    carry_to(zone_center[0], zone_center[1], height=drop_height)\n    open_gripper()\n    retreat(dz=0.12)\n    go_home()\n    check(\"yellow_paper\", \"red_bin\")",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": true,
+      "resting": true,
+      "offset_from_zone_center": [
+       -0.0068,
+       0.0028
+      ],
+      "offset_along_across_zone_axis": [
+       -0.0068,
+       0.0028
+      ],
+      "zone_half_size": [
+       0.0587,
+       0.0587
+      ],
+      "top_height_above_table": 0.0423,
+      "nominal_height": 0.04,
+      "gripper_holding": false,
+      "satisfied": true
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 402,
+     "seconds": 10.4,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 556,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "yellow_paper"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 556,
+       "source": "<program>",
+       "line": 6,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1075, \"y\": -0.1514, \"height\": 0.019, \"yaw\": -0.476, \"score\": 0.5, \"id\": 0, \"object\": \"yellow_paper\", \"squeeze_width\": 0.0342, \"fits_open_fingers\": true, \"object_height\": 0.0383, \"object_center\": [-0.1075, -0.1514], \"object_long_axis_yaw\": 1.094, \"object_footprint\": [0.0387, 0.0374], \"hand_clear\": true, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": null}, {\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1075, \"y\": -0.1514, \"height\": 0.019, \"yaw\": 0.309, \"score\": 0.5, \"id\": 1, \"object\": \"yellow_paper\", \"squee..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1075,
+         "y": -0.1514,
+         "height": 0.019,
+         "yaw": -0.476,
+         "score": 0.5,
+         "id": 0,
+         "object": "yellow_paper",
+         "squeeze_width": 0.0342,
+         "fits_open_fingers": true,
+         "object_height": 0.0383,
+         "object_center": [
+          -0.1075,
+          -0.1514
+         ],
+         "object_long_axis_yaw": 1.094,
+         "object_footprint": [
+          0.0387,
+          0.0374
+         ],
+         "hand_clear": true,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": null
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 557,
+       "source": "<program>",
+       "line": 12,
+       "result": {
+        "holding_something": true,
+        "finger_gap": 0.0336,
+        "finger_gap_when_closed": 0.034,
+        "expected_squeeze_width": 0.0342,
+        "stopped_above_target_m": null,
+        "object_in_hand": {
+         "source": "grasp estimate",
+         "centre_offset_from_grip_point_m": [
+          -0.0003,
+          0.0002
+         ],
+         "object_long_axis_minus_gripper_yaw_deg": null
+        }
+       }
+      },
+      {
+       "call": "carry_to",
+       "args": [
+        0.07,
+        -0.22
+       ],
+       "kwargs": {
+        "height": 0.2
+       },
+       "control_step": 208,
+       "frame": 625,
+       "source": "<program>",
+       "line": 20,
+       "result": {
+        "position": [
+         0.0665,
+         -0.2178,
+         0.9967
+        ],
+        "holding_something": true,
+        "planner": "straight line"
+       }
+      },
+      {
+       "call": "open_gripper",
+       "args": [],
+       "kwargs": {},
+       "control_step": 258,
+       "frame": 642,
+       "source": "<program>",
+       "line": 21,
+       "result": {
+        "width": 0.0785,
+        "closed_command": false,
+        "holding_something": false,
+        "gripper_yaw": 2.667
+       }
+      },
+      {
+       "call": "retreat",
+       "args": [],
+       "kwargs": {
+        "dz": 0.12
+       },
+       "control_step": 283,
+       "frame": 650,
+       "source": "<program>",
+       "line": 22,
+       "result": {
+        "position": [
+         0.0666,
+         -0.2179,
+         1.1153
+        ],
+        "holding_something": false
+       }
+      },
+      {
+       "call": "go_home",
+       "args": [],
+       "kwargs": {},
+       "control_step": 315,
+       "frame": 661,
+       "source": "<program>",
+       "line": 23,
+       "result": {
+        "ok": true,
+        "position": [
+         -0.2,
+         0.0001,
+         1.08
+        ],
+        "steps": 79
+       }
+      },
+      {
+       "call": "check",
+       "args": [
+        "yellow_paper",
+        "red_bin"
+       ],
+       "kwargs": {},
+       "control_step": 394,
+       "frame": 687,
+       "source": "<program>",
+       "line": 24,
+       "result": {
+        "inside_zone": true,
+        "resting": true,
+        "offset_from_zone_center": [
+         -0.0068,
+         0.0028
+        ],
+        "offset_along_across_zone_axis": [
+         -0.0068,
+         0.0028
+        ],
+        "zone_half_size": [
+         0.0587,
+         0.0587
+        ],
+        "top_height_above_table": 0.0423,
+        "nominal_height": 0.04,
+        "gripper_holding": false,
+        "satisfied": true
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: paper into bin record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": true
+        },
+        "reasons": [
+         "goal: paper into bin record 0 success / 0 failure"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "paper",
+      "zone_style": "bin",
+      "height": 0.0383,
+      "footprint_short": 0.0374,
+      "object_reach": 0.477,
+      "zone_reach": 0.667
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "paper",
+       "object_height": 0.0383,
+       "footprint": [
+        0.0387,
+        0.0374
+       ],
+       "grasp_height": 0.019,
+       "yaw_from_long_axis_deg": 90,
+       "holding": true,
+       "error": null
+      }
+     ],
+     "lessons_shown": [
+      40,
+      50,
+      54
+     ]
+    }
+   ],
+   "zone_occupied_at_start": [],
+   "extraction_skipped_covered_by": [
+    "place_on_zone_v6"
+   ]
+  },
+  {
+   "object": "purple_pen",
+   "zone": "magenta_holder",
+   "success": false,
+   "attempts": [
+    {
+     "n": 1,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy = holder[\"center\"][:2]\nrim_h = holder.get(\"rim_height\", 0.08)\n\n# Find clear grasp candidate across the pen's short axis\ncands = grasp_candidates(\"purple_pen\")\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True) and c.get(\"hand_clear\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in cands:\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_h + 0.15\n    carry_to(hx, hy, height=safe_z - table_z)\n\n    # Try horizontal approach orientations to orient the pen vertically\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    target_z = table_z + rim_h + 0.08\n    selected_app, selected_fa = None, None\n    for app, fa in candidate_orientations:\n        if solve_ik(hx, hy, target_z, approach=app, finger_axis=fa).get(\"reachable\", False):\n            selected_app, selected_fa = app, fa\n            break\n\n    if selected_app is not None:\n        move_gripper(hx, hy, safe_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n        move_gripper(hx, hy, target_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()",
+     "program_ok": true,
+     "error": null,
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 8,
+     "seconds": 0.5,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 691,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 691,
+       "source": "<program>",
+       "line": 8,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": 0.0, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.0109, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, -0.0147], \"object_long_axis_yaw\": -1.571, \"object_footprint\": [0.1326, 0.011], \"hand_clear\": false, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": 0.08}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": -1.571, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_wid..."
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.418,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [],
+     "lessons_shown": [
+      58,
+      60,
+      61
+     ],
+     "diagnosis": "- The program never grasped anything.",
+     "lesson": "When grasping a pen lying on the table, grasp vertically downward at its center with the finger axis aligned with the pen's short axis and grasp height positioned at the pen's mid-height just above the table."
+    },
+    {
+     "n": 2,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\npen = obs[\"objects\"][\"purple_pen\"]\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy = holder[\"center\"][:2]\nrim_h = holder.get(\"rim_height\", 0.08)\n\ncands = grasp_candidates(\"purple_pen\")\n# Filter to candidates that squeeze across the short side (fits open fingers)\ncands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\ncands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ncand = cands[0]\nres = grasp(cand)\nif not res.get(\"holding_something\", False):\n    # Retry with height adjusted slightly above table\n    cand[\"height\"] = max(0.006, pen[\"height\"] / 2.0)\n    res = grasp(cand)\n\nif res.get(\"holding_something\", False):\n    safe_z = table_z + rim_h + 0.15\n    carry_to(hx, hy, height=safe_z - table_z)\n\n    # Reorient pen vertically into holder using horizontal approach\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    target_z = table_z + rim_h + 0.08\n    selected_app, selected_fa = None, None\n    for app, fa in candidate_orientations:\n        if solve_ik(hx, hy, target_z, approach=app, finger_axis=fa).get(\"reachable\", False):\n            selected_app, selected_fa = app, fa\n            break\n\n    if selected_app is not None:\n        move_gripper(hx, hy, safe_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n        move_gripper(hx, hy, target_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.1418,
+        -0.0147,
+        0.806
+       ],
+       "reached": [
+        -0.1316,
+        -0.0177,
+        0.836
+       ],
+       "remaining_error_m": 0.0318
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 335,
+     "seconds": 8.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 693,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 693,
+       "source": "<program>",
+       "line": 8,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": 0.0, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.0109, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, -0.0147], \"object_long_axis_yaw\": -1.571, \"object_footprint\": [0.1326, 0.011], \"hand_clear\": false, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": 0.08}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": -1.571, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_wid..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1418,
+         "y": -0.0147,
+         "height": 0.006,
+         "yaw": 0.0,
+         "score": 0.5,
+         "id": 0,
+         "object": "purple_pen",
+         "squeeze_width": 0.0109,
+         "fits_open_fingers": true,
+         "object_height": 0.0119,
+         "object_center": [
+          -0.1418,
+          -0.0147
+         ],
+         "object_long_axis_yaw": -1.571,
+         "object_footprint": [
+          0.1326,
+          0.011
+         ],
+         "hand_clear": false,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": 0.08
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 694,
+       "source": "<program>",
+       "line": 14,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.1418,
+         -0.0147,
+         0.806
+        ],
+        "reached": [
+         -0.1316,
+         -0.0177,
+         0.836
+        ],
+        "remaining_error_m": 0.0318
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.418,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.1326,
+        0.011
+       ],
+       "grasp_height": 0.006,
+       "yaw_from_long_axis_deg": 90,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "lessons_shown": [
+      58,
+      61,
+      62
+     ],
+     "diagnosis": "- Call 2 grasp({'source': 'geometry (fingers across the short side)', 'x': -0.1418, 'y': -0.0147, 'height': 0.006, 'yaw': 0.0, 'score': 0.5, 'id': 0, 'object': 'purple_pen', 'squeeze_width': 0.0109, 'fits_open_fingers': True, 'object_height': 0.0119, 'object_center': [-0.1418, -0.0147], 'object_long_axis_yaw': -1.571, 'object_footprint': [0.1326, 0.011], 'hand_clear': False, 'fingers_clear': True, 'highest_obstacle_under_hand_m': 0.08},) failed: {'reason': 'motion_blocked', 'target': [-0.1418, -0.0147, 0.806], 'reached': [-0.1316, -0.0177, 0.836], 'remaining_error_m': 0.0318}.\n- The program never grasped anything.",
+     "lesson": "When selecting grasp candidates for a pen near tall obstacles or a holder, require candidates with hand_clear=True or highest_obstacle_under_hand_m == 0 so the gripper does not collide with the obstacle during descent."
+    },
+    {
+     "n": 3,
+     "code": "obs = observe()\ntable_z = obs[\"table_z\"]\npen = obs[\"objects\"][\"purple_pen\"]\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy = holder[\"center\"][:2]\nrim_h = holder.get(\"rim_height\", 0.08)\n\ncands = grasp_candidates(\"purple_pen\")\n# Prioritize candidates where hand is clear of obstacles (e.g. nearby magenta_holder)\nvalid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True) and c.get(\"hand_clear\", False)]\nif not valid_cands:\n    valid_cands = [c for c in cands if c.get(\"fits_open_fingers\", True)]\n    valid_cands.sort(key=lambda c: c.get(\"highest_obstacle_under_hand_m\", 1.0))\nelse:\n    valid_cands.sort(key=lambda c: c.get(\"score\", 0), reverse=True)\n\ngrasped = False\nfor cand in valid_cands:\n    # Mid-height grasp across short side\n    cand[\"height\"] = max(0.008, pen[\"height\"] * 0.7)\n    res = grasp(cand)\n    if res.get(\"holding_something\", False):\n        grasped = True\n        break\n\nif grasped:\n    safe_z = table_z + rim_h + 0.16\n    carry_to(hx, hy, height=safe_z - table_z)\n\n    # Reorient pen vertically into holder using horizontal approach\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n    target_z = table_z + rim_h + 0.08\n    selected_app, selected_fa = None, None\n    for app, fa in candidate_orientations:\n        if solve_ik(hx, hy, target_z, approach=app, finger_axis=fa).get(\"reachable\", False):\n            selected_app, selected_fa = app, fa\n            break\n\n    if selected_app is not None:\n        move_gripper(hx, hy, safe_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n        move_gripper(hx, hy, target_z, approach=selected_app, finger_axis=selected_fa, path=\"line\")\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()",
+     "program_ok": false,
+     "error": {
+      "type": "robot_error",
+      "reason": "motion_blocked",
+      "details": {
+       "target": [
+        -0.1418,
+        -0.0147,
+        0.8083
+       ],
+       "reached": [
+        -0.1319,
+        -0.0171,
+        0.8367
+       ],
+       "remaining_error_m": 0.0302
+      }
+     },
+     "check": {
+      "inside_zone": false,
+      "standing": false,
+      "compact": false,
+      "pen_pixels_high_in_holder": 0,
+      "top_height_above_table": null,
+      "rim_height": 0.08,
+      "horizontal_span_m": 0.1326,
+      "zone_half_size": [
+       0.0284,
+       0.0284
+      ],
+      "gripper_holding": false,
+      "satisfied": false
+     },
+     "used_skills": [],
+     "used_helpers": [],
+     "control_steps": 331,
+     "seconds": 8.1,
+     "trace": [
+      {
+       "call": "observe",
+       "args": [],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 804,
+       "source": "<program>",
+       "line": 1
+      },
+      {
+       "call": "grasp_candidates",
+       "args": [
+        "purple_pen"
+       ],
+       "kwargs": {},
+       "control_step": 0,
+       "frame": 804,
+       "source": "<program>",
+       "line": 8,
+       "result": "[{\"source\": \"geometry (fingers across the short side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": 0.0, \"score\": 0.5, \"id\": 0, \"object\": \"purple_pen\", \"squeeze_width\": 0.0109, \"fits_open_fingers\": true, \"object_height\": 0.0119, \"object_center\": [-0.1418, -0.0147], \"object_long_axis_yaw\": -1.571, \"object_footprint\": [0.1326, 0.011], \"hand_clear\": false, \"fingers_clear\": true, \"highest_obstacle_under_hand_m\": 0.08}, {\"source\": \"geometry (fingers across the long side)\", \"x\": -0.1418, \"y\": -0.0147, \"height\": 0.006, \"yaw\": -1.571, \"score\": 0.3, \"id\": 1, \"object\": \"purple_pen\", \"squeeze_wid..."
+      },
+      {
+       "call": "grasp",
+       "args": [
+        {
+         "source": "geometry (fingers across the short side)",
+         "x": -0.1418,
+         "y": -0.0147,
+         "height": 0.00833,
+         "yaw": 0.0,
+         "score": 0.5,
+         "id": 0,
+         "object": "purple_pen",
+         "squeeze_width": 0.0109,
+         "fits_open_fingers": true,
+         "object_height": 0.0119,
+         "object_center": [
+          -0.1418,
+          -0.0147
+         ],
+         "object_long_axis_yaw": -1.571,
+         "object_footprint": [
+          0.1326,
+          0.011
+         ],
+         "hand_clear": false,
+         "fingers_clear": true,
+         "highest_obstacle_under_hand_m": 0.08
+        }
+       ],
+       "kwargs": {},
+       "control_step": 4,
+       "frame": 805,
+       "source": "<program>",
+       "line": 21,
+       "error": {
+        "reason": "motion_blocked",
+        "target": [
+         -0.1418,
+         -0.0147,
+         0.8083
+        ],
+        "reached": [
+         -0.1319,
+         -0.0171,
+         0.8367
+        ],
+        "remaining_error_m": 0.0302
+       }
+      }
+     ],
+     "retrieved": [
+      {
+       "function": "place_on_zone_v1",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         10,
+         5
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 10 success / 5 failure",
+         "recent: 1/4 of its last uses on pen into holder succeeded (all-time 10/15)",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      },
+      {
+       "function": "place_on_zone_v2",
+       "verdict": {
+        "verdict": "uncertain",
+        "kind_record": [
+         0,
+         0
+        ],
+        "physical": {
+         "reach_range": false
+        },
+        "reasons": [
+         "goal: pen into holder record 0 success / 0 failure",
+         "physical: outside the reach range seen in successful executions"
+        ]
+       }
+      }
+     ],
+     "curobo_feasibility": null,
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.011,
+      "object_reach": 0.418,
+      "zone_reach": 0.532
+     },
+     "direct_reuse": false,
+     "picks": [
+      {
+       "kind": "pen",
+       "object_height": 0.0119,
+       "footprint": [
+        0.1326,
+        0.011
+       ],
+       "grasp_height": 0.0083,
+       "yaw_from_long_axis_deg": 90,
+       "holding": false,
+       "error": "motion_blocked"
+      }
+     ],
+     "lessons_shown": [
+      58,
+      62,
+      63
+     ],
+     "diagnosis": "- Call 2 grasp({'source': 'geometry (fingers across the short side)', 'x': -0.1418, 'y': -0.0147, 'height': 0.00833, 'yaw': 0.0, 'score': 0.5, 'id': 0, 'object': 'purple_pen', 'squeeze_width': 0.0109, 'fits_open_fingers': True, 'object_height': 0.0119, 'object_center': [-0.1418, -0.0147], 'object_long_axis_yaw': -1.571, 'object_footprint': [0.1326, 0.011], 'hand_clear': False, 'fingers_clear': True, 'highest_obstacle_under_hand_m': 0.08},) failed: {'reason': 'motion_blocked', 'target': [-0.1418, -0.0147, 0.8083], 'reached': [-0.1319, -0.0171, 0.8367], 'remaining_error_m': 0.0302}.\n- The program never grasped anything.",
+     "lesson": "When grasping a pen lying near an obstacle, grasp off-center along its long axis toward the end farther from the obstacle so the hand and gripper remain clear during descent."
+    }
+   ],
+   "zone_occupied_at_start": []
+  }
+ ],
+ "validations": [],
+ "task_meta": {
+  "out_of_place": [
+   "purple_pen",
+   "green_book",
+   "yellow_paper"
+  ],
+  "already_tidy": [
+   "cyan_mug"
+  ],
+  "subtasks": 3
+ },
+ "user_preferences_used": [],
+ "task_spec": {
+  "goals": [
+   {
+    "object": "purple_pen",
+    "zone": "magenta_holder",
+    "source": "instruction",
+    "evidence": "pens stand upright in the magenta pen holder"
+   },
+   {
+    "object": "cyan_mug",
+    "zone": "blue_coaster",
+    "source": "instruction",
+    "evidence": "the mug goes on the blue coaster"
+   },
+   {
+    "object": "green_book",
+    "zone": "orange_tray",
+    "source": "instruction",
+    "evidence": "notebooks go on the orange tray"
+   },
+   {
+    "object": "yellow_paper",
+    "zone": "red_bin",
+    "source": "instruction",
+    "evidence": "crumpled paper balls go into the red wastebasket"
+   }
+  ],
+  "dropped": [],
+  "already_done": [
+   "cyan_mug"
+  ],
+  "blocking_left": [],
+  "constraints": [
+   "Leave cyan_mug untouched as it is already placed on the blue_coaster.",
+   "Place purple_pen upright inside magenta_holder."
+  ],
+  "refined_instruction": "Tidy the desk by picking up purple_pen and placing it upright into magenta_holder, placing green_book onto orange_tray, and disposing of yellow_paper into red_bin, while leaving cyan_mug untouched on blue_coaster since it is already in place. Verify success by confirming that cyan_mug remains on blue_coaster, purple_pen is standing in magenta_holder, green_book is resting on orange_tray, and yellow_paper is inside red_bin.",
+  "sources": {
+   "instruction": 4,
+   "user_memory": 0,
+   "assumption": 0
+  }
+ },
+ "plan": [
+  {
+   "object": "purple_pen",
+   "zone": "magenta_holder"
+  },
+  {
+   "object": "green_book",
+   "zone": "orange_tray"
+  },
+  {
+   "object": "yellow_paper",
+   "zone": "red_bin"
+  }
+ ],
+ "raw_plan": [
+  {
+   "object": "purple_pen",
+   "zone": "magenta_holder"
+  },
+  {
+   "object": "green_book",
+   "zone": "orange_tray"
+  },
+  {
+   "object": "yellow_paper",
+   "zone": "red_bin"
+  }
+ ],
+ "progress": [
+  {
+   "after": "purple_pen",
+   "subgoal_ok": false,
+   "achieved": [
+    "cyan_mug"
+   ],
+   "disturbed": [],
+   "remaining": [
+    "purple_pen",
+    "green_book",
+    "yellow_paper"
+   ]
+  },
+  {
+   "after": "green_book",
+   "subgoal_ok": true,
+   "achieved": [
+    "cyan_mug",
+    "green_book"
+   ],
+   "disturbed": [],
+   "remaining": [
+    "purple_pen",
+    "yellow_paper"
+   ]
+  },
+  {
+   "after": "yellow_paper",
+   "subgoal_ok": true,
+   "achieved": [
+    "cyan_mug",
+    "green_book",
+    "yellow_paper"
+   ],
+   "disturbed": [],
+   "remaining": [
+    "purple_pen"
+   ]
+  },
+  {
+   "after": "purple_pen",
+   "subgoal_ok": false,
+   "achieved": [
+    "cyan_mug",
+    "green_book",
+    "yellow_paper"
+   ],
+   "disturbed": [],
+   "remaining": []
+  }
+ ],
+ "replans": [
+  {
+   "after": "purple_pen",
+   "subgoal_ok": false,
+   "disturbed": [],
+   "plan": [
+    {
+     "object": "green_book",
+     "zone": "orange_tray"
+    },
+    {
+     "object": "yellow_paper",
+     "zone": "red_bin"
+    },
+    {
+     "object": "purple_pen",
+     "zone": "magenta_holder"
+    }
+   ],
+   "raw": [
+    {
+     "object": "green_book",
+     "zone": "orange_tray"
+    },
+    {
+     "object": "yellow_paper",
+     "zone": "red_bin"
+    },
+    {
+     "object": "purple_pen",
+     "zone": "magenta_holder"
+    }
+   ]
+  }
+ ],
+ "final_perception": {
+  "purple_pen": {
+   "inside_zone": false,
+   "standing": false,
+   "compact": false,
+   "pen_pixels_high_in_holder": 0,
+   "top_height_above_table": null,
+   "rim_height": 0.08,
+   "horizontal_span_m": 0.1326,
+   "zone_half_size": [
+    0.0284,
+    0.0284
+   ],
+   "gripper_holding": false,
+   "satisfied": false
+  },
+  "cyan_mug": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    0.0051,
+    0.0035
+   ],
+   "offset_along_across_zone_axis": [
+    -0.0035,
+    0.0051
+   ],
+   "zone_half_size": [
+    0.0427,
+    0.0426
+   ],
+   "top_height_above_table": 0.074,
+   "nominal_height": 0.07,
+   "object_axis_vs_zone_axis_deg": 78.3,
+   "object_long_axis_yaw": -0.204,
+   "zone_long_axis_yaw": -1.571,
+   "gripper_holding": false,
+   "satisfied": true
+  },
+  "green_book": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.003,
+    -0.0005
+   ],
+   "offset_along_across_zone_axis": [
+    -0.003,
+    -0.0005
+   ],
+   "zone_half_size": [
+    0.0665,
+    0.0647
+   ],
+   "top_height_above_table": 0.0289,
+   "nominal_height": 0.025,
+   "object_axis_vs_zone_axis_deg": 12.5,
+   "object_long_axis_yaw": -0.219,
+   "zone_long_axis_yaw": 0.0,
+   "gripper_holding": false,
+   "satisfied": true
+  },
+  "yellow_paper": {
+   "inside_zone": true,
+   "resting": true,
+   "offset_from_zone_center": [
+    -0.0068,
+    0.0028
+   ],
+   "offset_along_across_zone_axis": [
+    -0.0068,
+    0.0028
+   ],
+   "zone_half_size": [
+    0.0587,
+    0.0587
+   ],
+   "top_height_above_table": 0.0423,
+   "nominal_height": 0.04,
+   "gripper_holding": false,
+   "satisfied": true
+  }
+ },
+ "private_eval": {
+  "success": false,
+  "objects": {
+   "purple_pen": {
+    "zone": "magenta_holder",
+    "inside": false,
+    "resting": true,
+    "upright": false,
+    "tilt_from_vertical_deg": 90.0,
+    "position": [
+     -0.1417,
+     -0.0172,
+     0.8059
+    ]
+   },
+   "cyan_mug": {
+    "zone": "blue_coaster",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0296,
+     0.1381,
+     0.839
+    ]
+   },
+   "green_book": {
+    "zone": "orange_tray",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.1097,
+     -0.053,
+     0.8164
+    ]
+   },
+   "yellow_paper": {
+    "zone": "red_bin",
+    "inside": true,
+    "resting": true,
+    "upright": true,
+    "position": [
+     0.0659,
+     -0.2209,
+     0.8236
+    ],
+    "distance_from_bin_centre": 0.0052
+   }
+  },
+  "gripper_holding": false
+ },
+ "depth_diagnostics": {
+  "last_raw_range": [
+   0.9820146560668945,
+   0.9945789575576782
+  ],
+  "rerendered": 0
+ },
+ "seconds": 166.1,
+ "llm_usage": {
+  "calls": 17,
+  "prompt_tokens": 58044,
+  "completion_tokens": 4247,
+  "seconds": 91.3,
+  "by_purpose": {
+   "code": 8,
+   "plan": 1,
+   "refine": 1,
+   "reflect": 6,
+   "replan": 1
+  },
+  "cost_usd": 0.067616,
+  "list_price_usd": 0.067616,
+  "models": [
+   "gemini-3.8-flash"
+  ]
+ }
+}

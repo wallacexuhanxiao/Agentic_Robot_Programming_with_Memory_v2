@@ -1,0 +1,224 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    \"\"\"Picks a flat/thin object and places it on top of a specified zone.\"\"\"\n    grasp_info, app, fa = pick_thin_object(obj_name)\n    place_held_object_on_zone(obj_name, grasp_info, zone_name, app, fa)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "notebook",
+     "book",
+     "folder"
+    ],
+    "notes": "Grasps a thin flat object using edge-free grasp candidates, accounts for grasp-to-center offset, and places it on a zone surface or stack via contact detection."
+   },
+   "origin": {
+    "task": "nbdesk_notebook_14004",
+    "object": "yellow_notebook",
+    "zone": "book_pile",
+    "attempt": 3,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncands = grasp_candidates(\"yellow_notebook\")\n\nchosen = None\nfor c in cands:\n    if c.get(\"edge_free_below\") and c.get(\"reachable_checked\"):\n        chosen = c\n        break\nif chosen is None:\n    chosen = cands[0]\n\napp = chosen.get(\"approach\", [1.0, 0.0, 0.0])\nfa = chosen.get(\"finger_axis\", [0.0, 0.0, 1.0])\ngx = chosen[\"x\"]\ngy = chosen[\"y\"]\ngz = table_z + chosen[\"height\"]\n\nopen_gripper()\n# Move directly to the grasp point back along approach via path=\"curobo\" to avoid table collision\npre_dist = 0.05\npre_x = gx - pre_dist * app[0]\npre_y = gy - pre_dist * app[1]\npre_z = gz - pre_dist * app[2]\n\nmove_gripper(pre_x, pre_y, pre_z, approach=app, finger_axis=fa, path=\"curobo\")\nmove_by(dx=pre_dist * app[0], dy=pre_dist * app[1], dz=pre_dist * app[2])\nclose_gripper()\n\n# Lift straight up keeping orientation\nretreat(dz=0.25)\n\nbp = obs[\"zones\"][\"book_pile\"]\nsafe_z = table_z + bp[\"top_height\"] + 0.15\n\n# Offset from grip point to notebook center\nnb_c = obs[\"objects\"][\"yellow_notebook\"][\"center\"]\noffset_x = gx - nb_c[0]\noffset_y = gy - nb_c[1]\n\ntarget_x = bp[\"center\"][0] + offset_x\ntarget_y = bp[\"center\"][1] + offset_y\n\nmove_gripper(target_x, target_y, safe_z, approach=app, finger_axis=fa, path=\"line\")\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()",
+    "skill": "place_on_zone_v1"
+   },
+   "history": [
+    {
+     "task": "nbdesk_notebook_14004",
+     "source": "origin",
+     "features": {
+      "kind": "notebook",
+      "zone_style": "pile",
+      "height": 0.01,
+      "footprint_short": 0.1439,
+      "object_reach": 0.521,
+      "zone_reach": 0.631
+     },
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5010",
+     "source": "validation",
+     "features": {
+      "kind": "notebook",
+      "zone_style": "pile",
+      "height": 0.01,
+      "footprint_short": 0.1439,
+      "object_reach": 0.51,
+      "zone_reach": 0.651
+     },
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5011",
+     "source": "validation",
+     "features": {
+      "kind": "notebook",
+      "zone_style": "pile",
+      "height": 0.01,
+      "footprint_short": 0.1476,
+      "object_reach": 0.49,
+      "zone_reach": 0.626
+     },
+     "outcome": false,
+     "failure": "'yellow_notebook'"
+    }
+   ],
+   "status": "validated",
+   "helpers": [
+    "pick_thin_object",
+    "place_held_object_on_zone"
+   ]
+  }
+ ],
+ "grasp_log": [],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "notebook",
+   "lesson": "For a thin notebook lying flat on the table, select a top-down grasp candidate rather than an edge grasp requiring clearance below.",
+   "task": "nbdesk_notebook_14000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "notebook",
+   "lesson": "For thin flat objects like a notebook resting on the table, use a top-down grasp candidate with standard grasp(candidate) rather than manually moving to a low tilted/edge pre-grasp pose that collides with the table.",
+   "task": "nbdesk_notebook_14001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "notebook",
+   "lesson": "Select a grasp candidate for yellow_notebook using valid candidate attributes or str(c.get('id', '')) to avoid TypeError when filtering candidate IDs.",
+   "task": "nbdesk_notebook_14002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "notebook",
+   "lesson": "When selecting grasp candidates for a notebook, filter for candidates with reachable_checked=True that have an approach vector pointing downward (az < -0.7) and grasp standardly rather than selecting edge_free_below grasps.",
+   "task": "nbdesk_notebook_14002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "notebook",
+   "lesson": "Use the high-level grasp(chosen) API directly on the chosen grasp candidate instead of manually executing pre-grasp and grasp linear motions at table height.",
+   "task": "nbdesk_notebook_14003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "notebook",
+   "lesson": "Before moving to the low pre-grasp pose at table height, first move above the pre-grasp coordinates at a safe transit clearance height to avoid motion blockage along a direct linear descent.",
+   "task": "nbdesk_notebook_14004",
+   "shown_then": [
+    false,
+    true
+   ]
+  },
+  {
+   "id": 7,
+   "kind": "notebook",
+   "lesson": "Use grasp_candidates with filter reachable_checked and execute the grasp by calling pick(chosen) or grasp(chosen) instead of manual open-loop move_gripper descending to edge pinch coordinates that trigger motion collisions.",
+   "task": "nbdesk_notebook_14004",
+   "shown_then": [
+    true
+   ]
+  }
+ ],
+ "helpers": [
+  {
+   "name": "pick_thin_object",
+   "code": "def pick_thin_object(obj_name: str):\n    \"\"\"Grasps a thin object from a flat surface along a verified approach and lifts it; leaves object held.\"\"\"\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    cands = grasp_candidates(obj_name)\n    if not cands:\n        raise RuntimeError(f\"No grasp candidates found for {obj_name}\")\n\n    chosen = None\n    for c in cands:\n        if c.get(\"edge_free_below\") and c.get(\"reachable_checked\"):\n            chosen = c\n            break\n    if chosen is None:\n        chosen = cands[0]\n\n    app = chosen.get(\"approach\", [1.0, 0.0, 0.0])\n    fa = chosen.get(\"finger_axis\", [0.0, 0.0, 1.0])\n    gx = chosen[\"x\"]\n    gy = chosen[\"y\"]\n    gz = table_z + chosen.get(\"height\", 0.01)\n\n    open_gripper()\n    pre_dist = 0.05\n    pre_x = gx - pre_dist * app[0]\n    pre_y = gy - pre_dist * app[1]\n    pre_z = gz - pre_dist * app[2]\n\n    move_gripper(pre_x, pre_y, pre_z, approach=app, finger_axis=fa, path=\"curobo\")\n    move_by(dx=pre_dist * app[0], dy=pre_dist * app[1], dz=pre_dist * app[2])\n    close_gripper()\n    retreat(dz=0.25)\n    return chosen, app, fa",
+   "doc": "Grasps a thin object from a flat surface along a verified approach and lifts it; leaves object held.",
+   "object_kinds": [
+    "notebook"
+   ],
+   "origin": {
+    "task": "nbdesk_notebook_14004",
+    "object": "yellow_notebook",
+    "zone": "book_pile",
+    "attempt": 3,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncands = grasp_candidates(\"yellow_notebook\")\n\nchosen = None\nfor c in cands:\n    if c.get(\"edge_free_below\") and c.get(\"reachable_checked\"):\n        chosen = c\n        break\nif chosen is None:\n    chosen = cands[0]\n\napp = chosen.get(\"approach\", [1.0, 0.0, 0.0])\nfa = chosen.get(\"finger_axis\", [0.0, 0.0, 1.0])\ngx = chosen[\"x\"]\ngy = chosen[\"y\"]\ngz = table_z + chosen[\"height\"]\n\nopen_gripper()\n# Move directly to the grasp point back along approach via path=\"curobo\" to avoid table collision\npre_dist = 0.05\npre_x = gx - pre_dist * app[0]\npre_y = gy - pre_dist * app[1]\npre_z = gz - pre_dist * app[2]\n\nmove_gripper(pre_x, pre_y, pre_z, approach=app, finger_axis=fa, path=\"curobo\")\nmove_by(dx=pre_dist * app[0], dy=pre_dist * app[1], dz=pre_dist * app[2])\nclose_gripper()\n\n# Lift straight up keeping orientation\nretreat(dz=0.25)\n\nbp = obs[\"zones\"][\"book_pile\"]\nsafe_z = table_z + bp[\"top_height\"] + 0.15\n\n# Offset from grip point to notebook center\nnb_c = obs[\"objects\"][\"yellow_notebook\"][\"center\"]\noffset_x = gx - nb_c[0]\noffset_y = gy - nb_c[1]\n\ntarget_x = bp[\"center\"][0] + offset_x\ntarget_y = bp[\"center\"][1] + offset_y\n\nmove_gripper(target_x, target_y, safe_z, approach=app, finger_axis=fa, path=\"line\")\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()",
+    "skill": "place_on_zone_v1"
+   },
+   "history": [
+    {
+     "task": "nbdesk_notebook_14004",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5010",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5011",
+     "source": "validation",
+     "outcome": false,
+     "failure": "'yellow_notebook'"
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "name": "place_held_object_on_zone",
+   "code": "def place_held_object_on_zone(obj_name: str, grasp_info: dict, zone_name: str, approach, finger_axis):\n    \"\"\"Transports held object above a target zone with grasp-offset correction, lowers to contact, and releases.\"\"\"\n    obs = observe()\n    table_z = obs[\"table_z\"]\n    zone = obs[\"zones\"][zone_name]\n    top_h = zone.get(\"top_height\", 0.0)\n    safe_z = table_z + top_h + 0.15\n\n    nb_c = obs[\"objects\"][obj_name][\"center\"]\n    offset_x = grasp_info[\"x\"] - nb_c[0]\n    offset_y = grasp_info[\"y\"] - nb_c[1]\n\n    target_x = zone[\"center\"][0] + offset_x\n    target_y = zone[\"center\"][1] + offset_y\n\n    move_gripper(target_x, target_y, safe_z, approach=approach, finger_axis=finger_axis, path=\"line\")\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()",
+   "doc": "Transports held object above a target zone with grasp-offset correction, lowers to contact, and releases.",
+   "object_kinds": [
+    "notebook"
+   ],
+   "origin": {
+    "task": "nbdesk_notebook_14004",
+    "object": "yellow_notebook",
+    "zone": "book_pile",
+    "attempt": 3,
+    "source_code": "obs = observe()\ntable_z = obs[\"table_z\"]\ncands = grasp_candidates(\"yellow_notebook\")\n\nchosen = None\nfor c in cands:\n    if c.get(\"edge_free_below\") and c.get(\"reachable_checked\"):\n        chosen = c\n        break\nif chosen is None:\n    chosen = cands[0]\n\napp = chosen.get(\"approach\", [1.0, 0.0, 0.0])\nfa = chosen.get(\"finger_axis\", [0.0, 0.0, 1.0])\ngx = chosen[\"x\"]\ngy = chosen[\"y\"]\ngz = table_z + chosen[\"height\"]\n\nopen_gripper()\n# Move directly to the grasp point back along approach via path=\"curobo\" to avoid table collision\npre_dist = 0.05\npre_x = gx - pre_dist * app[0]\npre_y = gy - pre_dist * app[1]\npre_z = gz - pre_dist * app[2]\n\nmove_gripper(pre_x, pre_y, pre_z, approach=app, finger_axis=fa, path=\"curobo\")\nmove_by(dx=pre_dist * app[0], dy=pre_dist * app[1], dz=pre_dist * app[2])\nclose_gripper()\n\n# Lift straight up keeping orientation\nretreat(dz=0.25)\n\nbp = obs[\"zones\"][\"book_pile\"]\nsafe_z = table_z + bp[\"top_height\"] + 0.15\n\n# Offset from grip point to notebook center\nnb_c = obs[\"objects\"][\"yellow_notebook\"][\"center\"]\noffset_x = gx - nb_c[0]\noffset_y = gy - nb_c[1]\n\ntarget_x = bp[\"center\"][0] + offset_x\ntarget_y = bp[\"center\"][1] + offset_y\n\nmove_gripper(target_x, target_y, safe_z, approach=app, finger_axis=fa, path=\"line\")\nlower_until_contact()\nopen_gripper()\nretreat(dz=0.15)\ngo_home()",
+    "skill": "place_on_zone_v1"
+   },
+   "history": [
+    {
+     "task": "nbdesk_notebook_14004",
+     "source": "origin",
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5010",
+     "source": "validation",
+     "outcome": true
+    },
+    {
+     "task": "nbdesk_notebook_5011",
+     "source": "validation",
+     "outcome": false,
+     "failure": "'yellow_notebook'"
+    }
+   ],
+   "status": "validated"
+  }
+ ]
+}

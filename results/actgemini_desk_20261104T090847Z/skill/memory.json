@@ -1,0 +1,490 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n\n    candidates = grasp_candidates(obj_name)\n    valid_candidates = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\n\n    if valid_candidates:\n        best_candidate = max(valid_candidates, key=lambda c: c.get(\"score\") or 0.0)\n    else:\n        best_candidate = candidates[0]\n\n    res = grasp(best_candidate)\n\n    if res[\"holding_something\"]:\n        target_yaw = zone[\"long_axis_yaw\"] + (\n            best_candidate[\"yaw\"] - best_candidate[\"object_long_axis_yaw\"]\n        )\n        carry_to(zone[\"center\"][0], zone[\"center\"][1], height=0.18, yaw=target_yaw)\n        lower_until_contact()\n        open_gripper()\n        retreat(0.12)\n        go_home()\n        check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "book"
+    ],
+    "notes": "Aligns the object's long axis with the target zone's long axis before placing it via contact sensing."
+   },
+   "origin": {
+    "task": "desk_9000",
+    "object": "blue_book",
+    "zone": "orange_tray",
+    "attempt": 2,
+    "source_code": "# Subgoal: Move blue_book to orange_tray\nobs = observe()\ntray = obs[\"zones\"][\"orange_tray\"]\n\ncandidates = grasp_candidates(\"blue_book\")\nvalid_candidates = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\n\nif valid_candidates:\n    best_candidate = max(valid_candidates, key=lambda c: c.get(\"score\") or 0.0)\nelse:\n    best_candidate = candidates[0]\n\nres = grasp(best_candidate)\n\nif res[\"holding_something\"]:\n    target_yaw = tray[\"long_axis_yaw\"] + (best_candidate[\"yaw\"] - best_candidate[\"object_long_axis_yaw\"])\n    carry_to(tray[\"center\"][0], tray[\"center\"][1], height=0.18, yaw=target_yaw)\n    lower_until_contact()\n    open_gripper()\n    retreat(0.12)\n    go_home()\n    check(\"blue_book\", \"orange_tray\")"
+   },
+   "history": [
+    {
+     "task": "desk_9000",
+     "source": "origin",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.029,
+      "footprint_short": 0.0528,
+      "object_reach": 0.638,
+      "zone_reach": 0.513
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5010",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0548,
+      "object_reach": 0.494,
+      "zone_reach": 0.504
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5011",
+     "source": "validation",
+     "features": {
+      "kind": "book",
+      "zone_style": "tray",
+      "height": 0.025,
+      "footprint_short": 0.0531,
+      "object_reach": 0.569,
+      "zone_reach": 0.56
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  },
+  {
+   "function": "place_on_zone_v2",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v2(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n\n    candidates = grasp_candidates(obj_name)\n    valid_candidates = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\n    if valid_candidates:\n        best_candidate = max(valid_candidates, key=lambda c: c.get(\"score\") or 0.0)\n    else:\n        best_candidate = candidates[0]\n\n    best_candidate[\"height\"] = 0.022\n\n    res = grasp(best_candidate)\n    if res[\"holding_something\"]:\n        target_yaw = zone[\"long_axis_yaw\"] + (\n            best_candidate[\"yaw\"] - best_candidate[\"object_long_axis_yaw\"]\n        )\n        carry_to(zone[\"center\"][0], zone[\"center\"][1], height=0.18, yaw=target_yaw)\n        lower_until_contact()\n        open_gripper()\n        retreat(0.12)\n        go_home()\n        check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": true,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "block"
+    ],
+    "notes": "Grasps block at calibrated height, aligns orientation with zone's long axis, and lowers until contact."
+   },
+   "origin": {
+    "task": "desk_9004",
+    "object": "red_block",
+    "zone": "purple_box",
+    "attempt": 1,
+    "source_code": "obs = observe()\nzone = obs[\"zones\"][\"purple_box\"]\n\ncandidates = grasp_candidates(\"red_block\")\nvalid_candidates = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\nif valid_candidates:\n    best_candidate = max(valid_candidates, key=lambda c: c.get(\"score\") or 0.0)\nelse:\n    best_candidate = candidates[0]\n\n# Adjust grasp height according to successful prior experience (~0.022m)\nbest_candidate[\"height\"] = 0.022\n\nres = grasp(best_candidate)\nif res[\"holding_something\"]:\n    target_yaw = zone[\"long_axis_yaw\"] + (\n        best_candidate[\"yaw\"] - best_candidate[\"object_long_axis_yaw\"]\n    )\n    carry_to(zone[\"center\"][0], zone[\"center\"][1], height=0.18, yaw=target_yaw)\n    lower_until_contact()\n    open_gripper()\n    retreat(0.12)\n    go_home()\n    check(\"red_block\", \"purple_box\")"
+   },
+   "history": [
+    {
+     "task": "desk_9004",
+     "source": "origin",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0439,
+      "footprint_short": 0.038,
+      "object_reach": 0.697,
+      "zone_reach": 0.502
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5020",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0399,
+      "footprint_short": 0.0373,
+      "object_reach": 0.618,
+      "zone_reach": 0.568
+     },
+     "outcome": true
+    },
+    {
+     "task": "place_5021",
+     "source": "validation",
+     "features": {
+      "kind": "block",
+      "zone_style": "box",
+      "height": 0.0399,
+      "footprint_short": 0.0378,
+      "object_reach": 0.656,
+      "zone_reach": 0.646
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1337,
+    0.0107
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.029,
+   "footprint": [
+    0.075,
+    0.0528
+   ],
+   "grasp_height": 0.015,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9000"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.074,
+   "footprint": [
+    0.058,
+    0.0452
+   ],
+   "grasp_height": 0.037,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0734,
+    0.0549
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.138,
+    0.0105
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9001"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.04,
+    0.0392
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.04,
+    0.04
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0559,
+    0.045
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1365,
+    0.01
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9002"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.04,
+    0.039
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.028,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0382,
+    0.0378
+   ],
+   "grasp_height": 0.02,
+   "yaw_from_long_axis_deg": 90,
+   "holding": false,
+   "error": "motion_blocked",
+   "task": "desk_9003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "mug",
+   "object_height": 0.07,
+   "footprint": [
+    0.0563,
+    0.0468
+   ],
+   "grasp_height": 0.035,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9003"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0439,
+   "footprint": [
+    0.0409,
+    0.038
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "block",
+   "object_height": 0.0399,
+   "footprint": [
+    0.0399,
+    0.0385
+   ],
+   "grasp_height": 0.022,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "book",
+   "object_height": 0.025,
+   "footprint": [
+    0.0743,
+    0.0533
+   ],
+   "grasp_height": 0.013,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.0117
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "desk_9004"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "To insert a pen into a holder, reorient or grasp the pen vertically along its long axis before lowering it so it fits upright into the holder opening.",
+   "task": "desk_9000",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "mug",
+   "lesson": "Handle grasp candidates whose score may be None by using `g.get('score') or 0` or picking the first candidate to avoid a comparison TypeError.",
+   "task": "desk_9000",
+   "shown_then": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "book",
+   "lesson": "Safely sort grasp candidates by using `c.get('score') or 0.0` to handle candidates where `score` is explicitly `None`.",
+   "task": "desk_9000",
+   "shown_then": [
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 4,
+   "kind": "pen",
+   "lesson": "To place the pen upright into the holder, grasp near one of its ends along its long axis rather than at the center, so that orienting it vertically leaves enough clearance to lower it into the container without colliding.",
+   "task": "desk_9001",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 5,
+   "kind": "pen",
+   "lesson": "Keep the standard downward approach ([0, 0, -1]) rather than tilting the gripper horizontally, carrying the pen above the holder center and releasing it.",
+   "task": "desk_9002",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "block",
+   "lesson": "Increase the grasp height on the block to grasp closer to its top and avoid collision during descent.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    false
+   ]
+  },
+  {
+   "id": 7,
+   "kind": "block",
+   "lesson": "Select the grasp candidate with the lowest height or use the default top candidate rather than maximizing grasp height to avoid collision during descent.",
+   "task": "desk_9003",
+   "shown_then": [
+    false,
+    true,
+    true
+   ]
+  },
+  {
+   "id": 8,
+   "kind": "block",
+   "lesson": "Select the grasp candidate with fingers across the long side instead of the short side to avoid collision during gripper descent.",
+   "task": "desk_9003",
+   "shown_then": [
+    true,
+    true
+   ]
+  },
+  {
+   "id": 9,
+   "kind": "pen",
+   "lesson": "Release the pen directly from a high clearance above the holder's center without calling lower_until_contact so it drops into the container naturally.",
+   "task": "desk_9003",
+   "shown_then": [
+    false
+   ]
+  },
+  {
+   "id": 10,
+   "kind": "pen",
+   "lesson": "Lower the pen down into the holder opening below the rim height before opening the gripper rather than dropping it from above the rim.",
+   "task": "desk_9004",
+   "shown_then": []
+  }
+ ]
+}

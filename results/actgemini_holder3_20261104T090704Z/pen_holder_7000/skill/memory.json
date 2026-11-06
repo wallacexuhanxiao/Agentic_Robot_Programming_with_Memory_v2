@@ -1,0 +1,221 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n\n    candidates = grasp_candidates(obj_name)\n    valid_candidates = [c for c in candidates if c.get(\"fits_open_fingers\", True)]\n    if not valid_candidates:\n        valid_candidates = candidates\n    chosen_grasp = sorted(valid_candidates, key=lambda c: c.get(\"score\", 0), reverse=True)[0]\n\n    grasp_res = grasp(chosen_grasp)\n    if not grasp_res.get(\"holding_something\", False):\n        raise RuntimeError(f\"Failed to grasp {obj_name}\")\n\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zx, zy, _ = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.08)\n\n    carry_to(zx, zy, height=rim_height + 0.18)\n\n    target_z = obs[\"table_z\"] + rim_height + 0.08\n    approach = [0.0, 1.0, 0.0]\n    finger_axis = [1.0, 0.0, 0.0]\n\n    ik_res = solve_ik(zx, zy, target_z, approach=approach, finger_axis=finger_axis)\n    if not ik_res.get(\"reachable\", False):\n        approach = [1.0, 0.0, 0.0]\n        finger_axis = [0.0, 1.0, 0.0]\n\n    move_gripper(zx, zy, target_z, approach=approach, finger_axis=finger_axis, path=\"joint\")\n\n    lower_until_contact()\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker",
+     "utensil"
+    ],
+    "notes": "Grasps an elongated object horizontally and reorients it vertically before inserting it into a container or holder zone."
+   },
+   "origin": {
+    "task": "penholder_7000",
+    "object": "yellow_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "candidates = grasp_candidates(\"yellow_pen\")\n# Choose a candidate near the center or with good score that fits open fingers\nvalid_candidates = [c for c in candidates if c[\"fits_open_fingers\"]]\nchosen_grasp = sorted(valid_candidates, key=lambda c: c.get(\"score\", 0), reverse=True)[0]\n\ngrasp_res = grasp(chosen_grasp)\nif not grasp_res[\"holding_something\"]:\n    raise RuntimeError(\"Failed to grasp yellow pen\")\n\nobs = observe()\nholder = obs[\"zones\"][\"magenta_holder\"]\nhx, hy, hz = holder[\"center\"]\nrim_height = holder.get(\"rim_height\", 0.08)\n\n# Move above the holder at safe height\ncarry_to(hx, hy, height=rim_height + 0.18)\n\n# The pen is held horizontally across the gripper fingers (side vector).\n# To orient the pen upright (vertical), tilt the gripper so the pen becomes vertical.\n# Side vector is approach x finger_axis. \n# If we rotate gripper approach to horizontal, say [1, 0, 0] or [0, 1, 0], side can point along [0, 0, -1].\n# Specifically: if approach = [0, 1, 0] and finger_axis = [1, 0, 0], then side = [0, 1, 0] x [1, 0, 0] = [0, 0, -1] (vertical!).\n# Let's test reachability of inserting into the cup from above.\n# Cup top is at table_z + rim_height.\ntarget_z = obs[\"table_z\"] + rim_height + 0.08\napproach = [0.0, 1.0, 0.0]\nfinger_axis = [1.0, 0.0, 0.0]\n\nik_res = solve_ik(hx, hy, target_z, approach=approach, finger_axis=finger_axis)\nif not ik_res[\"reachable\"]:\n    approach = [1.0, 0.0, 0.0]\n    finger_axis = [0.0, 1.0, 0.0]\n\nmove_gripper(hx, hy, target_z, approach=approach, finger_axis=finger_axis, path=\"joint\")\n\n# Lower slightly into the holder\nlower_res = lower_until_contact()\n\nopen_gripper()\nretreat(dz=0.15)\ngo_home()\ncheck(\"yellow_pen\", \"magenta_holder\")"
+   },
+   "history": [
+    {
+     "task": "penholder_7000",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.522,
+      "zone_reach": 0.668
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0096,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": false,
+     "failure": "carry_height_out_of_range"
+    },
+    {
+     "task": "penholder_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.565,
+      "zone_reach": 0.548
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_7002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0113,
+      "object_reach": 0.573,
+      "zone_reach": 0.643
+     },
+     "outcome": false,
+     "failure": "unreachable_pose",
+     "repaired_by": "later attempt"
+    },
+    {
+     "task": "penholder_7004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0117,
+      "object_reach": 0.506,
+      "zone_reach": 0.576
+     },
+     "outcome": false,
+     "failure": "unreachable_pose"
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.137,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1398,
+    0.0116
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1375,
+    0.0113
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.011
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.139,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1363,
+    0.0117
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_7004"
+  }
+ ],
+ "lessons": [
+  {
+   "id": 1,
+   "kind": "pen",
+   "lesson": "When inserting a pen into a cup holder, grasp it along or near its end rather than the center crosswise, or grasp it along its length, so that the fingers do not collide with the rim or prevent the pen from dropping fully into the holder.",
+   "task": "penholder_7001",
+   "shown_then": [
+    true,
+    false
+   ]
+  },
+  {
+   "id": 2,
+   "kind": "pen",
+   "lesson": "Keep the grasp yaw (around -1.2 rad) or choose a reachable orientation rather than rotating to yaw 3.142 when lowering the pen onto the holder.",
+   "task": "penholder_7002",
+   "shown_then": [
+    true,
+    false
+   ]
+  },
+  {
+   "id": 3,
+   "kind": "pen",
+   "lesson": "To place or drop a pen into an upright holder without unreachable horizontal gripper poses during lowering, simply carry the pen horizontally directly above the holder rim and open the gripper to let it fall in, or choose a reachable top-down drop orientation.",
+   "task": "penholder_7003",
+   "shown_then": []
+  },
+  {
+   "id": 4,
+   "kind": "pen",
+   "lesson": "Reduce the transit and approach height when placing onto the holder to avoid reaching beyond the robot's upper vertical workspace limit.",
+   "task": "penholder_7004",
+   "shown_then": []
+  }
+ ]
+}

@@ -1,0 +1,196 @@
+{
+ "skills": [
+  {
+   "function": "place_on_zone_v1",
+   "subgoal": "place_on_zone",
+   "code": "def place_on_zone_v1(obj_name, zone_name):\n    obs = observe()\n    zone = obs[\"zones\"][zone_name]\n    zone_center = zone[\"center\"]\n    rim_height = zone.get(\"rim_height\", 0.0)\n    table_z = obs.get(\"table_z\", 0.0)\n\n    # Grasp the object\n    cands = grasp_candidates(obj_name)\n    cands = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)\n    grasped = False\n    for cand in cands:\n        grasp_res = grasp(cand)\n        if grasp_res.get(\"holding_something\", False):\n            grasped = True\n            break\n    if not grasped:\n        return False\n\n    safe_z = table_z + rim_height + 0.15\n    carry_to(zone_center[0], zone_center[1], height=safe_z - table_z)\n\n    # Try orientation candidates to orient elongated object vertically into holder\n    candidate_orientations = [\n        ([1, 0, 0], [0, 1, 0]),\n        ([0, 1, 0], [1, 0, 0]),\n        ([-1, 0, 0], [0, 1, 0]),\n        ([0, -1, 0], [1, 0, 0]),\n    ]\n\n    selected_approach = None\n    selected_finger_axis = None\n    for app, fa in candidate_orientations:\n        ik_res = solve_ik(zone_center[0], zone_center[1], safe_z, approach=app, finger_axis=fa)\n        if ik_res.get(\"reachable\", False):\n            selected_approach = app\n            selected_finger_axis = fa\n            break\n\n    if selected_approach is None:\n        selected_approach, selected_finger_axis = candidate_orientations[0]\n\n    move_gripper(zone_center[0], zone_center[1], safe_z, approach=selected_approach, finger_axis=selected_finger_axis, path=\"line\")\n\n    lower_target_z = table_z + rim_height + 0.04\n    move_gripper(zone_center[0], zone_center[1], lower_target_z, approach=selected_approach, finger_axis=selected_finger_axis, path=\"line\")\n\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    return check(obj_name, zone_name)",
+   "expected_effect": "object resting inside the zone footprint, gripper open, arm lifted",
+   "conditions": {
+    "goal": {
+     "subgoal": "place_on_zone"
+    },
+    "state": {
+     "requires_zone_free": false,
+     "requires_gripper_empty": true
+    },
+    "proposed_object_kinds": [
+     "pen",
+     "pencil",
+     "marker",
+     "straw",
+     "stick"
+    ],
+    "notes": "Inserts an elongated object vertically into a container or holder by reorienting the gripper horizontally."
+   },
+   "origin": {
+    "task": "penholder_6000",
+    "object": "yellow_pen",
+    "zone": "magenta_holder",
+    "attempt": 1,
+    "source_code": "# Observe and get candidates for the pen\nobs = observe()\nholder = obs[\"zones\"][\"magenta_holder\"]\nholder_center = holder[\"center\"]\nrim_height = holder[\"rim_height\"]\ntable_z = obs[\"table_z\"]\n\ncands = grasp_candidates(\"yellow_pen\")\n# Filter for geometry or highest score grasp across the short axis\ncand = sorted(cands, key=lambda c: c.get(\"score\", 0), reverse=True)[0]\ngrasp_res = grasp(cand)\n\nif grasp_res[\"holding_something\"]:\n    # Move above the holder safely cleared of the rim\n    safe_z = table_z + rim_height + 0.15\n    carry_to(holder_center[0], holder_center[1], height=safe_z - table_z)\n\n    # To place it upright into the holder, orient the held pen vertically.\n    # The pen is held horizontally along the gripper's side vector (approach x finger_axis).\n    # Gripper pointing down with horizontal finger axis holds the pen horizontally.\n    # To make the pen point vertically (down into the holder), we rotate the gripper so its 'side' points down,\n    # i.e. pitch the gripper 90 degrees (approach horizontal, finger_axis horizontal or vertical).\n    # Pitching: approach = [1, 0, 0] or [0, 1, 0] makes the side vector vertical ([0, 0, -1]).\n    # Check IK for horizontal approach:\n    # If approach = [1, 0, 0] and finger_axis = [0, 1, 0], then side = [0, 0, 1] (or [0, 0, -1] with finger_axis = [0, -1, 0]).\n    # When side is vertical, the pen is oriented vertically.\n    approach = [1, 0, 0]\n    finger_axis = [0, 1, 0]\n    ik_res = solve_ik(holder_center[0], holder_center[1], safe_z, approach=approach, finger_axis=finger_axis)\n    if not ik_res[\"reachable\"]:\n        approach = [0, 1, 0]\n        finger_axis = [1, 0, 0]\n\n    move_gripper(holder_center[0], holder_center[1], safe_z, approach=approach, finger_axis=finger_axis, path=\"line\")\n\n    # Lower down into the holder opening\n    lower_target_z = table_z + rim_height + 0.04\n    move_gripper(holder_center[0], holder_center[1], lower_target_z, approach=approach, finger_axis=finger_axis, path=\"line\")\n\n    # Release the pen so it drops/stands in the holder\n    open_gripper()\n    retreat(dz=0.15)\n    go_home()\n    check(\"yellow_pen\", \"magenta_holder\")"
+   },
+   "history": [
+    {
+     "task": "penholder_6000",
+     "source": "origin",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0111,
+      "object_reach": 0.533,
+      "zone_reach": 0.679
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5010",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0096,
+      "object_reach": 0.674,
+      "zone_reach": 0.494
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_5011",
+     "source": "validation",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.565,
+      "zone_reach": 0.548
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6001",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.545,
+      "zone_reach": 0.636
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6002",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0114,
+      "object_reach": 0.65,
+      "zone_reach": 0.57
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6003",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0119,
+      "object_reach": 0.541,
+      "zone_reach": 0.601
+     },
+     "outcome": true
+    },
+    {
+     "task": "penholder_6004",
+     "source": "use",
+     "features": {
+      "kind": "pen",
+      "zone_style": "holder",
+      "height": 0.0119,
+      "footprint_short": 0.0115,
+      "object_reach": 0.592,
+      "zone_reach": 0.531
+     },
+     "outcome": true
+    }
+   ],
+   "status": "validated"
+  }
+ ],
+ "grasp_log": [
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1379,
+    0.0111
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6000"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6001"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1368,
+    0.0114
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6002"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1399,
+    0.0119
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6003"
+  },
+  {
+   "kind": "pen",
+   "object_height": 0.0119,
+   "footprint": [
+    0.1387,
+    0.0115
+   ],
+   "grasp_height": 0.006,
+   "yaw_from_long_axis_deg": 90,
+   "holding": true,
+   "error": null,
+   "task": "penholder_6004"
+  }
+ ],
+ "lessons": []
+}
