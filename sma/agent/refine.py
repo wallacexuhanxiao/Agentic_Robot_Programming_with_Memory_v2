@@ -13,14 +13,16 @@ REFINE = """You turn a user's request to a tabletop robot into an explicit task 
 robot-programming agent. Do not write robot code.
 
 User request: "{instruction}"
-Stored long-term preferences of this user (from earlier conversations): {preferences}
+Long-term memory of this user: preferences they stated in earlier conversations ("stated by the user") and habits
+observed on earlier desks, where things like it were kept ("observed habit"): {preferences}
 Objects seen by the camera (name, kind, and the zone each currently lies on): {objects}
-Zones seen: {zones}
+Zones seen: {zones}{grouping}
 
 For every object that the request concerns, give its target zone and the source of that decision:
 - "instruction": the request itself states it (give a verbatim quote as evidence);
-- "user_memory": a stored preference states it (the current request overrides stored preferences);
-- "assumption": neither does; you choose, and say why.
+- "user_memory": the long-term memory gives it (the current request overrides it; a stated preference overrides an
+  observed habit);{grouping_source}
+- "assumption": none of these does; you choose, and say why.
 Note zones that are occupied by another object, and objects that are already in place.
 Reply with ONLY JSON:
 {{"goals": [{{"object": "...", "zone": "...", "source": "instruction"|"user_memory"|"assumption",
@@ -29,6 +31,12 @@ Reply with ONLY JSON:
   "constraints": ["<short sentence>", ...],
   "refined_instruction": "<one explicit paragraph for the robot-programming agent: goals, order
                           constraints such as clearing an occupied zone first, and how success is checked>"}}"""
+GROUPING = """
+Where things like each loose object are already kept on this desk (scene grouping from the camera: categories
+clustered by similarity, and the place holding most of each cluster): {homes}"""
+GROUPING_SOURCE = """
+- "scene_grouping": the scene grouping gives this place: things of its kind are already kept there (give its
+  evidence). The request and stored preferences override it;"""
 
 
 def _json(text):
@@ -45,7 +53,7 @@ def scene_summary(scene):
     objects = []
     for name, obj in scene["objects"].items():
         on = [z for z in scene["zones"] if name in zone_occupants(scene, z)]
-        objects.append({"name": name, "kind": obj["kind"], "on_zone": on[0] if on else None})
+        objects.append({"name": name, "kind": obj.get("category") or obj["kind"], "on_zone": on[0] if on else None})
     return objects
 
 
@@ -61,10 +69,17 @@ def blocking_objects(spec_goals, scene):
     return out
 
 
-def refine(llm, instruction, preferences, scene, _note=""):
+def refine(llm, instruction, preferences, scene, _note="", grouping=None):
+    """grouping: infer_homes() of the scene (sma.agent.grouping), or None to leave the scene grouping out."""
+    homes = (grouping or {}).get("homes", {})
     raw = llm.chat([{"role": "user", "content": REFINE.format(
         instruction=instruction, preferences=json.dumps(preferences) if preferences else "none",
-        objects=json.dumps(scene_summary(scene)), zones=sorted(scene["zones"])) + _note}],
+        objects=json.dumps(scene_summary(scene)),
+        # colour-coded desk: the names are colours, so say what each place was identified as
+        zones=json.dumps({n: z["category"] for n, z in sorted(scene["zones"].items())})
+        if any(z.get("category") for z in scene["zones"].values()) else sorted(scene["zones"]),
+        grouping=GROUPING.format(homes=json.dumps(homes)) if grouping is not None else "",
+        grouping_source=GROUPING_SOURCE if grouping is not None else "") + _note}],
         purpose="refine", max_tokens=1200)
     try:
         spec = _json(raw)
@@ -84,7 +99,9 @@ def refine(llm, instruction, preferences, scene, _note=""):
             reason = "the request does not mention this object kind together with this place"
         elif source == "user_memory" and pref_zone.get(obj) != zone:
             reason = "no stored preference says this"
-        elif source not in ("instruction", "user_memory", "assumption"):
+        elif source == "scene_grouping" and (homes.get(obj) or {}).get("zone") != zone:
+            reason = "the scene grouping does not give this place"
+        elif source not in ("instruction", "user_memory", "assumption") + (("scene_grouping",) if grouping is not None else ()):
             reason = "missing source"
         (dropped if reason else goals).append({**g, **({"rejected_because": reason} if reason else {})})
     blocking = blocking_objects(goals, scene)
@@ -93,10 +110,11 @@ def refine(llm, instruction, preferences, scene, _note=""):
         note = ("\n\nYour previous specification had a problem: " + "; ".join(
             f"{b['object']} lies on {b['zone_blocked']}, which another object must go to, but {b['object']} has no goal"
             for b in blocking) + ". Give it a goal (a zone where it belongs) so the zone can be cleared first.")
-        again = refine(llm, instruction, preferences, scene, _note=note)
+        again = refine(llm, instruction, preferences, scene, _note=note, grouping=grouping)
         again["consistency_round"] = {"blocking": blocking}
         return again
     return {"goals": goals, "dropped": dropped, "already_done": spec.get("already_done", []), "blocking_left": blocking,
             "constraints": spec.get("constraints", []),
             "refined_instruction": spec.get("refined_instruction") or instruction,
-            "sources": {s: sum(1 for g in goals if g["source"] == s) for s in ("instruction", "user_memory", "assumption")}}
+            "sources": {s: sum(1 for g in goals if g["source"] == s)
+                        for s in ("instruction", "user_memory", "scene_grouping", "assumption")}}

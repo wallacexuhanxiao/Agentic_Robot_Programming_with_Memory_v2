@@ -1,4 +1,5 @@
-"""Side-by-side comparison videos: same task, no memory (left) vs memory (right). Usage: python scripts/make_pair_videos.py results"""
+"""Side-by-side comparison videos: same task, no memory (left) vs memory (right).
+Usage: python scripts/make_pair_videos.py results [all|pen|holder]"""
 import json, sys, textwrap
 import cv2, numpy as np, imageio.v2 as imageio
 R = sys.argv[1]
@@ -76,5 +77,19 @@ user = [
             ("Left: no memory, destinations are guessed (assumption).", WHITE),
             ("Right: user memory supplies each destination with the user's own words as evidence.", WHITE)]}
  for run, lvl, t in (("mid30b_20261017T110309Z", "mid-level", "tidy_1005"), ("final_20261017T084229Z", "task-level", "tidy_1001"))]
-main(skill, f"{R}/demo/skill_memory_pairs.mp4")
-main(user, f"{R}/demo/user_memory_pairs.mp4")
+holder_run = "actgemini_holder4_20261104T115318Z/pen_holder_6000"
+holder = [
+ {"task": f"penholder_{n}", "left": (f"{holder_run}/none", "NO MEMORY"), "right": (f"{holder_run}/skill", "SKILL MEMORY"),
+  "title": [(f"Skill memory on a 6-DoF manipulation: penholder_{n} (Gemini 3.8 Flash, act-level API)", CYAN),
+            ('"Stand the pen upright in the magenta pen holder." The pen lies flat; it must be turned upright.', WHITE),
+            ("Left: no memory, the model composes the motion anew each attempt (up to 3).", WHITE),
+            ("Right: skill memory; the program learned and validated on an earlier task is run directly.", WHITE),
+            ("No place_object/place_upright helpers: tilt, reach checks and descent are the model's own code.", GREY)]}
+ for n in (6003, 6004)]
+if __name__ == "__main__":
+    which = sys.argv[2] if len(sys.argv) > 2 else "all"
+    if which in ("all", "pen"):
+        main(skill, f"{R}/demo/skill_memory_pairs.mp4")
+        main(user, f"{R}/demo/user_memory_pairs.mp4")
+    if which in ("all", "holder"):
+        main(holder, f"{R}/demo/pen_holder_skill_pairs.mp4")

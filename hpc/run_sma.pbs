@@ -9,12 +9,13 @@
 #   suite = Qwen runs of SMA_CONDITIONS (e.g. memory:none) over SMA_SUITES (e.g. train+heldout).
 set -euo pipefail
 PROJECT=/scratch/e0985859/agentic_robot_programming
-ROOT=$PROJECT/skill_memory_agent
+ROOT=${SMA_ROOT:-$PROJECT/skill_memory_agent}  # SMA_ROOT: a separate code copy (e.g. a dev tree) for trial runs
 OUT=$ROOT/outputs/${SMA_RUN_NAME:?}
 mkdir -p "$OUT"
 cd "$ROOT"
 export PYTHONPATH=$ROOT PYTHONUNBUFFERED=1 OMP_NUM_THREADS=4
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
+if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then  # a CPU-only job (e.g. the Gemini probe) has no GPU assigned
 export CUDA_VISIBLE_DEVICES=$(/usr/bin/python3 - <<'PY'
 import os,subprocess
 assigned=os.environ['CUDA_VISIBLE_DEVICES'].split(',')[0]
@@ -23,17 +24,97 @@ print(next(line.split(',')[0].strip() for line in rows.splitlines() if assigned 
  (line.split(',')[0].strip(),line.split(',')[1].strip())))
 PY
 )
+fi
 export SMA_API_LEVEL=${SMA_API_LEVEL:-task}
-export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl EGL_PLATFORM=device MUJOCO_EGL_DEVICE_ID=$CUDA_VISIBLE_DEVICES
+export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl EGL_PLATFORM=device MUJOCO_EGL_DEVICE_ID=${CUDA_VISIBLE_DEVICES:-0}
 SIM_PY=$PROJECT/vision_venv/bin/python
 git rev-parse HEAD > "$OUT/code_commit.txt" 2>/dev/null || true
 sha256sum sma/*/*.py scripts/*.py > "$OUT/code_sha256.txt"
+[[ -z "${CUDA_VISIBLE_DEVICES:-}" ]] && export EGL_PLATFORM=surfaceless SMA_CPU_RENDER=1  # no GPU: Mesa software EGL
+if [[ "${SMA_MODE:-dev}" == cpu_check ]]; then  # simulator on CPU only, no services
+  "$SIM_PY" scripts/cpu_render_check.py > "$OUT/cpu_check.log" 2>&1 || echo "cpu check failed: $?" >> "$OUT/cpu_check.log"
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == act_gate ]]; then  # act-level reference programs through the sandbox (no LLM)
+  export SMA_API_LEVEL=act
+  for i in $(seq 0 10); do
+    "$SIM_PY" -X faulthandler scripts/act_gate.py "$OUT/act_gate" "$i" >> "$OUT/act_gate.log" 2>&1 || echo "act gate task $i failed: $?" >> "$OUT/act_gate.log"
+  done
+  "$SIM_PY" scripts/act_gate.py "$OUT/act_gate" summarize >> "$OUT/act_gate.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == realdesk_gate ]]; then  # realistic desk: camera calibration + act-level reference programs
+  export SMA_API_LEVEL=act
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    "$SIM_PY" -X faulthandler scripts/realdesk_gate.py "$OUT/realdesk_gate" "$i" >> "$OUT/realdesk_gate.log" 2>&1 || echo "realdesk gate task $i failed: $?" >> "$OUT/realdesk_gate.log"
+  done
+  "$SIM_PY" scripts/realdesk_gate.py "$OUT/realdesk_gate" summarize >> "$OUT/realdesk_gate.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == shape_probe ]]; then  # perceived shape features of paper balls and toy blocks (no LLM)
+  "$SIM_PY" -X faulthandler scripts/shape_probe.py "$OUT/shape_probe.json" ${SMA_SUITES//:/ } > "$OUT/shape_probe.log" 2>&1 || echo "shape probe failed: $?" >> "$OUT/shape_probe.log"
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == cdesk_check ]]; then  # colour-coded desk: neutral perception + checks + scripted notebook
+  export SMA_API_LEVEL=act
+  "$SIM_PY" -X faulthandler scripts/cdesk_check.py "$OUT/cdesk_check" ${SMA_SUITES:-cdesk@16000} > "$OUT/cdesk_check.log" 2>&1 || echo "cdesk check failed: $?" >> "$OUT/cdesk_check.log"
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    SMA_GATE_SUITE=${SMA_GATE_SUITE:-cdesk_notebook@16100} "$SIM_PY" -X faulthandler scripts/notebook_gate.py "$OUT/notebook_gate" "$i" >> "$OUT/notebook_gate.log" 2>&1 || echo "notebook gate task $i failed: $?" >> "$OUT/notebook_gate.log"
+  done
+  "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == hue_sweep ]]; then  # rendered hue of 45 nominal hues, to choose the cdesk palette
+  "$SIM_PY" -X faulthandler scripts/calibrate_hue_sweep.py "$OUT/hue_sweep.json" > "$OUT/hue_sweep.log" 2>&1 || echo "sweep failed: $?" >> "$OUT/hue_sweep.log"
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == calibrate_palette ]]; then  # rendered hue of each cdesk palette colour (no LLM)
+  "$SIM_PY" -X faulthandler scripts/calibrate_palette.py "$OUT/palette.json" ${SMA_SUITES:-cdesk@16000} > "$OUT/palette.log" 2>&1 || echo "calibration failed: $?" >> "$OUT/palette.log"
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == notebook_gate ]]; then  # nbdesk: scripted edge pinch + tip-down placing (no LLM)
+  export SMA_API_LEVEL=act
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    "$SIM_PY" -X faulthandler scripts/notebook_gate.py "$OUT/notebook_gate" "$i" >> "$OUT/notebook_gate.log" 2>&1 || echo "notebook gate task $i failed: $?" >> "$OUT/notebook_gate.log"
+  done
+  "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
+  [[ -n "${SMA_SUITES:-}" ]] && "$SIM_PY" -X faulthandler scripts/grouping_check.py "$OUT/grouping_check.json" ${SMA_SUITES//:/ } > "$OUT/grouping_check.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == notebook_probe ]]; then  # A5 notebook: pinch an edge that sticks out, drop it in a tray
+  for i in $(seq 0 6); do
+    "$SIM_PY" -X faulthandler scripts/notebook_probe.py "$OUT/notebook_probe" "$i" >> "$OUT/notebook_probe.log" 2>&1 || echo "notebook probe $i failed: $?" >> "$OUT/notebook_probe.log"
+  done
+  "$SIM_PY" scripts/notebook_probe.py "$OUT/notebook_probe" summarize >> "$OUT/notebook_probe.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == stand_gate ]]; then  # pen-holder gate: stand a pen upright (no LLM, CPU is enough)
+  for i in $(seq 0 5); do
+    "$SIM_PY" -X faulthandler scripts/stand_gate.py "$OUT/stand_gate" "$i" >> "$OUT/stand_gate.log" 2>&1 || echo "stand gate task $i failed: $?" >> "$OUT/stand_gate.log"
+  done
+  "$SIM_PY" scripts/stand_gate.py "$OUT/stand_gate" summarize >> "$OUT/stand_gate.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == cpu_pose_gate || "${SMA_MODE:-dev}" == cpu_pose_suite ]]; then
+  # The place_object gate without GraspNet (no GPU needed). cpu_pose_suite then runs the model suite on CPU, but
+  # only if place_object put the pen in its case in >= 4 of the 6 scripted geometry-grasp pen episodes.
+  for i in $(seq 0 8); do
+    "$SIM_PY" -X faulthandler scripts/pose_gate.py "$OUT/pose_gate" "$i" >> "$OUT/pose_gate.log" 2>&1 || echo "pose gate task $i failed: $?" >> "$OUT/pose_gate.log"
+  done
+  "$SIM_PY" scripts/pose_gate.py "$OUT/pose_gate" summarize >> "$OUT/pose_gate.log" 2>&1
+  passed=$(grep -E "^pen_[0-9]+ [a-z]+_pen geometry result placed" "$OUT/pose_gate.log" | grep -c "GT True" || true)
+  echo "pose gate: $passed of 6 geometry-grasp pen placements succeeded" >> "$OUT/pose_gate.log"
+  if [[ "${SMA_MODE}" == cpu_pose_gate || "$passed" -lt 4 ]]; then
+    echo "pose gate finished (suite skipped unless >= 4 pen placements succeeded)" >> "$OUT/pose_gate.log"; exit 0
+  fi
+  SMA_MODE=suite
+fi
 PIDS=()
 trap 'for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done' EXIT
 
 # ASPIRE backends: Contact-GraspNet, cuRobo and PyRoki services from the existing aspire_qwen provider environment,
 # started exactly as in aspire_qwen/hpc/run_aspire_qwen.pbs. The mid level uses Contact-GraspNet only.
-if [[ "${SMA_API_LEVEL:-task}" == aspire || "${SMA_API_LEVEL:-task}" == mid ]]; then
+if [[ "${SMA_API_LEVEL:-task}" == aspire || "${SMA_API_LEVEL:-task}" == mid || "${SMA_API_LEVEL:-task}" == act ]]; then
   AQ=$PROJECT/aspire_qwen
   export PYTHONPATH="$ROOT:$AQ/client_deps:$AQ/ASPIRE/src"
   export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 XDG_CACHE_HOME=$AQ/cache CAP_HARNESS_VENDOR_ROOT=$AQ/ASPIRE/third_party
@@ -46,20 +127,62 @@ print(' '.join(str(x.getsockname()[1]) for x in s))")
   export CAP_HARNESS_GRASPNET_URL=http://127.0.0.1:$GRASP_PORT CAP_HARNESS_CUROBO_URL=http://127.0.0.1:$CUROBO_PORT
   export CAP_HARNESS_PYROKI_URL=http://127.0.0.1:$IK_PORT
   PROVIDER_PY=$AQ/provider_env/bin/python
+  if [[ "${SMA_CPU_RENDER:-0}" == 1 ]]; then  # CPU-only job: no GraspNet or cuRobo (both need the GPU)
+    unset CAP_HARNESS_GRASPNET_URL CAP_HARNESS_CUROBO_URL
+    echo "CPU-only job: geometry grasp candidates only, no GraspNet or cuRobo" >> "$OUT/model_ready.txt"
+  else
   (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.graspnet.service --port "$GRASP_PORT") > "$OUT/grasp.log" 2>&1 &
   PIDS+=("$!")
-  if [[ "$SMA_API_LEVEL" == aspire ]]; then
+  # cuRobo also runs at the mid level when SMA_CUROBO=1 (physical feasibility checks; SMA_MOTION=curobo for transit).
+  USE_CUROBO=$([[ "$SMA_API_LEVEL" == aspire || "${SMA_CUROBO:-0}" == 1 ]] && echo 1 || echo 0)
+  if [[ "$USE_CUROBO" == 1 ]]; then
     (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" "$PROVIDER_PY" -m cap_harness.providers.curobo.service --port "$CUROBO_PORT") > "$OUT/curobo.log" 2>&1 &
     PIDS+=("$!")
+  else
+    unset CAP_HARNESS_CUROBO_URL  # the mid level falls back to the reach-range check
+  fi
+  if [[ "$SMA_API_LEVEL" == aspire ]]; then
     (cd "$AQ" && PYTHONPATH="$AQ/ASPIRE/src" JAX_PLATFORMS=cpu "$PROVIDER_PY" -m cap_harness.providers.pyroki.service --port "$IK_PORT") > "$OUT/pyroki.log" 2>&1 &
     PIDS+=("$!")
   fi
   for i in $(seq 1 150); do
-    if curl -sf "$CAP_HARNESS_GRASPNET_URL/healthz" >/dev/null && { [[ "$SMA_API_LEVEL" == mid ]] ||
-       { curl -sf "$CAP_HARNESS_CUROBO_URL/healthz" >/dev/null && curl -sf "$CAP_HARNESS_PYROKI_URL/healthz" >/dev/null; }; }; then break; fi
+    if curl -sf "$CAP_HARNESS_GRASPNET_URL/healthz" >/dev/null &&
+       { [[ "$USE_CUROBO" == 0 ]] || curl -sf "$CAP_HARNESS_CUROBO_URL/healthz" >/dev/null; } &&
+       { [[ "$SMA_API_LEVEL" != aspire ]] || curl -sf "$CAP_HARNESS_PYROKI_URL/healthz" >/dev/null; }; then break; fi
     sleep 2
   done
   echo "$SMA_API_LEVEL services ready after $((i*2))s" >> "$OUT/model_ready.txt"
+  fi
+  if [[ "${SMA_MODE:-dev}" == graspnet_probe ]]; then  # what Contact-GraspNet returns for the objects (no LLM)
+    "$SIM_PY" -X faulthandler scripts/graspnet_probe.py "$OUT/graspnet_probe.json" ${SMA_SUITES//:/ } > "$OUT/graspnet_probe.log" 2>&1 || echo "graspnet probe failed: $?" >> "$OUT/graspnet_probe.log"
+    exit 0
+  fi
+  if [[ "$SMA_API_LEVEL" == mid && "${SMA_MODE:-dev}" == curobo_gate ]]; then
+    # cuRobo feasibility vs scripted outcomes (part A) and cuRobo transit (part B), no LLM, one task per process.
+    for part in A B; do
+      for i in $(seq 0 $([[ $part == A ]] && echo 8 || echo 5)); do
+        "$SIM_PY" -X faulthandler scripts/curobo_gate.py "$OUT/curobo_gate" "$part" "$i" >> "$OUT/curobo_gate.log" 2>&1 || echo "curobo gate $part $i failed: $?" >> "$OUT/curobo_gate.log"
+      done
+    done
+    "$SIM_PY" scripts/curobo_gate.py "$OUT/curobo_gate" summarize >> "$OUT/curobo_gate.log" 2>&1
+    exit 0
+  fi
+  if [[ "$SMA_API_LEVEL" == mid && ( "${SMA_MODE:-dev}" == pose_gate || "${SMA_MODE:-dev}" == pose_suite ) ]]; then
+    # Contact-GraspNet frame fix + place_object (no LLM), one task per process, then the mid-level regression gate.
+    for i in $(seq 0 8); do
+      "$SIM_PY" -X faulthandler scripts/pose_gate.py "$OUT/pose_gate" "$i" >> "$OUT/pose_gate.log" 2>&1 || echo "pose gate task $i failed: $?" >> "$OUT/pose_gate.log"
+    done
+    "$SIM_PY" scripts/pose_gate.py "$OUT/pose_gate" summarize >> "$OUT/pose_gate.log" 2>&1
+    "$SIM_PY" -X faulthandler scripts/mid_gate.py "$OUT/mid_gate" > "$OUT/mid_gate.log" 2>&1 || echo "gate failed: $?" >> "$OUT/mid_gate.log"
+    # pose_suite: the model run starts only if place_object put the pen in its case in >= 4 of the 6 scripted
+    # pen episodes that use a geometry grasp.
+    passed=$(grep -E "^pen_[0-9]+ [a-z]+_pen geometry result placed" "$OUT/pose_gate.log" | grep -c "GT True" || true)
+    echo "pose gate: $passed of 6 geometry-grasp pen placements succeeded" >> "$OUT/pose_gate.log"
+    if [[ "${SMA_MODE}" == pose_gate || "$passed" -lt 4 ]]; then
+      echo "pose gate finished (suite skipped unless >= 4 pen placements succeeded)" >> "$OUT/pose_gate.log"; exit 0
+    fi
+    SMA_MODE=suite
+  fi
   if [[ "$SMA_API_LEVEL" == mid && ( "${SMA_MODE:-dev}" == pen_gate || "${SMA_MODE:-dev}" == pensuite ) ]]; then
     # Pen-case gate (no LLM) plus the earlier mid-level gate as a regression check of the shared primitives.
     "$SIM_PY" -X faulthandler scripts/pen_gate.py "$OUT/pen_gate" > "$OUT/pen_gate.log" 2>&1 || echo "pen gate failed: $?" >> "$OUT/pen_gate.log"
@@ -87,9 +210,11 @@ print(' '.join(str(x.getsockname()[1]) for x in s))")
   fi
 fi
 
-# Optional Grounded-SAM2 perception service (SMA_PERCEPTION=gsam), on the same GPU.
-if [[ "${SMA_PERCEPTION:-color}" == gsam ]]; then
-  export SMA_PERCEPTION
+# Optional segmentation service on the same GPU (SAM2 and Grounding DINO): for Grounded-SAM2 perception
+# (SMA_PERCEPTION=gsam), class-agnostic SAM2 perception (SMA_PERCEPTION=sam; sdesk tasks always use it), or SMA_SEG=1
+# (the service for sdesk tasks or Grounding DINO checks while other desks keep the colour perception).
+if [[ "${SMA_PERCEPTION:-color}" == gsam || "${SMA_PERCEPTION:-color}" == sam || "${SMA_SEG:-0}" == 1 ]]; then
+  export SMA_PERCEPTION=${SMA_PERCEPTION:-color}
   SHARED=/scratch/Projects/CFP-04/CFP04-CF-057
   export SMA_GDINO=$(ls -d $SHARED/hf_cache/models--IDEA-Research--grounding-dino-tiny/snapshots/*/ | head -1)
   export SMA_SAM2=$(ls -d $SHARED/hf_cache_cotrvs/hub/models--facebook--sam2-hiera-large/snapshots/*/ | head -1)
@@ -105,6 +230,33 @@ if [[ "${SMA_PERCEPTION:-color}" == gsam ]]; then
   echo "segmentation service ready after $((i*2))s" >> "$OUT/model_ready.txt"
 fi
 
+if [[ "${SMA_MODE:-dev}" == look_preview ]]; then  # pictures of the desks' appearance (no LLM)
+  "$SIM_PY" -X faulthandler scripts/look_preview.py "$OUT/look" ${SMA_SUITE_SIZE:-3} ${SMA_SUITES//:/ } > "$OUT/look.log" 2>&1 || echo "look preview failed: $?" >> "$OUT/look.log"
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == sam_gate ]]; then  # SAM2 perception on the shared-colour desk (no LLM): things against
+  # the layout, start checks, act-level reference programs with name tracking; then the scripted notebook
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    "$SIM_PY" -X faulthandler scripts/sam_gate.py "$OUT/sam_gate" "$i" >> "$OUT/sam_gate.log" 2>&1 || echo "sam gate task $i failed: $?" >> "$OUT/sam_gate.log"
+  done
+  "$SIM_PY" scripts/sam_gate.py "$OUT/sam_gate" summarize >> "$OUT/sam_gate.log" 2>&1
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    SMA_GATE_SUITE=${SMA_NOTEBOOK_SUITE:-sdesk@17000} "$SIM_PY" -X faulthandler scripts/notebook_gate.py "$OUT/notebook_gate" "$i" >> "$OUT/notebook_gate.log" 2>&1 || echo "notebook gate task $i failed: $?" >> "$OUT/notebook_gate.log"
+  done
+  "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == track_debug ]]; then  # name tracking through scripted gates (no LLM): every look's
+  # tracks, names and outlined top-down image, for the desks SMA_DESKS (indices joined by ":", default 0:1:2) and the
+  # gate scripts SMA_TRACK_GATE (joined by ":", run one after the other as in sam_gate; default notebook_gate.py)
+  gates=${SMA_TRACK_GATE:-notebook_gate.py}
+  for g in ${gates//:/ }; do
+    sub=track_debug; [[ "$gates" == *:* ]] && sub=track_debug_${g%.py}
+    SMA_GATE_SUITE=${SMA_NOTEBOOK_SUITE:-sdesk@17000} SMA_TRACK_GATE=$g "$SIM_PY" -X faulthandler scripts/track_debug.py \
+      "$OUT/$sub" $(echo ${SMA_DESKS:-0:1:2} | tr : " ") > "$OUT/$sub.log" 2>&1 || echo "track debug failed: $?" >> "$OUT/$sub.log"
+  done
+  exit 0
+fi
 if [[ "${SMA_MODE:-dev}" == perception ]]; then
   "$SIM_PY" scripts/perception_compare.py "$OUT/perception" > "$OUT/perception.log" 2>&1
   exit 0
@@ -125,6 +277,81 @@ if [[ "${SMA_MODE:-dev}" == dev || "${SMA_MODE:-dev}" == devsuite ]]; then
 fi
 
 PORT=$("$SIM_PY" -c "import socket;s=socket.socket();s.bind(('127.0.0.1',0));print(s.getsockname()[1])")
+if [[ "${SMA_LLM_PROVIDER:-vllm}" == gemini || "${SMA_LLM_PROVIDER:-vllm}" == deepseek ]]; then
+  # A hosted API instead of a local vLLM server: check that this compute node reaches the endpoint, then one tiny call.
+  export SMA_LLM_PROVIDER SMA_API_KEY_FILE
+  if [[ "$SMA_LLM_PROVIDER" == deepseek ]]; then
+    # The user's own DeepSeek account: a ledger and cap of its own; deepseek-flash at its peak-hour list prices.
+    export SMA_GLOBAL_LEDGER=${SMA_GLOBAL_LEDGER:-$PROJECT/skill_memory_agent/outputs/api_spend_deepseek.json}
+    export SMA_GLOBAL_CAP_USD=${SMA_DEEPSEEK_CAP_USD:-6}  # the user has 49 RMB (about US$6.8) of DeepSeek credit
+    export SMA_PRICE_IN=${SMA_PRICE_IN:-0.30} SMA_PRICE_OUT=${SMA_PRICE_OUT:-1.2} SMA_API_KEY_TIER=paid
+    GENERAL_NAME=${SMA_GENERAL_NAME:-deepseek-flash}
+    API_CHECK_URL=https://api.deepseek.com/models
+  else
+    # Project-wide billed spend across all runs (paid key only), capped below the user's budget.
+    export SMA_GLOBAL_LEDGER=${SMA_GLOBAL_LEDGER:-$PROJECT/skill_memory_agent/outputs/api_spend_total.json}
+    export SMA_GLOBAL_CAP_USD=${SMA_GLOBAL_CAP_USD:-11}  # the user raised the total budget to US$11 on 2026-11-05
+    GENERAL_NAME=${SMA_GENERAL_NAME:-gemini-3.8-flash}
+    API_CHECK_URL=https://generativelanguage.googleapis.com/v1beta/models
+  fi
+  if [[ "${SMA_MODE:-dev}" == gemini_tier ]]; then  # which tier is this key on (no probe call first)
+    "$SIM_PY" scripts/gemini_tier_check.py "$OUT/tier" > "$OUT/tier.log" 2>&1 || echo "tier check failed: $?" >> "$OUT/tier.log"
+    exit 0
+  fi
+  for attempt in 1 2 3; do  # the route out is sometimes down for a moment (the same node reached the API before)
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$API_CHECK_URL" || true)
+    [[ "$code" != 000 ]] && break
+    sleep 15
+  done
+  echo "compute node $(hostname) -> $API_CHECK_URL: HTTP $code" >> "$OUT/model_ready.txt"
+  if [[ "$code" == 000 ]]; then echo "no network route to the $SMA_LLM_PROVIDER API from this node" >> "$OUT/model_ready.txt"; exit 1; fi
+  SMA_SPEND_LEDGER="$OUT/probe_spend.json" "$SIM_PY" -c "
+from sma.agent.llm import LLM
+llm = LLM('', model='$GENERAL_NAME')
+print('reply:', llm.chat([{'role': 'user', 'content': 'Reply with the single word OK.'}], purpose='probe', max_tokens=20))
+print('usage:', llm.usage())" >> "$OUT/model_ready.txt" 2>&1 || { echo "Gemini probe call failed" >> "$OUT/model_ready.txt"; exit 1; }
+  [[ "${SMA_MODE:-dev}" == gemini_probe ]] && exit 0
+  if [[ "${SMA_MODE:-dev}" == memory_plan ]]; then  # long-term memory of observed habits, planning only
+    SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler scripts/memory_plan.py \
+      "$OUT/memory_plan" ${SMA_SUITES:-groupseq@15100} > "$OUT/memory_plan.log" 2>&1 || echo "memory plan failed: $?" >> "$OUT/memory_plan.log"
+    exit 0
+  fi
+  if [[ "${SMA_MODE:-dev}" == vision_ab ]]; then  # vision: the SAM2 gate and the scripted notebook (unless
+    # SMA_SKIP_GATE=1), Grounding DINO as a recogniser (no LLM), then the model's identification of every desk of each
+    # suite in SMA_SUITES with plain tags and with outlined marks plus close-ups (SMA_MARKS)
+    if [[ "${SMA_SKIP_GATE:-0}" != 1 ]]; then
+      for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+        "$SIM_PY" -X faulthandler scripts/sam_gate.py "$OUT/sam_gate" "$i" >> "$OUT/sam_gate.log" 2>&1 || echo "sam gate task $i failed: $?" >> "$OUT/sam_gate.log"
+        SMA_GATE_SUITE=${SMA_NOTEBOOK_SUITE:-sdesk@17000} "$SIM_PY" -X faulthandler scripts/notebook_gate.py "$OUT/notebook_gate" "$i" >> "$OUT/notebook_gate.log" 2>&1 || echo "notebook gate task $i failed: $?" >> "$OUT/notebook_gate.log"
+      done
+      "$SIM_PY" scripts/sam_gate.py "$OUT/sam_gate" summarize >> "$OUT/sam_gate.log" 2>&1
+      "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
+    fi
+    [[ "${SMA_SKIP_DINO:-0}" == 1 ]] || "$SIM_PY" -X faulthandler scripts/dino_check.py "$OUT/dino" $(echo ${SMA_DINO_SUITES:-$SMA_SUITES} | tr : ' ') > "$OUT/dino.log" 2>&1 || echo "dino check failed: $?" >> "$OUT/dino.log"
+    for marks in tags som; do
+      for s in ${SMA_SUITES//:/ }; do
+        SMA_MARKS=$marks SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler \
+          scripts/identify_trial.py "$OUT/identify_${marks}_${s%%@*}" "$s" > "$OUT/identify_${marks}_${s%%@*}.log" 2>&1 \
+          || echo "identify trial failed: $?" >> "$OUT/identify_${marks}_${s%%@*}.log"
+      done
+    done
+    exit 0
+  fi
+  if [[ "${SMA_MODE:-dev}" == identify_trial ]]; then  # colour-coded desk: what the model says each thing is
+    SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler scripts/identify_trial.py \
+      "$OUT/identify" ${SMA_SUITES//:/ } > "$OUT/identify.log" 2>&1 || echo "identify trial failed: $?" >> "$OUT/identify.log"
+    exit 0
+  fi
+  if [[ "${SMA_MODE:-dev}" == grouping_plan ]]; then  # destinations under a vague request, with/without scene grouping
+    SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler scripts/grouping_plan.py \
+      "$OUT/grouping_plan" ${SMA_SUITES//:/ } > "$OUT/grouping_plan.log" 2>&1 || echo "grouping plan failed: $?" >> "$OUT/grouping_plan.log"
+    exit 0
+  fi
+  if [[ "${SMA_MODE:-dev}" == vlm_trial ]]; then  # image-reading trial of free-tier Gemini models (no simulation)
+    "$SIM_PY" scripts/vlm_free_trial.py "$OUT/vlm_trial" > "$OUT/vlm_trial.log" 2>&1 || echo "vlm trial failed: $?" >> "$OUT/vlm_trial.log"
+    exit 0
+  fi
+else
 VLLM_EXTRA=${SMA_VLLM_EXTRA:-}  # optional extra vLLM flags, "@" for spaces
 MODEL=${SMA_GENERAL_MODEL:-$(cat "$PROJECT/qwen35_checkpoint_path.txt")}
 GENERAL_NAME=${SMA_GENERAL_NAME:-Qwen/Qwen3.5-9B}
@@ -139,6 +366,7 @@ for i in $(seq 1 240); do
   kill -0 "${PIDS[0]}"; sleep 2
 done
 echo "model ready after $((i*2))s" >> "$OUT/model_ready.txt"
+fi
 
 # Optional second model for code generation (SMA_CODER = path to a HF snapshot directory).
 CODER_ARGS=()
@@ -176,16 +404,21 @@ else
   SUITES=${SMA_SUITES:-train+heldout}
   # A crashed simulator process (e.g. a native abort) is restarted with --resume: finished tasks and the memories on
   # disk are kept and the unfinished task is rerun. -X faulthandler prints the Python stack of a native crash.
+  SMA_SETS=${SMA_SETS:-_}  # SMA_SETS: several independent task sets in one job, each with fresh memories ("+"-separated suite names);
+  # results go to $OUT/<set>/<condition>.
+  for set in ${SMA_SETS//:/ }; do
+  SET_OUT=$OUT; [[ "$set" != _ ]] && SUITES=$set && SET_OUT=$OUT/${set//@/_} && mkdir -p "$SET_OUT"
   for condition in ${SMA_CONDITIONS//:/ }; do
     RESUME=(); [[ -n "${SMA_RESUME:-}" ]] && RESUME=(--resume)
     for try in 1 2 3 4; do
       rc=0
       "$SIM_PY" -X faulthandler -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
-        --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$OUT/$condition" \
-        "${RESUME[@]}" >> "$OUT/$condition.log" 2>&1 || rc=$?
+        --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$SET_OUT/$condition" \
+        "${RESUME[@]}" >> "$SET_OUT/$condition.log" 2>&1 || rc=$?
       [[ $rc == 0 ]] && break
-      echo "$(date +%T) run_suite $condition exited with code $rc (try $try); restarting with --resume" | tee -a "$OUT/$condition.log" >> "$OUT/crashes.log"
+      echo "$(date +%T) run_suite $condition exited with code $rc (try $try); restarting with --resume" | tee -a "$SET_OUT/$condition.log" >> "$OUT/crashes.log"
       RESUME=(--resume)
     done
+  done
   done
 fi

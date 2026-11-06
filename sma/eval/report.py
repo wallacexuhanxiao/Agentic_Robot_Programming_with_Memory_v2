@@ -57,7 +57,7 @@ def main(run_dir):
         for s in json.loads(mem.read_text())["skills"]:
             kinds = {}
             for h in s["history"]:
-                kinds.setdefault(h["features"]["kind"], [0, 0])[0 if h["outcome"] else 1] += 1
+                kinds.setdefault((h.get("features") or {}).get("kind", "?"), [0, 0])[0 if h["outcome"] else 1] += 1
             lines.append(f"- {s['function']} ({s['status']}), from {s['origin']['task']}: " +
                          ", ".join(f"{k} {w} ok/{l} fail" for k, (w, l) in kinds.items()))
     text = "\n".join(lines) + "\n"

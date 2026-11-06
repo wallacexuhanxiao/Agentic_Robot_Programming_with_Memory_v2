@@ -11,7 +11,7 @@ import types
 from ..env.robot_env import RobotError
 
 FORBIDDEN_NODES = (ast.Import, ast.ImportFrom, ast.Try, ast.With, ast.AsyncFunctionDef, ast.Await,
-                   ast.Global, ast.Nonlocal, ast.ClassDef, ast.Lambda)
+                   ast.Global, ast.Nonlocal, ast.ClassDef)  # lambdas allowed since 2026-11-04 (harmless here)
 FORBIDDEN_NAMES = {"eval", "exec", "compile", "open", "globals", "locals", "vars", "getattr",
                    "setattr", "delattr", "__import__", "input", "breakpoint", "help", "dir"}
 def _import_math_only(name, globals=None, locals=None, fromlist=(), level=0):
@@ -34,8 +34,13 @@ import os
 API_LEVEL = os.environ.get("SMA_API_LEVEL", "task")
 API_NAMES = {"pose": ("observe", "move_to", "open_gripper", "close_gripper", "go_home", "wait"),
              "task": ("observe", "pick", "place", "release", "go_home", "wait"),
-             "mid": ("observe", "grasp_candidates", "grasp", "free_spots", "carry_to", "rotate_by",
+             "mid": ("observe", "grasp_candidates", "grasp", "free_spots", "place_object", "carry_to", "rotate_by",
                      "lower_until_contact", "open_gripper", "close_gripper", "retreat", "check", "go_home", "wait"),
+             # act: the mid-level primitives without the object-pose placement helpers, plus free gripper
+             # orientation, straight relative moves and reachability queries (the model composes manipulations).
+             "act": ("observe", "grasp_candidates", "grasp", "free_spots", "carry_to", "rotate_by",
+                     "lower_until_contact", "open_gripper", "close_gripper", "retreat", "check", "go_home", "wait",
+                     "gripper_pose", "move_gripper", "move_by", "solve_ik"),
              "aspire": ()}[API_LEVEL]  # the ASPIRE level takes its functions from env.aspire_api()
 UNTRACED = ("Pose", "MotionStrategy")
 
@@ -66,7 +71,7 @@ def check_source(source):
             continue
         if isinstance(node, FORBIDDEN_NODES):
             raise ProgramRejected(f"forbidden_statement: {type(node).__name__} at line "
-                                  f"{getattr(node, 'lineno', '?')} (no imports, try/except, classes, lambdas)")
+                                  f"{getattr(node, 'lineno', '?')} (no imports, try/except, classes)")
         if isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
             raise ProgramRejected(f"forbidden_name: {node.id}")
         if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
@@ -80,22 +85,23 @@ def _short(value, limit=600):
 
 
 def _source_location():
-    """(filename, line) of the innermost frame executing generated code ('<program>' or '<skill ...>')."""
+    """(filename, line) of the innermost frame executing generated code ('<program>', '<skill ...>', '<helper ...>')."""
     import sys
     frame = sys._getframe(2)
     while frame is not None:
         name = frame.f_code.co_filename
-        if name == "<program>" or name.startswith("<skill"):
+        if name == "<program>" or name.startswith(("<skill", "<helper")):
             return name, frame.f_lineno
         frame = frame.f_back
     return None, None
 
 
 class Sandbox:
-    def __init__(self, env, skills=None, on_call=None, on_result=None):
+    def __init__(self, env, skills=None, on_call=None, on_result=None, helpers=None):
         self.env = env
         self.trace = []
         self.skills = skills or {}
+        self.helpers = helpers or {}  # helper (sub-skill) name -> source; callable by name from programs and skills
         self.on_call = on_call  # optional observer (used to annotate videos with the executing line)
         self.on_result = on_result  # optional observer of (entry, raw result) after a call returns
 
@@ -126,6 +132,19 @@ class Sandbox:
                    for name, fn in self.env.aspire_api().items()}
         else:
             api = {name: self._traced(name, getattr(self.env, name)) for name in API_NAMES}
+        # Helpers (sub-skills from memory) share one namespace so they can call each other; every call is traced as
+        # "helpers.<name>" so that their use and outcome can be recorded.
+        helper_fns = {}
+        if self.helpers:
+            helper_ns = {"__builtins__": SAFE_BUILTINS, "math": math, **api}
+            for name, code in self.helpers.items():
+                exec(compile(check_source(code), f"<helper {name}>", "exec"), helper_ns)
+            for name in self.helpers:
+                if not callable(helper_ns.get(name)):
+                    raise ProgramRejected(f"helper {name} does not define its function")
+                helper_fns[name] = self._traced("helpers." + name, helper_ns[name])
+            helper_ns.update(helper_fns)
+        api = {**api, **helper_fns}
         ns = {"__builtins__": SAFE_BUILTINS, "math": math, **api}
         skill_fns = {}
         for skill_name, code in self.skills.items():
@@ -156,7 +175,7 @@ class Sandbox:
             line = None
             tb = exc.__traceback__
             while tb is not None:
-                if tb.tb_frame.f_code.co_filename in ("<program>",) or tb.tb_frame.f_code.co_filename.startswith("<skill"):
+                if tb.tb_frame.f_code.co_filename in ("<program>",) or tb.tb_frame.f_code.co_filename.startswith(("<skill", "<helper")):
                     line = (tb.tb_frame.f_code.co_filename, tb.tb_lineno)
                 tb = tb.tb_next
             return False, {"type": "program_error", "exception": type(exc).__name__,

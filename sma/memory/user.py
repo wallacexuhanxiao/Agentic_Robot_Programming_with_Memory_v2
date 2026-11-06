@@ -28,11 +28,22 @@ def resolve_place(text, scene):
     if t in scene["zones"]:
         return t
     matches = [z for z in scene["zones"] if z.split("_")[0] in t]
-    return matches[0] if len(matches) == 1 else t
+    if len(matches) == 1:
+        return matches[0]
+    # colour-coded desk: a place named by what it was identified as ("pen_holder"), if exactly one place is that
+    words = t.replace("_", " ")
+    by_category = [n for n, z in scene["zones"].items() if z.get("category") and z["category"] in words]
+    return by_category[0] if len(by_category) == 1 else t
 
 
 KIND_WORDS = {"block": ("block", "blocks", "cube", "cubes"), "mug": ("mug", "mugs", "cup", "cups"),
-              "book": ("book", "books", "notebook", "notebooks"), "pen": ("pen", "pens")}
+              "paper": ("paper", "paper ball", "paper balls"),
+              "book": ("book", "books", "notebook", "notebooks"), "pen": ("pen", "pens"),
+              "notebook": ("notebook", "notebooks")}
+PLACE_WORDS = {"book_pile": ("pile", "stack")}  # places without a colour: the words that name them
+CATEGORY_PLACE_WORDS = {"wastebasket": ("wastebasket", "basket", "bin"), "pen holder": ("holder", "pen holder"),
+                        "coaster": ("coaster",), "pile of books": ("pile", "stack"), "tray": ("tray",), "box": ("box",),
+                        "pen case": ("case", "pen case")}
 KINDS = set(KIND_WORDS)
 LASTING = ("always", "from now on", "usually", "prefer", "every time", "in future", "in the future", "whenever")
 
@@ -52,14 +63,24 @@ def supported(message, subject, zone, scene):
     if zone not in scene["zones"]:
         return False
     words = KIND_WORDS.get(subject, (subject.replace("_", " "), subject.split("_")[-1]))
+    if scene["zones"][zone].get("category"):  # colour-coded desk: places are named by what the model saw them as
+        own = CATEGORY_PLACE_WORDS.get(scene["zones"][zone]["category"], (scene["zones"][zone]["category"],))
+        every = {w for z in scene["zones"].values() for w in CATEGORY_PLACE_WORDS.get(z.get("category"), ())} | set(own)
+        for w in words:
+            for hit in _re.finditer(rf"\b{_re.escape(w)}", m):
+                later = _re.search(r"\b(" + "|".join(sorted(map(_re.escape, every))) + r")\b", m[hit.end():hit.end() + 60])
+                if later and later.group(1) in own:
+                    return True
+        return False
     color = zone.split("_")[0]
-    colors = {z.split("_")[0] for z in scene["zones"]} | {"orange", "cyan", "purple"}
+    colors = {z.split("_")[0] for z in scene["zones"]} | {"orange", "cyan", "purple"} | \
+        {w for ws in PLACE_WORDS.values() for w in ws}
     # The first colour word after the object word must be this place's colour ("my mugs on the cyan
     # tray"), so a mug is never paired with a colour the message attaches to a different object.
     for w in words:
         for hit in _re.finditer(rf"\b{_re.escape(w)}\b", m):
             later = _re.search(r"\b(" + "|".join(sorted(colors)) + r")\b", m[hit.end():hit.end() + 60])
-            if later and later.group(1) == color:
+            if later and (later.group(1) == color or later.group(1) in PLACE_WORDS.get(zone, ())):
                 return True
     return False
 
@@ -77,11 +98,44 @@ class UserMemory:
         self.rules = data.get("rules", {})      # subject -> placement rule
         self.handling = data.get("handling", {})  # subject -> how-to request
         self.events = data.get("events", [])
+        # Observed habits (from the scene grouping): category -> place -> {"count", "tasks"}; a place is kept as what it
+        # is (the model's category on a colour-coded desk, where colours change from desk to desk; else its name).
+        self.habits = data.get("habits", {})
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps({"user_id": self.user_id, "rules": self.rules, "handling": self.handling,
-                                         "events": self.events}, indent=1, ensure_ascii=False))
+                                         "events": self.events, "habits": self.habits}, indent=1, ensure_ascii=False))
+
+    @staticmethod
+    def _place_label(zone_name, scene):
+        """How a place is remembered: what it is on a colour-coded desk (its name, a colour, changes per desk)."""
+        return (scene["zones"].get(zone_name) or {}).get("category") or zone_name
+
+    @staticmethod
+    def _zone_for(label, scene):
+        """The zone on this desk that a remembered place stands for: by name, or the one place of that category."""
+        if label in scene["zones"]:
+            return label
+        same = [n for n, z in scene["zones"].items() if z.get("category") == label]
+        return same[0] if len(same) == 1 else None
+
+    def observe_habits(self, grouping, scene, task_id):
+        """Write what this desk shows about where things are kept into long-term memory: each category seen in a place
+        (a thing already there, or the group a place stands for, e.g. the books of a pile) is one observation, at most
+        once per desk. Returns the observations added."""
+        added = []
+        for m in (grouping or {}).get("members", []):
+            if m["place"] is None or not m["category"]:
+                continue
+            place = self._place_label(m["place"], scene)
+            entry = self.habits.setdefault(m["category"], {}).setdefault(place, {"count": 0, "tasks": []})
+            if task_id not in entry["tasks"]:
+                entry["count"] += 1
+                entry["tasks"].append(task_id)
+                added.append({"category": m["category"], "place": place})
+        self.save()
+        return added
 
     def learn(self, llm, message, scene, task_id):
         raw = llm.chat([{"role": "user", "content": LEARN.format(
@@ -107,8 +161,9 @@ class UserMemory:
             (accepted if ok else rejected).append({"subject": subject, "zone": zone,
                                                    "scope": u.get("scope"), "evidence": evidence})
         for u in accepted:
-            if u["scope"] == "long_term":
-                self.rules[u["subject"]] = {"zone": u["zone"], "evidence": u["evidence"], "source_task": task_id}
+            if u["scope"] == "long_term":  # the place as what it is, so the rule carries over to another desk
+                self.rules[u["subject"]] = {"zone": self._place_label(u["zone"], scene), "evidence": u["evidence"],
+                                            "source_task": task_id}
         # Handling requests: kept only if the quote is the user's own words and names the object kind.
         handled = []
         for h in handling:
@@ -142,12 +197,32 @@ class UserMemory:
         return out
 
     def retrieve(self, scene):
-        """Rules that apply to an object currently in view (specific rules override kind rules)."""
+        """Long-term memory for the objects in view: first a preference the user stated (a specific object's rule over
+        its kind's), else an observed habit: where things of this or a similar category (clustered as in the scene
+        grouping) were kept on earlier desks, the place with the most similarity-weighted observations."""
+        from ..agent.grouping import THRESHOLD, similarity
         out = []
         for name, obj in scene["objects"].items():
             rule = self.rules.get(name) or self.rules.get(obj["kind"])
-            if rule:
-                out.append({"object": name, "zone": rule["zone"],
+            zone = self._zone_for(rule["zone"], scene) if rule else None
+            if zone:
+                out.append({"object": name, "zone": zone, "origin": "stated by the user",
                             "rule_subject": name if name in self.rules else obj["kind"],
                             "evidence": rule["evidence"], "source_task": rule["source_task"]})
+                continue
+            votes, seen = {}, {}
+            for category, places in self.habits.items():
+                weight = similarity(obj["kind"], category) if obj.get("kind") else 0
+                if weight < THRESHOLD:
+                    continue
+                for place, e in places.items():
+                    votes[place] = votes.get(place, 0.0) + weight * e["count"]
+                    seen.setdefault(place, []).append(f"{category} x{e['count']}")
+            for place, _ in sorted(votes.items(), key=lambda kv: -kv[1]):
+                zone = self._zone_for(place, scene)
+                if zone:
+                    out.append({"object": name, "zone": zone, "origin": "observed habit",
+                                "evidence": f"on earlier desks things like it were kept in {place} "
+                                            f"({', '.join(seen[place])})"})
+                    break
         return out

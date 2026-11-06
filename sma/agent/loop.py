@@ -1,6 +1,7 @@
 """Online agent loop: plan -> per-subgoal code -> execute -> perception check -> repair; memory hooks."""
 import json
 import math
+import os
 import re
 import time
 from pathlib import Path
@@ -8,7 +9,8 @@ from pathlib import Path
 import numpy as np
 
 from ..env.robot_env import RobotError, TabletopEnv
-from ..env.tasks import make_task
+from ..env.naming import kind_of, zone_style
+from ..env.tasks import REALDESK_ZONE, make_cdesk_task, make_realdesk_task, make_single_task, make_task
 from ..memory.store import literal_coordinates, scene_features, zone_occupants
 from . import prompts
 from .refine import refine
@@ -32,6 +34,29 @@ def parse_plan(text, scene):
     steps = json.loads(match.group(0))["steps"] if match else []
     valid = [s for s in steps if s.get("object") in scene["objects"] and s.get("zone") in scene["zones"]]
     return valid, steps
+
+
+def occupancy(scene):
+    """What the camera sees in each zone (objects whose centre lies inside it)."""
+    return {z: zone_occupants(scene, z) for z in scene["zones"]}
+
+
+def replan(llm, spec, remaining, scene, done, last, failures):
+    """Plan the remaining goals from the current scene. Steps for goals the planner leaves out are appended."""
+    text = llm.chat([{"role": "user", "content": prompts.REPLANNER.format(
+        instruction=spec["refined_instruction"], done=json.dumps(done),
+        remaining=json.dumps([{"object": o, "zone": z} for o, z in remaining]), last=last,
+        failures=json.dumps(failures) if failures else "none", occupants=json.dumps(occupancy(scene)),
+        scene=prompts.scene_text(scene))}], purpose="replan")
+    plan, raw = parse_plan(text, scene)
+    wanted = dict(remaining)
+    steps, seen = [], set()
+    for st in plan:
+        if st["object"] in wanted and st["object"] not in seen:
+            steps.append({"object": st["object"], "zone": wanted[st["object"]]})
+            seen.add(st["object"])
+    steps += [{"object": o, "zone": z} for o, z in remaining if o not in seen]
+    return steps, raw
 
 
 def feedback_text(error, trace, check):
@@ -241,17 +266,28 @@ def used_skills(trace):
     return sorted({t["call"][len("skills."):] for t in trace if t["call"].startswith("skills.")})
 
 
+def used_helpers(trace):
+    return sorted({t["call"][len("helpers."):] for t in trace if t["call"].startswith("helpers.")})
+
+
 def run_subgoal(env, llm, task, obj, zone, memory, log):
     attempts_text, attempts = "", []
     for n in range(1, MAX_ATTEMPTS + 1):
         scene = env.observe()
         skills_text, retrieved, lesson_ids = "", [], []
+        feasibility = None
         if memory is not None:
-            retrieved = memory.retrieve(scene, obj, zone)
+            if memory.skills and hasattr(env, "physical_feasibility"):  # cuRobo, when its service is running
+                feasibility = env.physical_feasibility(obj, zone)
+                scene = env.observe()
+            retrieved = memory.retrieve(scene, obj, zone, feasibility=feasibility, task_id=task.task_id)
             if retrieved:
                 skills_text = prompts.SKILLS_HEADER + memory.describe(retrieved)
             skills_text += memory.grasp_experience_text()
             kind_now = scene["objects"].get(obj, {}).get("kind")
+            helpers = memory.helpers_for(kind_of(obj, scene))
+            if helpers:
+                skills_text += prompts.HELPERS_HEADER + memory.describe_helpers(helpers)
             lessons, lesson_ids = memory.lessons_for(kind_now) if kind_now else ("", [])
             if lessons:
                 skills_text += prompts.LESSONS_HEADER + lessons
@@ -262,11 +298,12 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             lesson_ids = []  # no prompt was written, so no lesson was shown
         else:
             shown = env.observe_base() if hasattr(env, "observe_base") else scene  # ASPIRE level: base frame
-            prompt = prompts.CODER.format(api=prompts.API_DOC, instruction=getattr(task, "spec_text", task.instruction),
+            prompt = prompts.CODER.format(api=prompts.api_doc(getattr(env, "neutral", False), getattr(env, "perception", "color")), instruction=getattr(task, "spec_text", task.instruction),
                                           object=obj, zone=zone, scene=prompts.scene_text(shown), skills=skills_text,
                                           attempts=attempts_text)
             code = strip_code(llm.chat([{"role": "user", "content": prompt}], purpose="code"))
-        sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved})
+        sandbox = Sandbox(env, skills={s["function"]: s["code"] for s, _ in retrieved},
+                          helpers=memory.helper_code() if memory is not None else None)
         env.steps, env.step_budget = 0, ATTEMPT_STEPS
         started = time.time()
         if not direct and llm.last_truncated():
@@ -276,9 +313,11 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
         env.step_budget = env.steps + 800  # the verifier's own go_home is not charged to the program
         check = env.check_on_zone(obj, zone)
         attempt = {"n": n, "code": code, "program_ok": ok, "error": error, "check": check,
-                   "used_skills": used_skills(sandbox.trace), "control_steps": env.steps,
+                   "used_skills": used_skills(sandbox.trace), "used_helpers": used_helpers(sandbox.trace),
+                   "control_steps": env.steps,
                    "seconds": round(time.time() - started, 1), "trace": sandbox.trace,
                    "retrieved": [{"function": s["function"], "verdict": v} for s, v in retrieved],
+                   "curobo_feasibility": feasibility,
                    "features": scene_features(scene, obj, zone), "direct_reuse": bool(direct),
                    "picks": pick_records(sandbox.trace, scene, obj)}
         attempts.append(attempt)
@@ -286,7 +325,7 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
             memory.log_grasps(attempt["picks"], task.task_id)
             memory.record_lesson_outcome(lesson_ids, check.get("satisfied", False))
             attempt["lessons_shown"] = lesson_ids
-        log(f"    attempt {n}{' (direct skill reuse)' if direct else ''}: program_ok={ok} check={check.get('satisfied')} skills={attempt['used_skills']} "
+        log(f"    attempt {n}{' (direct skill reuse)' if direct else ''}: program_ok={ok} check={check.get('satisfied')} skills={attempt['used_skills']} helpers={attempt['used_helpers']} "
             f"error={error and (error.get('reason') or error.get('message'))}")
         if check.get("satisfied"):
             return True, attempts
@@ -303,10 +342,17 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
 
 
 def extract_skill(llm, memory, task, obj, zone, attempt, scene, log):
+    """Turn a verified program into a subgoal skill composed of helper functions (sub-skills). Helpers are stored
+    on their own (a changed helper with an existing name gets a version suffix) and can be called by name from any
+    later program or skill."""
+    import ast
+    from .sandbox import API_NAMES, SAFE_BUILTINS
     function = memory.next_function_name()
+    kind = kind_of(obj, scene)  # the goal's kind (the camera may misjudge a moved object)
+    known = memory.helpers_for(kind)
     text = llm.chat([{"role": "user", "content": prompts.EXTRACT.format(
-        object=obj, kind=scene["objects"][obj]["kind"], zone=zone, code=attempt["code"], function=function)}],
-        purpose="extract")
+        object=obj, kind=kind, zone=zone, code=attempt["code"], function=function,
+        helpers=memory.describe_helpers(known) if known else "  (none yet)\n")}], purpose="extract")
     code = strip_code(text)
     conditions = {"goal": {"subgoal": "place_on_zone"},
                   "state": {"requires_zone_free": True, "requires_gripper_empty": True}}
@@ -321,46 +367,89 @@ def extract_skill(llm, memory, task, obj, zone, attempt, scene, log):
             pass
     try:
         tree = check_source(code)
-    except ProgramRejected as exc:
-        # The model sometimes puts the conditions JSON inside the code block; keep the function only.
-        match = re.search(rf"def {function}\(.*?(?=\n\S|\Z)", code, re.S)
-        if not match:
-            log(f"    extraction rejected: {exc}")
-            return None
-        code = match.group(0)
+    except ProgramRejected:  # the model sometimes puts the conditions JSON inside the code block
+        code = "\n".join(l for l in code.splitlines() if not l.strip().startswith("{"))
         try:
             tree = check_source(code)
-        except ProgramRejected as exc2:
-            log(f"    extraction rejected: {exc2}")
+        except ProgramRejected as exc:
+            log(f"    extraction rejected: {exc}")
             return None
-    fn_node = next((n for n in tree.body if isinstance(n, __import__("ast").FunctionDef) and n.name == function), None)
-    if fn_node is None:
+    defs = [n for n in tree.body if isinstance(n, ast.FunctionDef)]
+    main = next((n for n in defs if n.name == function), None)
+    if main is None:
         log("    extraction rejected: function not defined")
         return None
-    code = __import__("ast").get_source_segment(code, fn_node)  # drop any module-level extras
-    literals = literal_coordinates(code, scene)
+    sources = {n.name: ast.get_source_segment(code, n) for n in defs}
+    literals = literal_coordinates("\n\n".join(sources.values()), scene)
     if literals:
         log(f"    extraction rejected: scene coordinates hard-coded {literals}")
         return None
+    reserved = set(API_NAMES) | set(SAFE_BUILTINS) | {"skills", "math", function}
+    final = {}
+    for n in defs:
+        if n.name == function:
+            continue
+        name = n.name if n.name not in reserved else n.name + "_helper"
+        existing = memory.helper(name)
+        if existing is not None and existing["code"].strip() != sources[n.name].strip():
+            i = 2
+            while memory.helper(f"{name}_v{i}"):
+                i += 1
+            name = f"{name}_v{i}"
+        final[n.name] = name
+
+    def renamed(src):
+        for old, new in final.items():
+            if old != new:
+                src = re.sub(rf"\b{re.escape(old)}\b", new, src)
+        return src
+
     origin = {"task": task.task_id, "object": obj, "zone": zone, "attempt": attempt["n"],
-              "source_code": attempt["code"]}
-    memory.add(function, code, conditions, origin)
+              "source_code": attempt["code"], "skill": function}
+    helpers = []
+    for n in defs:
+        if n.name in final:
+            name = memory.add_helper(final[n.name], renamed(sources[n.name]), ast.get_docstring(n) or "", [kind], origin)
+            memory.record_helper(name, task_id=task.task_id, source="origin", outcome=True)
+            helpers.append(name)
+    memory.add(function, renamed(sources[function]), conditions, origin)
+    memory.get(function)["helpers"] = helpers
     memory.record(function, task_id=task.task_id, source="origin", feats=attempt["features"], outcome=True)
-    log(f"    new skill {function} (proposed kinds {conditions.get('proposed_object_kinds')})")
+    log(f"    new skill {function} composed of helpers {helpers} (proposed kinds {conditions.get('proposed_object_kinds')})")
     return function
 
 
-def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
-    """Controlled scene variations: run the stored skill unchanged on new layouts (no LLM)."""
+def validate_skill(memory, function, kind, seeds, out_dir, log, video=False, style=None, family=None):
+    """Controlled scene variations: run the stored skill unchanged on new layouts (no LLM), with the same kind of
+    object and receptacle it was learned on, in the same kind of scene: a skill learned on the realistic desk is
+    validated on new realistic desks where only its object is out of place."""
     results = []
     for seed in seeds:
-        # A pen only fits its case; other kinds are validated on single-object placements.
-        task = make_task("pen", seed) if kind == "pen" else make_task("place", seed, kinds=[kind])
-        obj, zone = next(iter(task.goal.items()))
+        # A pen goes into its case or stands in its holder; other kinds are validated on single-object placements.
+        if family == "cdesk" and kind in REALDESK_ZONE:
+            task = make_cdesk_task(seed, only=kind)
+        elif family in ("realdesk", "nbdesk") and kind in REALDESK_ZONE:
+            task = make_realdesk_task(seed, only=kind, notebook=family == "nbdesk")
+        elif kind == "pen":
+            task = make_task("pen_holder" if style == "holder" else "pen", seed)
+        elif style in ("coaster", "bin", "tray") or kind == "paper":  # same receptacle style as where it was learned
+            task = make_single_task(kind, style or "bin", seed)
+        else:
+            task = make_task("place", seed, kinds=[kind])
+        obj = task.meta["out_of_place"][0] if task.meta else next(iter(task.goal))
+        zone = task.goal[obj]
         env = make_env(task, video=video)
         try:
             scene = env.reset()
-            sandbox = Sandbox(env, skills={function: memory.get(function)["code"]})
+            if getattr(env, "neutral", False):  # no LLM here: the things are taken as what they are (validation of the
+                # skill, not of recognition), under the names the camera reports
+                from .identify import private_truth, role_of
+                truth, seen_as = private_truth(env, task, scene)
+                env.set_identity({c: {"category": cat, "role": role_of(cat)}
+                                  for c, cat in truth.items()})
+                obj, zone = seen_as[obj], seen_as[zone]
+                scene = env.observe()
+            sandbox = Sandbox(env, skills={function: memory.get(function)["code"]}, helpers=memory.helper_code())
             env.steps, env.step_budget = 0, ATTEMPT_STEPS
             ok, error = sandbox.run(f'skills.{function}("{obj}", "{zone}")')
             env.step_budget = env.steps + 800
@@ -371,6 +460,9 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False):
         failure = None if check.get("satisfied") else (error and (error.get("reason") or error.get("message"))) or "check_failed"
         memory.record(function, task_id=task.task_id, source="validation", feats=scene_features(scene, obj, zone),
                       outcome=check.get("satisfied", False), failure=failure)
+        for name in used_helpers(sandbox.trace):
+            memory.record_helper(name, task_id=task.task_id, source="validation", outcome=check.get("satisfied", False),
+                                 failure=failure)
         results.append({"seed": seed, "kind": kind, "perception_ok": check.get("satisfied", False),
                         "gt_ok": gt["success"], "error": error})
         log(f"    validation {function} on {kind} seed {seed}: perception={check.get('satisfied')} gt={gt['success']}")
@@ -383,17 +475,35 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
     env = make_env(task)
     record = {"task_id": task.task_id, "family": task.family, "instruction": task.instruction,
               "skill_memory": memory is not None, "user_memory": user_memory is not None,
-              "subgoals": [], "validations": []}
+              "subgoals": [], "validations": [], "task_meta": task.meta}
     started = time.time()
     pending = []
     try:
         scene = env.reset()
+        if getattr(env, "neutral", False):  # colour-coded desk: the model says what each thing is, from the camera
+            from .identify import identify, private_truth, score_identity
+            identity, views = identify(llm, env)
+            record["identification"] = identity
+            record["identification_score"] = score_identity(identity, private_truth(env, task)[0])
+            for v in views:
+                (out_dir / f"identify_{v['camera']}.png").write_bytes(v["png"])
+            log(f"  identified {record['identification_score']['category_ok']}/{record['identification_score']['things']}"
+                f" things: {[(n, i['category'], i['role']) for n, i in identity.items()]}")
+            scene = env.observe()
         preferences = []
         if user_memory is not None:
             record["user_memory_write"] = user_memory.learn(llm, task.instruction, scene, task.task_id)
             preferences = user_memory.retrieve(scene)
         record["user_preferences_used"] = preferences
-        spec = refine(llm, task.instruction, preferences, scene)
+        grouping = None
+        if os.environ.get("SMA_GROUPING", "1") == "1":  # where similar things already are on this desk (no LLM; on by default)
+            from .grouping import infer_homes
+            grouping = infer_homes(scene)
+            record["scene_grouping"] = grouping
+            log(f"  grouping: {[(o, h['zone']) for o, h in grouping['homes'].items()]}")
+            if user_memory is not None:  # what this desk shows goes into long-term memory, for the desks after it
+                record["habits_observed"] = user_memory.observe_habits(grouping, scene, task.task_id)
+        spec = refine(llm, task.instruction, preferences, scene, grouping=grouping)
         record["task_spec"] = spec
         task.spec_text = spec["refined_instruction"]
         if user_memory is not None:  # how-to requests from earlier conversations go to the code agent verbatim
@@ -406,18 +516,35 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
         goals = [{"object": g["object"], "zone": g["zone"]} for g in spec["goals"]]
         plan_text = llm.chat([{"role": "user", "content": prompts.PLANNER.format(
             instruction=spec["refined_instruction"], goals=json.dumps(goals),
-            scene=prompts.scene_text(scene))}], purpose="plan")
+            scene=prompts.scene_text(scene), occupants=json.dumps(occupancy(scene)))}], purpose="plan")
         plan, raw = parse_plan(plan_text, scene)
         record["plan"], record["raw_plan"] = plan, raw
         log(f"  plan: {plan}")
-        for step in plan:
+        # Execution monitoring: after every subgoal the camera checks all goals; a failed step, a disturbed goal or
+        # a plan that no longer matches what is left triggers re-planning. Each goal gets at most two rounds.
+        goal_list = [(g["object"], g["zone"]) for g in goals]
+        checks, _ = env.check_goals(goal_list)
+        status = {o: bool(c.get("satisfied")) for o, c in checks.items()}
+        rounds, failures, queue = {}, {}, list(plan)
+        record["progress"], record["replans"] = [], []
+        while queue and len(record["subgoals"]) < 2 * len(goal_list) + 1:
+            step = queue.pop(0)
             obj, zone = step["object"], step["zone"]
+            if status.get(obj) or rounds.get(obj, 0) >= 2:
+                continue
+            rounds[obj] = rounds.get(obj, 0) + 1
             log(f"  subgoal {obj} -> {zone}")
             before = env.observe()
             ok, attempts = run_subgoal(env, llm, task, obj, zone, memory, log)
             entry = {"object": obj, "zone": zone, "success": ok, "attempts": attempts,
                      "zone_occupied_at_start": zone_occupants(before, zone, exclude=obj)}
             if memory is not None:
+                for a in attempts:  # history for every helper (sub-skill) that was actually called
+                    for name in a.get("used_helpers", []):
+                        err = a["error"] or {}
+                        memory.record_helper(name, task_id=task.task_id, source="use", outcome=a["check"].get("satisfied", False),
+                                             failure=None if a["check"].get("satisfied") else
+                                             (err.get("reason") or err.get("message") or "check_failed")[:120])
                 for a in attempts:  # history for every stored skill that was actually called
                     for fn in a["used_skills"]:
                         verdict = next((r["verdict"] for r in a["retrieved"] if r["function"] == fn), None)
@@ -432,17 +559,62 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
                                       repaired_by="later attempt" if repaired else None)
                 final = attempts[-1]
                 kind = before["objects"][obj]["kind"] if obj in before["objects"] else None
-                covered = [sk["function"] for sk in memory.skills
-                           if any(h["outcome"] and h["features"]["kind"] == kind for h in sk["history"])]
-                if ok and not final["used_skills"] and covered:
-                    log(f"    extraction skipped: kind {kind} already covered by {covered}")
+                style = zone_style(zone, before)
+                covering = [sk for sk in memory.skills if sk["status"] not in ("rejected", "superseded")
+                            and any(h["outcome"] and (h.get("features") or {}).get("kind") == kind
+                                    and (h.get("features") or {}).get("zone_style") == style for h in sk["history"])]
+                # Only a skill that still works counts as covering the goal. One whose recent record here is poor
+                # (e.g. learned on an empty desk, failing on a crowded one) is replaced by the new program that
+                # succeeded, so the memory can learn the version that fits the current conditions.
+                covered = [sk["function"] for sk in covering if memory.reliable(sk, kind, style)]
+                stale = [sk["function"] for sk in covering if not memory.reliable(sk, kind, style)]
+                # A stored skill that failed here and a new program that then succeeded: store the repaired program
+                # as a new version and retire the old one (the skill is updated by its execution outcome).
+                failed_skills = sorted({fn for a in attempts[:-1] for fn in a["used_skills"]} & set(covered))
+                if ok and not final["used_skills"] and failed_skills:
+                    fn = extract_skill(llm, memory, task, obj, zone, final, before, log)
+                    if fn:
+                        for old in failed_skills:
+                            memory.get(old)["status"], memory.get(old)["superseded_by"] = "superseded", fn
+                        memory.save()
+                        log(f"    skill {fn} replaces {failed_skills} (repaired after the stored skill failed)")
+                        entry["repaired_skill"] = {"from": failed_skills, "to": fn}
+                        if validate:
+                            pending.append((fn, before["objects"][obj]["kind"], style))
+                elif ok and not final["used_skills"] and covered:
+                    log(f"    extraction skipped: {kind} into {style} already covered by {covered}")
                     entry["extraction_skipped_covered_by"] = covered
                 elif ok and not final["used_skills"]:
                     fn = extract_skill(llm, memory, task, obj, zone, final, before, log)
                     entry["extracted_skill"] = fn
+                    if fn and stale:
+                        for old in stale:
+                            memory.get(old)["status"], memory.get(old)["superseded_by"] = "superseded", fn
+                        memory.save()
+                        log(f"    skill {fn} replaces {stale} (their recent record on {kind} into {style} was poor)")
+                        entry["replaced_stale_skill"] = {"from": stale, "to": fn}
                     if fn and validate:  # run after this episode's simulator is closed
-                        pending.append((fn, before["objects"][obj]["kind"]))
+                        pending.append((fn, before["objects"][obj]["kind"], style))
             record["subgoals"].append(entry)
+            env.step_budget = env.steps + 1500
+            checks, now = env.check_goals(goal_list)
+            new_status = {o: bool(c.get("satisfied")) for o, c in checks.items()}
+            disturbed = [o for o in status if status[o] and not new_status[o]]
+            status = new_status
+            if not ok:
+                err = (attempts[-1]["error"] or {}) if attempts else {}
+                failures[obj] = (err.get("reason") or err.get("message") or "camera check failed")[:120]
+            remaining = [(o, z) for o, z in goal_list if not status[o] and rounds.get(o, 0) < 2]
+            record["progress"].append({"after": obj, "subgoal_ok": ok, "achieved": [o for o in status if status[o]],
+                                       "disturbed": disturbed, "remaining": [o for o, _ in remaining]})
+            if not remaining:
+                break
+            planned = sorted({st["object"] for st in queue} & {o for o, _ in remaining})
+            if not ok or disturbed or planned != sorted(o for o, _ in remaining):
+                last = f"{obj} -> {zone}: " + ("succeeded" if ok else f"failed ({failures[obj]})")
+                queue, raw = replan(llm, spec, remaining, now, [o for o in status if status[o]], last, failures)
+                record["replans"].append({"after": obj, "subgoal_ok": ok, "disturbed": disturbed, "plan": list(queue), "raw": raw})
+                log(f"  replan after {obj} ({'ok' if ok else 'failed'}{', disturbed ' + str(disturbed) if disturbed else ''}): {queue}")
         env.step_budget = env.steps + 2000
         env.go_home()
         record["final_perception"] = {k: env.check_on_zone(o, z) for o, z in task.goal.items() for k in [o]}
@@ -458,11 +630,22 @@ def run_episode(task, llm, memory, out_dir, *, user_memory=None, validate=True, 
         if env.frames:
             import imageio.v2 as imageio
             imageio.mimwrite(out_dir / "video.mp4", env.frames, fps=20)
+        views = getattr(env, "check_views", [])
+        if views:  # every camera check of the episode; the last one per object is the final state that GT scores
+            import imageio.v2 as imageio
+            (out_dir / "check_views").mkdir(exist_ok=True)
+            index = []
+            for i, v in enumerate(views):
+                name = f"{i:02d}_{v['object']}.png"
+                imageio.imwrite(out_dir / "check_views" / name, v["image"])
+                index.append({"file": name, "object": v["object"], "zone": v["zone"], "rule_check": v["satisfied"]})
+            (out_dir / "check_views" / "index.json").write_text(json.dumps(index, indent=1))
         env.close()
         (out_dir / "episode.json").write_text(json.dumps(record, indent=1, default=str))
-    for fn, kind in pending:
+    for fn, kind, style in pending:
         seed0 = 5000 + 10 * len(memory.skills)
-        record["validations"] += validate_skill(memory, fn, kind, [seed0, seed0 + 1], out_dir, log)
+        record["validations"] += validate_skill(memory, fn, kind, [seed0, seed0 + 1], out_dir, log, style=style,
+                                                family=task.family)
     if pending:
         (out_dir / "episode.json").write_text(json.dumps(record, indent=1, default=str))
     return record
