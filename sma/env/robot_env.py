@@ -8,7 +8,7 @@ import os
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .perception import (KIND_HEIGHT, OBJECT_HUES, _footprint, _palette_label, inside_zone, object_on_zone,
+from .perception import (OBJECT_HUES, _footprint, _palette_label, inside_zone, object_on_zone,
                          object_pixels, perceive)
 from .scene import KIND_HALF_HEIGHT, RECEPTACLES, TABLE_Z, TabletopOrganize, receptacle_half
 
@@ -110,6 +110,7 @@ class TabletopEnv:
         # sam perception: names of things across views, the thing in the hand, the one just let go of, and each
         # receptacle's best view
         self._tracks, self._next_thing, self._held_track, self._released, self._zone_best = {}, 1, None, None, {}
+        self._own_size = {}  # each object's size as first seen (_note_sizes)
         self.q_rest = self._q()
         self.wait(10)
         self.go_home()
@@ -246,7 +247,27 @@ class TabletopEnv:
             if name not in scene["zones"]:
                 scene["zones"][name] = {**zone, "visible_now": False}
         self.last_rgb = rgb
+        self._note_sizes(scene)
         return scene
+
+    def _note_sizes(self, scene):
+        """Each object's own size, measured the first time the camera sees it at rest (nothing in the hand): its height
+        above what it rests on (the desk, the top of a flat receptacle or pile, the floor of a hollow one) and its length
+        (the longer of its footprint and that height: a pen standing in a holder shows its length as height). The camera
+        checks compare later views with these, so no table of nominal object sizes is needed."""
+        sizes = getattr(self, "_own_size", None)
+        if sizes is None or scene["gripper"]["holding_something"]:
+            return
+        for name, obj in scene["objects"].items():
+            if name in sizes:
+                continue
+            base = 0.0
+            for zone in scene["zones"].values():
+                if zone.get("visible_now", True) and inside_zone(obj["center"], zone, .005):
+                    base = zone.get("top_height") or (zone.get("inner_floor_height") if zone.get("hollow") else 0.0) or 0.0
+                    break
+            own = max(float(obj["height"]) - float(base), .003)
+            sizes[name] = {"height": round(own, 4), "length": round(max(float(obj["footprint_long"]), own), 4)}
 
     # ---------------------------------------------------------------- colour-coded desk (neutral perception)
     def _hues(self):
@@ -358,13 +379,15 @@ class TabletopEnv:
                 de = float(np.sqrt((d[0] / 2) ** 2 + d[1] ** 2 + d[2] ** 2))
                 dist = float(np.hypot(*(np.asarray(t["center"][:2]) - (carried if n == held else np.asarray(tr["center"][:2])))))
                 size = abs(np.log(max(t["visible_pixels"], 1) / max(tr["visible_pixels"], 1)))
-                if (de < 15 or (dist < .03 and de < 30)) and (dist < .10 or n == held or tr.get("put_down")):
-                    cost[i, j] = de / 8 + dist / .05 + .3 * size
-                elif n == self._released and tr.get("turned_over") and dist < .04:
+                if n == self._released and tr.get("turned_over"):
                     # let go of after the hand turned it over (a pen stood up in a holder): from above it looks nothing
-                    # like it did on the desk (its top, not its length), so only where it was let go of counts; the
-                    # things already there keep their own names (one to one)
-                    cost[i, j] = dist / .05 + .3 * size
+                    # like it did on the desk (its top, not its length; neither colour nor size compare), so only where
+                    # it was let go of counts, within 6 cm (a pen leaning 30-40 degrees in a holder has its top 4-5 cm
+                    # from where its middle was); the things already there keep their own names (one to one)
+                    if dist < .06:
+                        cost[i, j] = dist / .05
+                elif (de < 15 or (dist < .03 and de < 30)) and (dist < .10 or n == held or tr.get("put_down")):
+                    cost[i, j] = de / 8 + dist / .05 + .3 * size
                 if n == self._released and t.get("released_here"):
                     cost[i, j] = 0.0
         pairs = {}
@@ -843,7 +866,7 @@ class TabletopEnv:
                     "highest_obstacle_under_hand_m": round(float(z[body].max()), 3) if body.sum() >= 3 else None}
 
         if obj["footprint_short"] > .075 and xyz is not None:  # too wide for the open fingers either way (a notebook)
-            out = self._edge_pinches(obj, table, masks) + out
+            out = self._edge_pinches(obj, table, masks, size=getattr(self, "_own_size", {}).get(object_name)) + out
         for i, c in enumerate(out[:max_candidates]):
             if c.get("pinch"):  # its own fields (the top-down squeeze and clearance do not apply)
                 c.update({"id": i, "object": object_name, "object_height": h,
@@ -867,7 +890,7 @@ class TabletopEnv:
             c["graspnet_note"] = note
         return out[:max_candidates]
 
-    def _edge_pinches(self, obj, table, masks, depth_in=.02):
+    def _edge_pinches(self, obj, table, masks, depth_in=.02, size=None):
         """Side grasps for a flat object wider than the open fingers (an A5 notebook): the gripper comes in level
         with the object, fingers pointing at one of its edges and closing vertically, one finger on the top face and
         one under the bottom face, depth_in inside the edge. That needs free space under the edge: the object must
@@ -880,7 +903,7 @@ class TabletopEnv:
         "edge_free_below" is always given: whether the edge sticks out over a drop."""
         xyz, own = masks["_xyz"], masks[obj["color"]]
         valid = np.isfinite(xyz[..., 2])
-        thick = KIND_HEIGHT.get(obj["kind"], .01)
+        thick = size["height"] if size else obj["height"]  # its own thickness as first seen (_note_sizes)
         bottom = obj["top_z"] - thick
         c = np.asarray(obj["center"][:2], float)
         yaw = obj["long_axis_yaw"]
@@ -1701,7 +1724,7 @@ class TabletopEnv:
         if obj is None or zone is None:
             return {"satisfied": False, "reason": "not_visible", "object_visible": obj is not None,
                     "zone_visible": zone is not None}
-        result = object_on_zone(obj, zone, scene["table_z"])
+        result = object_on_zone(obj, zone, scene["table_z"], own=getattr(self, "_own_size", {}).get(object_name))
         result["gripper_holding"] = scene["gripper"]["holding_something"]
         result["satisfied"] = (result["inside_zone"] and result["resting"] and result.get("upright", True)
                                and not result["gripper_holding"])
@@ -1737,13 +1760,16 @@ class TabletopEnv:
         # the cup below the rim; a pen standing inside shows outside the cup only parts above the rim.
         low_outside = int((~inside & (pts[:, 2] < table + rim)).sum()) if len(pts) else 0
         span = float(_footprint(pts[:, :2])[1]) if len(pts) >= 3 else None
-        # Standing: the top more than 2 cm above the rim and at least as high as a 14 cm pen tilted 40 degrees from
-        # vertical (the ground-truth limit); a pen knocked over to ~50 degrees still rose above an 8 cm rim.
-        from .assets import PEN_HALF
-        need = max(rim + .02, .004 + 2 * PEN_HALF[0] * np.cos(np.radians(40)))
+        # Standing: the top more than 2 cm above the rim and at least as high as the object, at the length the camera
+        # measured when it first saw it, tilted 40 degrees from vertical (the ground-truth limit for a pen); a pen
+        # knocked over to ~50 degrees still rose above an 8 cm rim. Compact: its pixels near the cup span less than
+        # 0.78 of that length (a pen lying flat spans its length; one leaning 37 degrees, about 0.6 of it).
+        length = (getattr(self, "_own_size", {}).get(object_name) or {}).get("length")
+        need = max(rim + .02, .004 + length * np.cos(np.radians(40))) if length else rim + .02
         result = {"inside_zone": bool(len(high) >= 3 and low_outside < 3),
                   "standing": bool(top is not None and top > need),
-                  "compact": bool(span is not None and span < .11), "pen_pixels_low_outside": low_outside,
+                  "compact": bool(span is not None and (length is None or span < .78 * length)),
+                  "own_length_first_seen": length, "pen_pixels_low_outside": low_outside,
                   "pen_pixels_high_in_holder": int(len(high)), "top_height_above_table": None if top is None else round(top, 4),
                   "rim_height": rim, "horizontal_span_m": None if span is None else round(span, 4),
                   "zone_half_size": zone["half_size"], "gripper_holding": scene["gripper"]["holding_something"]}

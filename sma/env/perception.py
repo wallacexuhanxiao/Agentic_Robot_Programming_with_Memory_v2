@@ -8,7 +8,6 @@ import numpy as np
 
 
 WALL_THICKNESS = .008  # receptacle walls (assets.py: 4 mm half thickness)
-KIND_HEIGHT = {"block": .04, "book": .025, "mug": .07, "pen": .012, "paper": .04, "notebook": .01}
 ZONE_NAMES = {"orange": "orange_tray", "cyan": "cyan_tray", "purple": "purple_box",
               "green": "green_case", "magenta": "magenta_holder",
               "blue": "blue_coaster", "red": "red_bin"}  # receptacle catalogue (plus "book_pile", found from depth)
@@ -234,9 +233,10 @@ def inside_zone(xy, zone, margin=0.0):
     return abs(a) <= zone["half_size"][0] - margin and abs(b) <= zone["half_size"][1] - margin
 
 
-def object_on_zone(obj, zone, table_z, margin=.01):
-    """Perception-only check: object centre inside the zone (in the zone's own frame) and resting at its nominal
-    height. A pen must lie inside with both ends."""
+def object_on_zone(obj, zone, table_z, margin=.01, own=None):
+    """Perception-only check: object centre inside the zone (in the zone's own frame) and resting at its own height.
+    own: the object's size as the camera measured it when it first saw it at rest ({"height", "length"}, from
+    TabletopEnv._note_sizes); without it, its current height. A pen must lie inside with both ends."""
     inside = inside_zone(obj["center"], zone, margin)
     if obj["kind"] == "pen":
         u = np.array([np.cos(obj["long_axis_yaw"]), np.sin(obj["long_axis_yaw"])]) * obj["footprint_long"] / 2
@@ -246,7 +246,7 @@ def object_on_zone(obj, zone, table_z, margin=.01):
         v = np.array([-u[1], u[0]])
         inside = inside and all(inside_zone(np.asarray(obj["center"][:2]) + a * obj["footprint_long"] / 2 * u +
                                             b * obj["footprint_short"] / 2 * v, zone, -.004) for a in (-1, 1) for b in (-1, 1))
-    nominal = KIND_HEIGHT.get(obj["kind"]) or obj.get("height") or .02  # an unidentified thing: its own height
+    nominal = (own or {}).get("height") or obj.get("height") or .02  # its own height when first seen
     # lying on the 4 mm floor, not on the 8 mm rim (a notebook partly on the rim is 4 mm higher)
     resting = obj["top_z"] - table_z <= nominal + (.007 if obj["kind"] == "notebook" else .012)
     if zone.get("top_height") is not None:  # on a pile of books: its centre over the pile, lying flat on the top
@@ -256,15 +256,15 @@ def object_on_zone(obj, zone, table_z, margin=.01):
         resting = obj["top_z"] - table_z < (zone.get("rim_height") or 0) + .01
     # A mug must also stand: one lying on its side is about 5 cm tall instead of 7 (a GPU realdesk run counted a
     # fallen mug on the coaster as done).
-    upright = obj["kind"] != "mug" or obj["top_z"] - table_z >= nominal - .006  # 5.9-6.2 cm read as standing in the
-    # GPU realdesk runs for mugs that ground truth found tipped; a standing mug measures 7.0 cm
+    upright = obj["kind"] != "mug" or obj["top_z"] - table_z >= nominal - .006  # still as tall as when first seen
+    # (standing): tipped mugs measured 5.9-6.2 cm in the GPU realdesk runs, standing ones 7.0 cm
     along, across = in_zone_frame(obj["center"], zone)
     out = {"inside_zone": bool(inside), "resting": bool(resting), "upright": bool(upright),
            "offset_from_zone_center": [round(obj["center"][0] - zone["center"][0], 4),
                                        round(obj["center"][1] - zone["center"][1], 4)],
            "offset_along_across_zone_axis": [round(along, 4), round(across, 4)],
            "zone_half_size": zone["half_size"], "top_height_above_table": round(obj["top_z"] - table_z, 4),
-           "nominal_height": nominal}
+           "own_height_first_seen": nominal}
     if obj["footprint_long"] - obj["footprint_short"] > .01 and "long_axis_yaw" in zone:
         diff = (obj["long_axis_yaw"] - zone["long_axis_yaw"] + np.pi / 2) % np.pi - np.pi / 2
         out["object_axis_vs_zone_axis_deg"] = round(float(np.degrees(abs(diff))), 1)

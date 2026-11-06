@@ -237,7 +237,7 @@ def diagnose(trace, scene_before, check, obj, zone, error=None):
         if "object_axis_vs_zone_axis_deg" in check:
             facts.append(f"{obj}'s long axis is {check['object_axis_vs_zone_axis_deg']} degrees from {zone}'s long axis; "
                          f"its top is {check['top_height_above_table']} m above the table "
-                         f"(lying flat on the floor would be about {check['nominal_height']} m).")
+                         f"(when the camera first saw it, it was {check['own_height_first_seen']} m tall).")
     return "\n".join("- " + f for f in facts)
 
 
