@@ -1181,15 +1181,38 @@ class TabletopEnv:
         return {"zone": zone_name, "center": zone["center"], "half_size": zone["half_size"],
                 "long_axis_yaw": zyaw, "occupants": occupants, "spots": unique[:max_spots]}
 
+    def _tilted(self):
+        """Whether the fingers point more than 45 degrees away from straight down (a side grasp, a pen turned upright
+        in the hand). carry_to, rotate_by and lower_until_contact then keep the hand's orientation: turning the fingers
+        down, as they do otherwise, would turn whatever is held by as much (in DeepSeek runs a notebook taken by an
+        edge ended up standing on that edge)."""
+        return Rotation.from_quat(self.obs["robot0_eef_quat_site"]).as_matrix()[2, 2] > -np.cos(np.radians(45))
+
     def carry_to(self, x, y, height=.18, yaw=None):
         """Rise vertically to table_z + height (if lower), then move horizontally to (x, y) at that height,
-        fingers along yaw (None keeps the current yaw). Whatever is held comes along."""
+        fingers along yaw (None keeps the current yaw). Whatever is held comes along. A tilted hand (_tilted) keeps
+        its orientation; yaw is then refused (turn it with rotate_by)."""
         height = float(height)
         if not .05 <= height <= .30:
             raise RobotError("carry_height_out_of_range", height=height, allowed=[.05, .30],
                              hint="height is measured above the table surface")
         z = self._table() + height
         here = self._ee()
+        if self._tilted():
+            if yaw is not None:
+                raise RobotError("yaw_needs_fingers_down", hint="the hand is tilted (e.g. a side grasp) and keeps its "
+                                 "orientation: carry with yaw=None, turn it with rotate_by")
+            rotation = Rotation.from_quat(self.obs["robot0_eef_quat_site"])
+            if here[2] < z - .005:
+                self._line_move([here[0], here[1], z], rotation)
+            planner = "straight line"
+            if os.environ.get("SMA_MOTION") == "curobo":
+                note = self._curobo_move(float(x), float(y), z, rotation=rotation)
+                planner = "curobo" if note is None else f"straight line (cuRobo: {note})"
+            if planner != "curobo":
+                self._line_move([float(x), float(y), z], rotation)
+            return {"position": self._ee().round(4).tolist(), "holding_something": self.gripper_state()["holding_something"],
+                    "planner": planner, "orientation_kept": True}
         if here[2] < z - .005:
             self.move_to(here[0], here[1], z)
         planner = "straight line"
@@ -1203,11 +1226,26 @@ class TabletopEnv:
 
     def lower_until_contact(self):
         """Lower straight down until the held object's bottom reaches table level, or until something stops it
-        earlier (a wall, another object). Does not open the fingers."""
+        earlier (a wall, another object). Does not open the fingers. A tilted hand (_tilted) keeps its orientation
+        and goes down until something stops it (how far the held object reaches below the fingers is not known)."""
         table = self._table()
         holding = self.gripper_state()["holding_something"]
-        grip = getattr(self, "_held_grasp_height", .01) if holding else .01
         here = self._ee()
+        if self._tilted():
+            # In 1 cm steps, stopping at the first one something blocks or that turns the hand. Sent on to the table in
+            # one move, the arm kept pushing after the hand (hanging 10 cm below the grip point) met the pile, the
+            # wrist twisted by 40-60 degrees and the notebook slid off (side-carry gate, 2026-11-06).
+            rotation = Rotation.from_quat(self.obs["robot0_eef_quat_site"])
+            floor, stopped = table + self.LOWEST_GRIP, False
+            while not stopped and self._ee()[2] > floor + .002:
+                z = max(float(self._ee()[2]) - .01, floor)
+                stopped = self._line_move([here[0], here[1], z], rotation, tolerance=.003, stop_on_contact=True)
+                turned = (Rotation.from_quat(self.obs["robot0_eef_quat_site"]) * rotation.inv()).magnitude()
+                stopped = stopped or turned > np.radians(5)
+            return {"stopped_by_contact": stopped, "grip_point_height": round(float(self._ee()[2]) - table, 4),
+                    "held_object_bottom_above_table": None, "holding_something": self.gripper_state()["holding_something"],
+                    "orientation_kept": True}
+        grip = getattr(self, "_held_grasp_height", .01) if holding else .01
         stopped = None
         try:
             self.move_to(here[0], here[1], table + grip + .004, tolerance=.004)
@@ -1223,10 +1261,23 @@ class TabletopEnv:
     def rotate_by(self, delta):
         """Turn the gripper, and whatever it holds, by delta radians about the vertical axis without moving it
         (positive = counter-clockwise seen from above). The finger line is symmetric, so the shorter of delta and
-        delta -/+ pi is executed; for a symmetric object (pen, book) both give the same orientation."""
+        delta -/+ pi is executed; for a symmetric object (pen, book) both give the same orientation. A tilted hand
+        (_tilted) keeps its tilt and turns by delta itself (within -/+ pi); the direction it points is reported."""
         delta = float(delta)
         if not np.isfinite(delta):
             raise RobotError("non_finite_rotation", delta=delta)
+        if self._tilted():
+            def heading():  # of the approach, which is not vertical here
+                a = Rotation.from_quat(self.obs["robot0_eef_quat_site"]).as_matrix()[:, 2]
+                return float(np.arctan2(a[1], a[0]))
+            before, here = heading(), self._ee()
+            delta = float((delta + np.pi) % (2 * np.pi) - np.pi)
+            goal = Rotation.from_euler("z", delta) * Rotation.from_quat(self.obs["robot0_eef_quat_site"])
+            self._move_pose(here, goal, tolerance=.01, residual_tol=.008)
+            turned = (heading() - before + np.pi) % (2 * np.pi) - np.pi
+            return {"approach_heading_before": round(before, 3), "approach_heading": round(heading(), 3),
+                    "turned_by": round(float(turned), 3), "holding_something": self.gripper_state()["holding_something"],
+                    "orientation_kept": True}
         before, here = self._yaw(), self._ee()
         self.move_to(here[0], here[1], here[2], before + delta, tolerance=.01)
         after = self._yaw()

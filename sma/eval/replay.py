@@ -178,6 +178,8 @@ def replay(run_dir, out_dir, item):
         goals = record.get("subgoals", [])
         for k, sub in enumerate(goals):
             for attempt in sub["attempts"]:
+                if attempt["code"] is None:  # skipped: the camera did not see the object (nothing ran)
+                    continue
                 obj, zone = sub["object"], sub["zone"]
                 source = (f"direct reuse of learned skill (no new code)" if attempt.get("direct_reuse")
                           else "code written by the LLM for this attempt")

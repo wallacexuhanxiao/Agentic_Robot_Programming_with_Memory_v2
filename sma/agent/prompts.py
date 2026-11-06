@@ -144,6 +144,7 @@ rotate_by(delta) -> {"gripper_yaw_before", "gripper_yaw", "turned_by", "holding_
 lower_until_contact() -> {"stopped_by_contact": bool, "held_object_bottom_above_table": float, ...}
   Lowers straight down until the held object's bottom reaches table level, or until something stops it
   earlier (then stopped_by_contact is True, e.g. it landed on a wall or another object). Keeps holding.
+  With a tilted hand it goes down until something stops it (held_object_bottom_above_table is None).
 open_gripper() / close_gripper() -> {"width": float, "holding_something": bool, ...}: fingers only, no
   motion (open_gripper also reports the gripper_yaw at release).
 retreat(dz=0.12) moves straight up by dz.
@@ -197,7 +198,10 @@ def aspire_skill_notes():
     return ("\n\nOfficial ASPIRE skill notes (from the ASPIRE repository):\n" + "\n".join(parts)) if parts else ""
 
 
-ACT_EXTRA = """Free gripper orientation (carry_to, rotate_by, lower_until_contact and grasp keep the fingers pointing down):
+ACT_EXTRA = """Free gripper orientation (grasp always comes from above; carry_to, rotate_by and lower_until_contact keep the
+fingers pointing down, except with a hand tilted more than 45 degrees from pointing down, e.g. after a side grasp: then
+they keep its orientation (carry_to refuses a yaw; rotate_by turns the whole hand, and what it holds, about the vertical)
+and report "orientation_kept"):
 gripper_pose() -> {"position": [x, y, z], "approach": [ax, ay, az], "finger_axis": [fx, fy, fz],
   "side": [sx, sy, sz], "yaw", "holding_something"}: unit vectors in the world frame. approach is the direction
   the fingers point ([0, 0, -1] when pointing down), finger_axis the line along which they close, side =

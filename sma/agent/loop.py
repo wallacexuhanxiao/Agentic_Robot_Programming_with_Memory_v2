@@ -274,6 +274,23 @@ def run_subgoal(env, llm, task, obj, zone, memory, log):
     attempts_text, attempts = "", []
     for n in range(1, MAX_ATTEMPTS + 1):
         scene = env.observe()
+        if obj not in scene["objects"]:
+            try:  # the arm may hide it: look again with the arm parked
+                env.go_home()
+            except RobotError:
+                pass
+            scene = env.observe()
+        if obj not in scene["objects"]:
+            # No program can act on a thing the camera does not see (standing on an edge, taken together with what it
+            # lies on): no code is generated for it. In the DeepSeek comparison runs about 40% of all attempts went to
+            # such objects.
+            attempts.append({"n": n, "code": None, "program_ok": False, "control_steps": 0, "used_skills": [],
+                             "used_helpers": [], "retrieved": [], "direct_reuse": False, "trace": [], "picks": [],
+                             "error": {"type": "robot_error", "reason": "object_not_visible_before_attempt",
+                                       "details": {"object": obj, "visible": sorted(scene["objects"])}},
+                             "check": {"satisfied": False, "reason": "not_visible"}})
+            log(f"    attempt {n}: skipped, the camera does not see {obj}")
+            return False, attempts
         skills_text, retrieved, lesson_ids = "", [], []
         feasibility = None
         if memory is not None:
