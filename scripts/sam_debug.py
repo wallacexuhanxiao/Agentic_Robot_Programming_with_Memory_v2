@@ -36,6 +36,7 @@ def request(url, rgb, points_per_side=16, iou_threshold=.8, points=None):
 def segment(rgb, height, valid, masks, **k):
     kept = _segment(rgb, height, valid, masks, **k)
     look["kept"], look["inputs"] = kept, masks
+    look["args"] = {"rgb": rgb, "height": height, "valid": valid, "xyz": k.get("xyz")}
     return kept
 
 
@@ -112,6 +113,15 @@ def report(env, task, tag):
           f"32-point grid masks {len(dense)}", flush=True)
     for r in rows:
         print("  ", json.dumps(r), flush=True)
+    # everything the last segment_things call was given, and the things kept, for trying rules offline
+    a, inputs = look["args"], look["inputs"]
+    np.savez_compressed(f"{out}/{task.task_id}_{tag}.npz", rgb=a["rgb"], height=a["height"], valid=a["valid"],
+                        xyz=a["xyz"] if a["xyz"] is not None else np.zeros(0),
+                        masks=np.array([m for _, m in inputs]),
+                        scores=np.array([-1.0 if s is None else -2.0 if s == "expected" else float(s) for s, _ in inputs]),
+                        thing_names=np.array(names), thing_masks=np.array([env._masks[n] for n in names]),
+                        thing_truth=np.array([str(r["truth"]) for r in rows]),
+                        thing_bodies=np.array([json.dumps(r["bodies"]) for r in rows]))
     return {"rows": rows, "masks": {"grid": len(grid), "points": len(pts), "depth_only": len(depth), "grid32": len(dense)}}
 
 

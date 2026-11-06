@@ -7,9 +7,9 @@ rises at least 5 mm above the part of the other thing around it, it is a thing o
 ball in a basket, a notebook on a pile, a pen standing in a holder); if not, it is a part of the other thing (the
 inside of a mug, a basket's floor) and is dropped. Names are given by the tracker in the environment.
 
-A grid of point prompts can miss small things (the top of a pen standing in a holder of the same colour is about 50
-pixels here; a 16 x 16 grid, 32 pixels apart, missed it and a pen of the holder's colour laid across it, a 32 x 32 grid
-finds both), and SAM2 can take two things for one (a mug on a coaster) or miss a thing that looks
+A grid of point prompts misses small things (the top of a pen standing in a holder of the same colour is about 50
+pixels here, the grid 32 pixels apart; a 32 x 32 grid found it but tripled the time of a look and split more things into
+parts), and SAM2 can take two things for one (a mug on a coaster) or miss a thing that looks
 like what it stands on (a white wastebasket on a white desk). Depth then points to what is left: parts of a thing rising
 more than 2 cm above most of it (a pen standing out of a holder), parts rising more than 2 cm above its lowest level
 that lie wholly inside it (a mug on a coaster; a hollow thing's walls reach its outline), and raised regions no thing
@@ -64,13 +64,14 @@ def _ring_height(mask, other, height, kernel=np.ones((7, 7), np.uint8)):
     return float(np.median(height[ring])) if ring.sum() >= 5 else float(np.median(height[other]))
 
 
-def _side_of(part, thing, xyz, tol=.015):
-    """Whether `part` is a side of `thing` seen in perspective (the page edges of a pile of books beside its cover, in
-    another colour): it spans more than 2 cm in height and its points lie on the thing's outline on the desk (within tol
-    of the hull of the thing's points); something standing or lying beside the thing lies outside that outline or is
-    flat."""
-    h = xyz[part][:, 2]
-    if np.quantile(h, .9) - np.quantile(h, .1) < .02:
+def _side_of(part, thing, xyz, height, tol=.015):
+    """Whether `part` is a part of `thing` beside its top, in another colour: a side seen in perspective (spanning more
+    than 2 cm in height) or a lower step of a stack (all of it more than 2 cm above the desk: in the sdesk piles the top
+    book left a strip of the book under it uncovered, 2.8 or 8.4 cm up), with its points on the thing's outline on the
+    desk (within tol of the hull of the thing's points). Something standing or lying on the desk beside the thing lies
+    outside that outline, or is flat and low."""
+    h = height[part]
+    if np.quantile(h, .9) - np.quantile(h, .1) < .02 and np.quantile(h, .1) < .02:
         return False
     hull = cv2.convexHull((xyz[thing][:, :2] * 1000).astype(np.float32))
     pts = xyz[part][:, :2] * 1000
@@ -138,14 +139,6 @@ def segment_things(rgb, height, valid, masks, *, min_pixels=30, max_share=.15, e
                 if not _rises(c["mask"], other, height):
                     drop = True
                     break
-            elif inter > .5 * c["area"] and c["score"] != "expected" and not _rises(c["mask"], t["mask"], height):
-                # mostly on a thing kept already and not above it: another piece of that thing (the top of a pen
-                # found by depth and the mask SAM2 gave when prompted there overlap by about half)
-                t["mask"] = t["mask"] | c["mask"]
-                t["area"] = int(t["mask"].sum())
-                t["filled"] = _filled(t["mask"])
-                drop = True
-                break
         if not drop:
             c["filled"] = _filled(c["mask"])
             kept.append(c)
@@ -171,7 +164,7 @@ def segment_things(rgb, height, valid, masks, *, min_pixels=30, max_share=.15, e
                     continue
                 d = s["lab"] - b["lab"]
                 if (s["depth_only"] or np.sqrt((d[0] / 2) ** 2 + d[1] ** 2 + d[2] ** 2) < 12 or
-                        (xyz is not None and _side_of(s["mask"], b["mask"], xyz))) and \
+                        (xyz is not None and _side_of(s["mask"], b["mask"], xyz, height))) and \
                         not _rises(s["mask"], b["mask"], height):
                     b["mask"] = b["mask"] | s["mask"]
                     b["area"] = int(b["mask"].sum())
@@ -217,6 +210,21 @@ def _inner_point(region):
     dist = cv2.distanceTransform(np.pad(region.astype(np.uint8), 1), cv2.DIST_L2, 3)[1:-1, 1:-1]
     r, c = np.unravel_index(int(np.argmax(dist)), dist.shape)
     return [int(c), int(r)]
+
+
+def _second_look(regions, rgb, url, fit=.25):
+    """One mask per raised region nothing explained (see unexplained): SAM2 prompted at the region's inner point, its
+    mask there that best overlaps the region (it follows the thing's own edges), or, when none overlaps it by `fit`
+    (IoU), the region itself. Never both: the two were kept as two things for one (the top of a pen standing in a
+    holder found by depth and SAM2's mask of the pen there overlap by about half)."""
+    points = [_inner_point(r) for r in regions]
+    prompted = request_masks(url, rgb, iou_threshold=.7, points=points)
+    out = []
+    for r, (x, y) in zip(regions, points):
+        fits = [(int((m & r).sum()) / max(int((m | r).sum()), 1), s, m) for s, m in prompted if m[y, x]]
+        best = max(fits, key=lambda f: f[0], default=None)
+        out.append((best[1], best[2]) if best is not None and best[0] >= fit else (None, r))
+    return out
 
 
 def _expected_spot(expect, xyz, height, valid, camera_z):
@@ -277,12 +285,11 @@ def perceive_sam(rgb, depth_m, K, world_from_camera, url, *, masks_out=None, exc
         valid = valid & ~exclude
     table_z = float(np.median(xyz[..., 2][valid]))  # the desk fills most of the view
     height = xyz[..., 2] - table_z
-    masks = request_masks(url, rgb, points_per_side=32)
+    masks = request_masks(url, rgb)
     kept = segment_things(rgb, height, valid, masks, xyz=xyz)
     regions = unexplained(kept, height, valid)
-    if regions:  # a second look where depth says something is missing; the regions themselves as a last resort
-        points = [_inner_point(r) for r in regions]
-        masks = masks + request_masks(url, rgb, iou_threshold=.7, points=points) + [(None, r) for r in regions]
+    if regions:  # a second look where depth says something is missing
+        masks = masks + _second_look(regions, rgb, url)
         kept = segment_things(rgb, height, valid, masks, xyz=xyz)
     spot = expect and _expected_spot(expect, xyz, height, valid, float(world_from_camera[2, 3]))
     here = None

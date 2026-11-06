@@ -87,6 +87,7 @@ def refine(llm, instruction, preferences, scene, _note="", grouping=None):
         spec = {}
     pref_zone = {p["object"]: p["zone"] for p in preferences}
     goals, dropped = [], []
+    from ..env.robot_env import WORKSPACE
     from ..memory.user import resolve_place, supported
     for g in spec.get("goals", []):
         g["zone"] = resolve_place(str(g.get("zone", "")), scene)
@@ -94,6 +95,9 @@ def refine(llm, instruction, preferences, scene, _note="", grouping=None):
         reason = None
         if obj not in scene["objects"] or zone not in scene["zones"]:
             reason = "unknown object or zone"
+        elif not all(lo <= c <= hi for c, (lo, hi) in zip(scene["objects"][obj]["center"][:2], WORKSPACE[:2])):
+            # the arm cannot move it (a DeepSeek run planned to carry a laptop at the back of the desk, taken for a book)
+            reason = "outside the arm's reach"
         elif source == "instruction" and not supported(instruction, scene["objects"][obj]["kind"], zone, scene) \
                 and not _quoted(str(g.get("evidence", "")), instruction):
             reason = "the request does not mention this object kind together with this place"
