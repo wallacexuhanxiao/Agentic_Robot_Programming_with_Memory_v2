@@ -97,6 +97,8 @@ grasp_candidates(object_name) -> list of top-down grasp proposals for a visible 
   move_gripper to a point back along the approach with that approach and finger_axis, path="curobo" when cuRobo
   is running, then move_by along the approach, close_gripper(), and lift).
   Each candidate also repeats the object's "object_center", "object_long_axis_yaw" and "object_footprint".
+  "support_height" (only when the object lies on something above the table, e.g. a book): the height above the
+  table of the surface it lies on, seen around it; the candidate heights already allow for it.
   The list is not ranked for your task: YOU choose which candidate to use (you may also adjust its
   height or yaw). Geometry candidates carry a fixed score (0.5 across the short side, 0.3 across the long side).
   "hand_clear" / "fingers_clear": whether the camera's depth points show something else (not this object) where

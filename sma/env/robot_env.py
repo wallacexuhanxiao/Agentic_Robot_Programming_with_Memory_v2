@@ -199,7 +199,8 @@ class TabletopEnv:
         self.obs, _, _, _ = self.env.step(action)
         self.steps += 1
         if self.video and self.steps % self.video_every == 0:
-            frame = self.render("demo", 480, 360)
+            # SMA_VIDEO_SIZE (e.g. 960x720) only changes the recorded video, for demo clips
+            frame = self.render("demo", *map(int, os.environ.get("SMA_VIDEO_SIZE", "480x360").split("x")))
             hook = getattr(self, "frame_hook", None)
             self.frames.append(hook(frame) if hook else frame)
 
@@ -825,7 +826,11 @@ class TabletopEnv:
             proposals, note = [], f"contact-graspnet failed: {type(exc).__name__}: {str(exc)[:160]}"
         out += proposals[:4]
         low = self.LOWEST_GRIP
-        heights = sorted({round(max(low, .5 * h), 3), round(max(low, .5 * h, h - .012), 3)})
+        # Heights from the surface the object lies on (the table, or e.g. the top of a pile of books it lies on): the
+        # fingertips keep off that surface as they keep off the table
+        base = self._support_height(obj, masks, table)
+        t = h - base
+        heights = sorted({round(base + max(low, .5 * t), 3), round(base + max(low, .5 * t, t - .012), 3)})
         if obj["footprint_long"] - obj["footprint_short"] > .01:
             axes = [("short", obj["short_axis_yaw"]), ("long", obj["long_axis_yaw"])]
         else:  # round footprint (paper ball, mug body): any finger direction works; offer four, at one height
@@ -884,11 +889,36 @@ class TabletopEnv:
                       "object_height": h, "object_center": [round(float(v), 4) for v in obj["center"][:2]],
                       "object_long_axis_yaw": obj["long_axis_yaw"],
                       "object_footprint": [obj["footprint_long"], obj["footprint_short"]],
+                      **({"support_height": base} if base else {}),
                       **clearance(c["x"], c["y"], c["yaw"], c["height"])})
         self.last_grasp_note = note
         for c in out[:max_candidates]:  # what the learned detector returned (or why not), for the program and the log
             c["graspnet_note"] = note
         return out[:max_candidates]
+
+    @staticmethod
+    def _support_height(obj, masks, table):
+        """Height above the table of the surface an object lies on, from the depth points just around its footprint
+        (1.2-3.5 cm outside it, below the object's top; the 70% quantile, so a ring partly over an edge still finds
+        the surface): e.g. 0.112 for a pen lying on a pile of books. 0 for the table, when the ring is too small to
+        tell, or below 1.5 cm (a coaster or a notebook beside a thing on the table does not lift its grasp)."""
+        xyz = masks.get("_xyz")
+        if xyz is None:
+            return 0.0
+        keep = np.isfinite(xyz[..., 2])
+        if obj.get("color") in masks:
+            keep &= ~masks[obj["color"]]
+        p = xyz[keep]
+        u = np.array([np.cos(obj["long_axis_yaw"]), np.sin(obj["long_axis_yaw"])])
+        d = p[:, :2] - np.asarray(obj["center"][:2])
+        outside = np.maximum(np.abs(d @ u) - obj["footprint_long"] / 2,
+                             np.abs(d @ np.array([-u[1], u[0]])) - obj["footprint_short"] / 2)
+        z = p[:, 2] - table
+        ring = (outside > .012) & (outside < .035) & (z < obj["height"] - .004)
+        if ring.sum() < 20:
+            return 0.0
+        base = float(np.quantile(z[ring], .7))
+        return round(base, 3) if base > .015 else 0.0
 
     def _edge_pinches(self, obj, table, masks, depth_in=.02, size=None):
         """Side grasps for a flat object wider than the open fingers (an A5 notebook): the gripper comes in level
