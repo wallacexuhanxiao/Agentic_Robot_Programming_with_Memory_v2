@@ -47,6 +47,15 @@
 | `ds_full_sdesk_20261106T063745Z` | REALDESK_TASK_zh.md · DeepSeek 全流程 |
 | `ds_groupseq` |  |
 
+## DeepSeek 演示运行，SAM2 真实视觉（11-08）
+
+演示录像（原始、英文字幕、中文字幕三版）和每段的结果说明在 `results/demo/real_perception/`（见其中的 README.md）。
+
+| 目录 | 文档引用 |
+|---|---|
+| `demo_real_20261108T083052Z` | results/demo/real_perception/README.md（demo_17200、demo_17201、demo_17202） |
+| `varied_demo_20261108T123917Z` | results/demo/real_perception/README.md（varied_17308：多样布局桌） |
+
 ## SAM2 感知与跟踪闸门，无模型（11-05）
 
 | 目录 | 文档引用 |
@@ -119,7 +128,18 @@
 
 | 目录 | 文档引用 |
 |---|---|
+| `side_carry_dev_20261106T140810Z` |  |
+| `side_carry_test2_20261106T143521Z` |  |
 | `side_carry_test_20261106T140810Z` |  |
+
+## 多样布局闸门，无模型（11-08）
+
+`sdesk_varied` 桌（本子在任一侧桌边、笔在书堆上、收纳物位置分散）上的 SAM2 分割、初始检查和参考程序。第二次是在抓取高度改为从物体下方支撑面算起之后。
+
+| 目录 | 文档引用 |
+|---|---|
+| `varied_gate_20261108T120741Z` | results/demo/real_perception/README.md |
+| `varied_gate2_20261108T122424Z` | results/demo/real_perception/README.md |
 
 ## 视觉接入试验（11-05）
 
