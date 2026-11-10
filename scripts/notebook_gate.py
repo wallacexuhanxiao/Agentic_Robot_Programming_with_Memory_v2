@@ -2,7 +2,8 @@
 level (observe, grasp_candidates, solve_ik, move_gripper, move_by, close_gripper, open_gripper, check): pinch the
 edge that sticks out over the desk edge from outside the desk, lift, carry along straight lines at a fixed orientation,
 lay it on the pile of books with the gripped edge 4 cm out over the pile's side (the pickup in reverse: the hand hangs
-beside the pile), let go, and score with the camera and the ground truth.
+beside the pile), let go, and score with the camera and the ground truth. On a varied desk the pen lying on the pile
+is first moved to its holder by the act-level reference program (reference_programs.py), so the pile is clear.
 Usage: notebook_gate.py OUT_DIR INDEX   or   notebook_gate.py OUT_DIR summarize   (suite: SMA_GATE_SUITE,
 default nbdesk_notebook@14000)"""
 import json
@@ -14,6 +15,7 @@ import numpy as np
 
 from sma.agent.loop import make_env
 from sma.env.robot_env import RobotError
+from sma.env.scene import PILE_HEIGHT
 from sma.env.tasks import suite
 
 out, arg = sys.argv[1], sys.argv[2]
@@ -44,11 +46,27 @@ def turn(v, axis, angle):
 
 try:
     scene = env.reset()
+    seen_as = {}
     if env.neutral:  # colour-coded desk: things taken as what they are, under the names (colours) the camera reports
         from sma.agent.identify import private_truth, role_of
         truth, seen_as = private_truth(env, task, scene)
         env.set_identity({c: {"category": cat, "role": role_of(cat)} for c, cat in truth.items()})
         nb, target = seen_as[nb], seen_as[target]
+        scene = env.observe()
+    on_pile = [o.name for o in task.layout.objects if o.name in task.meta["out_of_place"] and o.kind == "pen"
+               and o.lift >= PILE_HEIGHT]
+    if on_pile:  # varied desk: the pen on the pile goes to its holder first
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from reference_programs import PROGRAM
+        from sma.agent.sandbox import Sandbox
+        pen = on_pile[0]
+        env.steps, env.step_budget = 0, 6000
+        ok, error = Sandbox(env).run(PROGRAM["pen"].format(obj=seen_as.get(pen, pen),
+                                                          zone=seen_as.get(task.goal[pen], task.goal[pen])))
+        own = env.private_evaluate({pen: task.goal[pen]})["objects"][pen]
+        row["pen_cleared_first"] = {"program_ok": ok, "error": error and (error.get("reason") or error.get("message")),
+                                    "gt": bool(own["inside"] and own["resting"] and own["upright"])}
+        print("  pen on the pile first:", row["pen_cleared_first"], flush=True)
         scene = env.observe()
     env.steps, env.step_budget = 0, 9000
     table = scene["table_z"]
@@ -118,7 +136,8 @@ finally:
     env.close()
 json.dump(row, open(f"{out}/row_{task.task_id}.json", "w"), indent=1, default=str)
 g = next((v for k, v in (row["gt"].get("objects") or {}).items() if "notebook" in k), {})
-print(task.task_id, "heading", row.get("heading_deg"), "held", row.get("holding"), "carry", row.get("carry_path"),
+print(task.task_id, "pen first", (row.get("pen_cleared_first") or {}).get("gt"), "heading", row.get("heading_deg"),
+      "held", row.get("holding"), "carry", row.get("carry_path"),
       "camera", (row.get("camera_check") or {}).get("satisfied"), "GT", row["notebook_gt"],
       {k: g.get(k) for k in ("inside", "resting", "upright", "position")}, "error", (row.get("error") or {}).get("reason"),
       flush=True)

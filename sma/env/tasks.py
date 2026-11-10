@@ -152,6 +152,10 @@ REALDESK_ZONE = {"pen": "magenta", "mug": "blue", "book": "orange", "paper": "re
 # The static desk clutter (assets.add_decor) as boxes: the laptop, the lamp and the phone (its rotated footprint's
 # bounding box). The realdesk layouts never came near them, so they are added to the layout only for nbdesk.
 DECOR_BOXES = [("box", .315, .03, .075, .11), ("box", .32, .31, .045, .045), ("box", -.31, .32, .055, .077)]
+
+
+def _decor_boxes(phone_side=1):
+    return DECOR_BOXES[:2] + [("box", -.31, .32 * phone_side, .055, .077)]
 DESK_HALF = .40
 NBDESK_INSTRUCTION = ("Tidy up my desk: pens stand upright in the magenta pen holder, the mug goes on the blue coaster, "
                       "the notebook goes on the pile of books, and crumpled paper balls go into the red wastebasket. "
@@ -214,11 +218,15 @@ def _place(rng, shapes, make, x_range, y_range, gap, tries=400, reach=MAX_REACH 
     raise RuntimeError("no room")
 
 
-def make_realdesk_task(seed, only=None, notebook=False, vague=False, anchors=False):
+def make_realdesk_task(seed, only=None, notebook=False, vague=False, anchors=False, varied=False):
     """'realdesk': a realistic, crowded desk. Four receptacles stand at the back (pen holder, mug coaster, notebook
     tray, round wastebasket) and 3 or 4 things are out of place in front: a pen, a mug, a notebook, a paper ball.
     A kind that is not out of place starts tidy in its receptacle, and the wastebasket may already hold a paper ball. Every object, including the tidy ones, must end in its receptacle; the subtasks are
-    the 3 or 4 objects out of place. Static clutter (a laptop, books, a lamp, a phone) sits out of reach."""
+    the 3 or 4 objects out of place. Static clutter (a laptop, books, a lamp, a phone) sits out of reach.
+    varied (nbdesk only): positions vary beyond the standard layout: the notebook lies at either side edge (drawn per
+    seed; the phone moves to the other near corner) and sticks out further, 5.5-6.5 cm of its 14.8 cm; the receptacles
+    may stand anywhere in reach, not only in a row at the back; and the pen, always out of place, lies on top of the
+    pile of books, where the notebook has to go, so it has to be moved first."""
     # The number of subtasks is drawn once per seed, so redrawing a crowded layout does not favour 3 over 4.
     # only: a single kind out of place, the others tidy (validation of a skill learned on this desk).
     n_active = 1 if only else 4 if np.random.default_rng([seed, 99]).random() < .4 else 3
@@ -226,45 +234,65 @@ def make_realdesk_task(seed, only=None, notebook=False, vague=False, anchors=Fal
     if notebook and not only:  # the notebook plus two others, drawn once per seed (a retry for a layout that fits must
         # not change which objects are out of place); the pile of books and the notebook leave no room for a fourth
         others = np.random.default_rng([seed, 98]).permutation(["pen", "mug", "paper"])[:2]
+        if varied:  # the pen (on the pile) and one of the mug and the paper ball
+            others = ["pen", str(np.random.default_rng([seed, 98]).choice(["mug", "paper"]))]
         active = ["notebook"] + [str(k) for k in others]
     for attempt in range(1000):  # each attempt is drawn from (seed, attempt): a layout found earlier stays the same
         try:
             return _realdesk_layout(seed, np.random.default_rng([seed, attempt]), n_active, only, notebook, active, vague,
-                                    anchors)
+                                    anchors, varied)
         except RuntimeError:
             continue
     raise RuntimeError(f"no realdesk layout for seed {seed}")
 
 
-def _notebook_at_desk_edge(rng, shapes, color):
-    """The notebook along the right desk edge, its long edge 4-6 cm out over the side. Kept clear: the part on the
-    desk plus 4 cm (the wrist and forearm pass over it when the hand comes in from outside)."""
-    overhang = float(rng.uniform(.04, .06))
-    ny = -(DESK_HALF + overhang - .074)
+def _notebook_at_desk_edge(rng, shapes, color, side=-1, overhang=(.04, .06)):
+    """The notebook along the right (side -1) or left (+1) desk edge, its long edge 4-6 cm out over the side. Kept
+    clear: the part on the desk plus 4 cm (the wrist and forearm pass over it when the hand comes in from outside)."""
+    overhang = float(rng.uniform(*overhang))
+    ny = side * (DESK_HALF + overhang - .074)
     for _ in range(400):
         nx = rng.uniform(-0.25, -0.19)  # further out the hand must come in 60 degrees off square, and the fingers hold
         # only a corner of the edge (the notebook slipped out in the gate); nearer the robot (-0.264) the back-off
         # point before the pinch was out of reach
         on_desk = (DESK_HALF - abs(ny) + .074 - overhang) / 2 + .04
-        new = [("box", nx, -(DESK_HALF - on_desk + .04), .105 + .04, on_desk)]
+        new = [("box", nx, side * (DESK_HALF - on_desk + .04), .105 + .04, on_desk)]
         if all(_gap(a, b) >= .005 for a in new for b in shapes):
             shapes.extend(new)
             return ObjectSpec(color, "notebook", (round(nx, 4), round(ny, 4)), round(float(rng.uniform(-.03, .03)), 3))
     raise RuntimeError("no room")
 
 
-def _pile_shapes(xy):
-    """The pile of books plus room for the hand on its right side, where a notebook pinched by its edge can be laid on
-    it with that edge out over the side (the hand hangs 10.4 cm below the grip point, beside the pile)."""
+def _pile_shapes(xy, side=-1):
+    """The pile of books plus room for the hand on its right (side -1) or left (+1) side, the side of the desk edge the
+    notebook lies at, where a notebook pinched by its edge can be laid on it with that edge out over the side (the
+    hand hangs 10.4 cm below the grip point, beside the pile)."""
     hx, hy = RECEPTACLE_HALF["pile"]
     return [("box", float(xy[0]), float(xy[1]), hx + WALL, hy + WALL),
-            ("box", float(xy[0]), float(xy[1]) - hy - .07, hx * .8, .07)]
+            ("box", float(xy[0]), float(xy[1]) + side * (hy + .07), hx * .8, .07)]
 
 
-def _realdesk_layout(seed, rng, n_active, only=None, notebook=False, active=None, vague=False, anchors=False):
+def _pen_on_pile(rng, color, pile):
+    """A pen lying on top of the pile of books, wholly on its top surface (1.5 cm from the edges), at any heading."""
+    hx, hy = RECEPTACLE_HALF["pile"]
+    for _ in range(400):
+        yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
+        xy = np.asarray(pile.xy) + rng.uniform(-1, 1, 2) * [hx - .03, hy - .03]
+        ends = [xy + s * .07 * np.array([np.cos(yaw), np.sin(yaw)]) for s in (-1, 1)]
+        if all(abs(e[0] - pile.xy[0]) < hx - .015 and abs(e[1] - pile.xy[1]) < hy - .015 for e in ends):
+            return ObjectSpec(color, "pen", tuple(np.round(xy, 4)), round(yaw, 3), lift=PILE_HEIGHT)
+    raise RuntimeError("no room on the pile")
+
+
+def _realdesk_layout(seed, rng, n_active, only=None, notebook=False, active=None, vague=False, anchors=False,
+                     varied=False):
     kinds = ["pen", "mug", "notebook" if notebook else "book", "paper"]
     active = active or ([only] if only else [str(k) for k in rng.permutation(kinds)[:n_active]])
-    shapes, zones = (list(DECOR_BOXES) if notebook else []), {}
+    # varied: the edge the notebook lies at, drawn once per seed (not per layout attempt), and the receptacles anywhere
+    # in reach (the standard desk keeps them in a row at the back)
+    side = (-1 if np.random.default_rng([seed, 97]).random() < .5 else 1) if varied else -1
+    back = (-0.12, 0.13) if varied else (-0.03, 0.13)
+    shapes, zones = (_decor_boxes(-side) if notebook else []), {}
     order = [str(k) for k in rng.permutation(kinds)]
     if notebook:  # the 25 cm pile of books first, or the smaller receptacles leave it no room
         order.remove("notebook")
@@ -274,9 +302,10 @@ def _realdesk_layout(seed, rng, n_active, only=None, notebook=False, active=None
         # The pen holder within 0.64 m of the base: a pen held upright high above it is out of reach further out
         # (the act-level reference program failed at 0.665 m in the realdesk gate).
         if color == "pile":
-            xy, _ = _place(rng, shapes, lambda p, _y: _pile_shapes(p), (-0.03, 0.13), (-0.15, 0.20), .01)
+            xy, _ = _place(rng, shapes, lambda p, _y: _pile_shapes(p, side), back,
+                           (-0.15, 0.20) if side < 0 else (-0.20, 0.15), .01)
         else:
-            xy, _ = _place(rng, shapes, lambda p, _y, c=color: [_zone_box(c, p)], (-0.03, 0.13), (-0.25, 0.25), .01,
+            xy, _ = _place(rng, shapes, lambda p, _y, c=color: [_zone_box(c, p)], back, (-0.25, 0.25), .01,
                            reach=.64 if kind == "pen" else MAX_REACH - .02)
         zones[kind] = ZoneSpec(color, tuple(np.round(xy, 4)))
     colors = [str(c) for c in rng.permutation(["yellow", "green", "cyan", "purple"])]
@@ -284,7 +313,10 @@ def _realdesk_layout(seed, rng, n_active, only=None, notebook=False, active=None
     for i, kind in enumerate(kinds):
         zone = zones[kind]
         if kind == "notebook" and kind in active:
-            spec = _notebook_at_desk_edge(rng, shapes, colors[i])
+            spec = _notebook_at_desk_edge(rng, shapes, colors[i], side, (.055, .065) if varied else (.04, .06))
+            out_of_place.append(spec.name)
+        elif kind == "pen" and varied and kind in active:
+            spec = _pen_on_pile(rng, colors[i], zones["notebook"])
             out_of_place.append(spec.name)
         elif kind in active:
             xy, yaw = _place(rng, shapes, lambda p, y, k=kind: _object_discs(k, p, y), (-0.15, 0.14), (-0.26, 0.26), .005)
@@ -312,8 +344,9 @@ def _realdesk_layout(seed, rng, n_active, only=None, notebook=False, active=None
     family = "nbdesk" if notebook else "realdesk"
     instruction = VAGUE_DESK_INSTRUCTION if vague else NBDESK_INSTRUCTION if notebook else REALDESK_INSTRUCTION
     task_id = "_".join([family] + ([only] if only else []) + (["vague"] if vague else []) +
-                       (["anchors"] if anchors else []) + [str(seed)])
-    return Task(task_id, family, instruction, Layout(objects, list(zones.values()), decor=True, decor_books=not notebook),
+                       (["anchors"] if anchors else []) + (["varied"] if varied else []) + [str(seed)])
+    return Task(task_id, family, instruction, Layout(objects, list(zones.values()), decor=True, decor_books=not notebook,
+                                                     phone_side=-side),
                 goal, seed,
                 meta={"out_of_place": out_of_place, "already_tidy": tidy, "subtasks": len(out_of_place)})
 
@@ -329,6 +362,8 @@ def _hand_room(spec, objects, zones):
     below it.) A pen can be taken anywhere along its length: the hand must fit at one of five points along it."""
     tall = [_zone_box(z.color, z.xy) for k, z in zones.items() if k in ("pen", "paper", "notebook")]
     tall += [("disc", *o.xy, .04) for o in objects if o.kind == "mug" and o is not spec]
+    if spec.lift >= PILE_HEIGHT:  # on top of the pile of books: only the 20 cm wastebasket reaches above the hand's body
+        tall = [_zone_box(z.color, z.xy) for k, z in zones.items() if k == "paper"]
     turns = {"pen": (np.pi / 2,), "book": (0.0, np.pi / 2)}.get(spec.kind, (0.0, np.pi / 4, np.pi / 2, 3 * np.pi / 4))
     axis = np.array([np.cos(spec.yaw), np.sin(spec.yaw)])
     for turn in turns:
@@ -399,7 +434,7 @@ def make_cdesk_task(seed, only=None, vague=False, anchors=False):
     return task
 
 
-def make_sdesk_task(seed, vague=True, anchors=True, look="real"):
+def make_sdesk_task(seed, vague=True, anchors=True, look="real", varied=False):
     """'sdesk': the nbdesk layout in ordinary desk colours that several things share (white paper balls, a white mug or
     wastebasket, pens and a holder of the same dark blue, ...), drawn per seed from five colours for nine or ten things,
     so the camera cannot tell things apart by colour: what is one thing comes from class-agnostic segmentation (SAM2)
@@ -407,7 +442,7 @@ def make_sdesk_task(seed, vague=True, anchors=True, look="real"):
     the wastebasket, each the same colour as the loose one of its kind. The request names nothing. meta "category":
     each private name -> what it is (private: used only to score recognition)."""
     from .palette import NATURAL
-    task = make_realdesk_task(seed, notebook=True, vague=vague, anchors=anchors)
+    task = make_realdesk_task(seed, notebook=True, vague=vague, anchors=anchors, varied=varied)
     rng = np.random.default_rng([seed, 37])
     colours = list(NATURAL)
     by_kind = {"pen": str(rng.choice(["navy", "black", "red"])), "paper": "white"}
@@ -621,11 +656,13 @@ def suite(name):
                 for i in range(SUITE_SIZE)]
     if name.startswith("sdesk"):  # ordinary colours shared by several things: "sdesk@17000", "sdesk_named@17000" (the
         # request lists where things go, still naming no colour), "sdesk_noanchors@17000"; things look real (textures,
-        # caps, handles, page edges; looks.py) unless "plain" ("sdesk_plain@17000": the flat-coloured shapes)
+        # caps, handles, page edges; looks.py) unless "plain" ("sdesk_plain@17000": the flat-coloured shapes);
+        # "sdesk_varied@17300": positions vary beyond the standard layout (make_realdesk_task)
         head, _, base = name.partition("@")
         words = head.split("_")[1:]
         return [make_sdesk_task(int(base or 17000) + i, vague="named" not in words, anchors="noanchors" not in words,
-                                look="plain" if "plain" in words else "real") for i in range(SUITE_SIZE)]
+                                look="plain" if "plain" in words else "real", varied="varied" in words)
+                for i in range(SUITE_SIZE)]
     if name.startswith("groupseq"):  # one user's desk seen again and again: "groupseq@15100" = plain containers kept for
         # the same kinds on every desk (drawn once for the sequence); the first three desks show one thing of each kind
         # already in its container, the rest show only empty containers, under the plain "tidy up" request

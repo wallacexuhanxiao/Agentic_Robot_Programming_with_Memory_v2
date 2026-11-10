@@ -101,6 +101,7 @@ class Layout:
     decor_books: bool = True  # nbdesk: the pile of books is a receptacle in reach instead
     stacks: list = field(default_factory=list)  # textbook piles: (x, y, height, yaw); a notebook may lie on one
     look: str = "plain"  # "real" (sdesk): things shaped and textured like real ones, same physics (looks.py)
+    phone_side: int = 1  # the decor phone at the left (+1) or right (-1) near corner of the desk
 
 
 class TabletopOrganize(Lift):
@@ -146,6 +147,7 @@ class TabletopOrganize(Lift):
                            wall_half_height=WALL_HALF_HEIGHT[style], wall_rgba=wall, look=look, asset=arena.asset)
         if getattr(self.layout, "decor", False):
             add_decor(arena.worldbody, TABLE_Z, books=getattr(self.layout, "decor_books", True),
+                      phone_side=getattr(self.layout, "phone_side", 1),
                       look=getattr(self.layout, "look", "plain"), asset=arena.asset)
         for i, (x, y, height, yaw) in enumerate(getattr(self.layout, "stacks", [])):
             add_stack(arena.worldbody, f"stack_{i}", (x, y), TABLE_Z, height, yaw=yaw)

@@ -594,7 +594,7 @@ def stack_look(worldbody, asset, name, books, paint=None):
                  f"{name}_pages_mat", yaw)
 
 
-def decor_look(worldbody, asset, table_z):
+def decor_look(worldbody, asset, table_z, phone_side=1):
     """Visuals for add_decor's laptop (aluminium lid, dark seam) and phone (a lit screen in a black frame)."""
     _asset(asset, material("decor_alu_mat", tex_aluminium(), specular=.7, shininess=.6) +
            material("decor_seam_mat", rgba=(.10, .10, .11, 1), specular=.2) +
@@ -603,7 +603,7 @@ def decor_look(worldbody, asset, table_z):
     _vstatic(worldbody, "decor_laptop_v_lid", "box", [.075, .11, .0035], [.315, .03, table_z + .0125], "decor_alu_mat")
     _vstatic(worldbody, "decor_laptop_v_seam", "box", [.0745, .1095, .001], [.315, .03, table_z + .0085], "decor_seam_mat")
     _vstatic(worldbody, "decor_laptop_v_base", "box", [.075, .11, .0035], [.315, .03, table_z + .0035], "decor_alu_mat")
-    _vstatic(worldbody, "decor_phone_v_frame", "box", [.035, .07, .0035], [-.31, .32, table_z + .0035],
-             "decor_phone_frame_mat", .3)
-    _vstatic(worldbody, "decor_phone_v_screen", "box", [.032, .066, .0006], [-.31, .32, table_z + .0074],
-             "decor_screen_mat", .3)
+    _vstatic(worldbody, "decor_phone_v_frame", "box", [.035, .07, .0035], [-.31, .32 * phone_side, table_z + .0035],
+             "decor_phone_frame_mat", .3 * phone_side)
+    _vstatic(worldbody, "decor_phone_v_screen", "box", [.032, .066, .0006], [-.31, .32 * phone_side, table_z + .0074],
+             "decor_screen_mat", .3 * phone_side)

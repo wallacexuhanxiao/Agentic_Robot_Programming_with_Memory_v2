@@ -236,10 +236,12 @@ def add_bin(worldbody, name, base_rgba, xy, table_z, radius=BIN_RADIUS, half_hei
     return table_z + .004
 
 
-def add_decor(worldbody, table_z, books=True, look="plain", asset=None):
+def add_decor(worldbody, table_z, books=True, look="plain", asset=None, phone_side=1):
     """Static clutter on the desk, out of the arm's reach (x > 0.23 or at the far corners): a closed laptop, a stack of
     books, a desk lamp and a phone. Low and unsaturated (greys, beige), so perception never takes them for objects
-    and they do not hide the workspace from the demo camera (which looks from the far side of the table)."""
+    and they do not hide the workspace from the demo camera (which looks from the far side of the table).
+    phone_side: +1 the phone at the left near corner (+y), -1 at the right near corner (a varied desk whose notebook
+    lies at the left edge)."""
     fr = [1, .005, .0001]
     real = look == "real"
     _static(worldbody, "decor_laptop", [.075, .11, .008], [.315, .03, table_z + .008], [.30, .30, .32, 1], fr,
@@ -252,11 +254,11 @@ def add_decor(worldbody, table_z, books=True, look="plain", asset=None):
     _static(worldbody, "decor_lamp_base", [.045, .045, .008], [.32, .31, table_z + .008], [.25, .25, .27, 1], fr)
     _static(worldbody, "decor_lamp_pole", [.006, .006, .14], [.32, .31, table_z + .156], [.6, .6, .62, 1], fr)
     _static(worldbody, "decor_lamp_head", [.06, .025, .015], [.28, .31, table_z + .30], [.25, .25, .27, 1], fr)
-    _static(worldbody, "decor_phone", [.035, .07, .004], [-.31, .32, table_z + .004], [.12, .12, .14, 1], fr, .3,
-            visual=not real)
+    _static(worldbody, "decor_phone", [.035, .07, .004], [-.31, .32 * phone_side, table_z + .004], [.12, .12, .14, 1], fr,
+            .3 * phone_side, visual=not real)
     if real:
         from .looks import decor_look
-        decor_look(worldbody, asset, table_z)
+        decor_look(worldbody, asset, table_z, phone_side)
 
 
 def add_stack(worldbody, name, xy, table_z, height, half=(.125, .09), yaw=0.0, covers=None, look="plain", asset=None,
