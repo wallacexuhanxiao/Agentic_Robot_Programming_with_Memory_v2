@@ -3,7 +3,7 @@
 每个目录是一次运行的输出（Hopper `outputs/<运行名>` 下载而来）。仓库里只放轻量文件：`summary.json`、`episode.json`、日志、闸门行记录。
 这几类文件只留在本地和 Hopper，不进仓库：
 - 每次观测的 PNG；
-- 模型原始调用记录 `llm/`（含 base64 图像，每个约 2–3 MB）；
+- 模型原始调用记录 `llm/`、`llm_*/`（含 base64 图像，每个约 2–3 MB）；
 - 掩码 `.npz`；
 - 大部分录像。
 文档引用到的图片和录像，以及 `results/demo/` 下的演示录像，单独加入了仓库。
@@ -175,6 +175,20 @@
 |---|---|
 | `realdesk_gate3_20261104T133944Z` |  |
 | `realdesk_gate_20261104T132730Z` |  |
+
+## 新桌面、用户记忆与统计（11-11 至 11-17）
+
+| 目录 | 文档引用 |
+|---|---|
+| `dev_stats` | DEV_DATA_zh.md（逐桌、逐子目标、逐次尝试的表和 numbers.json）；TIDY_METRIC_zh.md（整洁度）；LLM_SAVINGS_zh.md（省下的调用，api_steps.json） |
+| `transfer_par_20261111T1440Z` | XDESK_EXP_zh.md · 4. 技能迁移：存好的技能放到更多新桌上（不调用模型） |
+| `upref_look_20261111T112414Z` | （用户记忆实验桌面的外观预览，无模型） |
+| `upref_plan_20261111T120024Z` | USER_MEMORY_EXP_zh.md（只做规划，16 个会话） |
+| `xdesk_gate_20261111T113242Z` | XDESK_EXP_zh.md · 1. 新桌面 xdesk / xdesk_nb（预览图） |
+| `xdesk_none2_20261111T153824Z` | XDESK_EXP_zh.md · 3. DeepSeek 完整运行（无记忆补跑，配对比较） |
+| `xdesk_par_20261111T1440Z` | XDESK_EXP_zh.md · 3. DeepSeek 完整运行（三张桌并行） |
+| `xdesk_run_20261111T121104Z` | XDESK_EXP_zh.md · 3. DeepSeek 完整运行（两张桌依次跑，记忆接力） |
+| `xdesknb_gate_20261111T115440Z` | XDESK_EXP_zh.md · 1. 新桌面 xdesk / xdesk_nb（预览图） |
 
 ## 其他试跑与早期运行
 
