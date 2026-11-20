@@ -27,6 +27,13 @@ MUG_RADIUS, MUG_HALF_HEIGHT = 0.024, 0.035  # 4.8 cm wide, 7 cm tall (+ handle)
 BLOCK_HALF = 0.02                            # 4 cm toy block
 PEN_HALF = (0.07, 0.006, 0.006)              # 14 cm pen with a square 1.2 cm section (does not roll, like a hex pencil)
 PAPER_RADIUS = 0.022                         # 4.4 cm crumpled paper ball (light)
+# xdesk (more kinds of things): a whiteboard marker, an empty drink can, an eraser, a pad of sticky notes, a roll of tape
+MARKER_HALF = (0.065, 0.0085, 0.0085)        # 13 cm marker, square 1.7 cm section (does not roll)
+CAN_RADIUS, CAN_HALF_HEIGHT = 0.0265, 0.044  # 5.3 x 8.8 cm mini drink can (150 ml), empty (12 g), standing: held
+# near its top it clears the 20 cm wastebasket's rim when carried at the highest carry height (30 cm)
+ERASER_HALF = (0.026, 0.011, 0.007)          # 5.2 x 2.2 x 1.4 cm eraser
+STICKY_HALF = (0.038, 0.0255, 0.008)         # 7.6 x 5.1 cm pad of sticky notes, 1.6 cm thick (taken across its 5.1 cm)
+TAPE_RADIUS, TAPE_HALF_HEIGHT = 0.026, 0.0095  # 5.2 cm roll of clear tape, 1.9 cm wide, lying flat
 BIN_RADIUS, BIN_BOTTOM_RADIUS, BIN_HALF_HEIGHT = 0.085, 0.07, 0.10  # round wire-mesh wastebasket, inside: 17 cm
                                                                   # across the mouth, 14 cm at the floor; 20 cm tall
 
@@ -149,13 +156,74 @@ def crumpled_paper_xml(rgba, look="plain"):
     return _xml("paper", geoms, r * .85, r)
 
 
-REAL_KINDS = ("mug", "pen", "paper", "notebook")  # kinds with a real look (the paper ball: crumpled)
+def marker_xml(rgba, look="plain"):
+    hx, hy, hz = MARKER_HALF
+    geoms = [_geom("body", "box", [hx, hy, hz], [0, 0, 0], [.95, .95, .95, 1], .015)]
+    if look == "real":
+        from .looks import marker_visual
+        return _real("marker", geoms, hz, hx, marker_visual(rgba))
+    return _xml("marker", geoms, hz, hx)
+
+
+def can_xml(rgba, look="plain"):
+    r, h = CAN_RADIUS, CAN_HALF_HEIGHT
+    geoms = [_geom("body", "cylinder", [r, h], [0, 0, 0], rgba, .012)]
+    if look == "real":
+        from .looks import can_visual
+        return _real("can", geoms, h, r, can_visual(rgba))
+    return _xml("can", geoms, h, r)
+
+
+def eraser_xml(rgba, look="plain"):
+    hx, hy, hz = ERASER_HALF
+    geoms = [_geom("body", "box", [hx, hy, hz], [0, 0, 0], rgba, .02)]
+    if look == "real":
+        from .looks import eraser_visual
+        return _real("eraser", geoms, hz, math.hypot(hx, hy), eraser_visual(rgba))
+    return _xml("eraser", geoms, hz, math.hypot(hx, hy))
+
+
+def sticky_xml(rgba, look="plain"):
+    hx, hy, hz = STICKY_HALF
+    geoms = [_geom("body", "box", [hx, hy, hz], [0, 0, 0], rgba, .03)]
+    if look == "real":
+        from .looks import sticky_visual
+        return _real("sticky", geoms, hz, math.hypot(hx, hy), sticky_visual(rgba))
+    return _xml("sticky", geoms, hz, math.hypot(hx, hy))
+
+
+def tape_xml(rgba, look="plain"):
+    r, h = TAPE_RADIUS, TAPE_HALF_HEIGHT
+    geoms = [_geom("body", "cylinder", [r, h], [0, 0, 0], rgba, .025)]
+    if look == "real":
+        from .looks import tape_visual
+        return _real("tape", geoms, h, r, tape_visual(rgba))
+    return _xml("tape", geoms, h, r)
+
+
+def book_real_xml(rgba, look="real"):
+    """The pocket book with printed covers (sdesk / xdesk look)."""
+    hx, hy, hz = BOOK_HALF
+    from .looks import book_visual
+    cover = .0016
+    geoms = [_geom("cover_top", "box", [hx, hy, cover], [0, 0, hz - cover], rgba, .03),
+             _geom("cover_bottom", "box", [hx, hy, cover], [0, 0, -hz + cover], rgba, .03),
+             _geom("spine", "box", [.0016, hy, hz], [-hx + .0016, 0, 0], rgba, .01),
+             _geom("pages", "box", [hx - .004, hy - .002, hz - 2 * cover], [.0008, 0, 0], PAGES, .12)]
+    return _real("book", geoms, hz, math.hypot(hx, hy), book_visual(rgba))
+
+
+REAL_KINDS = ("mug", "pen", "paper", "notebook", "marker", "can", "eraser", "sticky", "tape", "book")  # kinds with a
+# real look (the paper ball: crumpled)
 
 
 def make_object(kind, name, rgba, variant=None, look="plain"):
     CACHE.mkdir(parents=True, exist_ok=True)
     builders = {"mug": mug_xml, "book": book_xml, "block": block_xml, "pen": pen_xml, "paper": paper_xml,
-                "notebook": notebook_xml}
+                "notebook": notebook_xml, "marker": marker_xml, "can": can_xml, "eraser": eraser_xml,
+                "sticky": sticky_xml, "tape": tape_xml}
+    if look == "real":
+        builders["book"] = book_real_xml
     if variant == "crumpled" and kind == "paper" or look == "real" and kind == "paper":
         builders["paper"] = crumpled_paper_xml
     real = look == "real" and kind in REAL_KINDS
@@ -191,7 +259,7 @@ def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=(0.065, 
         return [xy[0] + c * dx - s * dy, xy[1] + s * dx + c * dy, z]
 
     base_h = .002
-    real = look == "real" and style in ("holder", "coaster")
+    real = look == "real" and style in ("holder", "coaster", "tray")
     _static(worldbody, f"{name}_base", [hx, hy, base_h], at(0, 0, table_z + base_h), base_rgba,
             [1.5, .005, .0001], yaw, visual=not real)
     wall_half_h = wall_half_height or (.004 if style == "tray" else .025)
@@ -201,9 +269,9 @@ def add_receptacle(worldbody, name, style, base_rgba, xy, table_z, half=(0.065, 
         _static(worldbody, f"{name}_wall_{i}", [sx, sy, wall_half_h], at(dx, dy, table_z + wall_half_h),
                 wall_rgba or WOOD, [1.0, .005, .0001], yaw, visual=not real)
     if real:
-        from .looks import coaster_look, holder_look
-        (holder_look if style == "holder" else coaster_look)(worldbody, asset, name, base_rgba, xy, table_z, (hx, hy),
-                                                             wall_half_h, yaw)
+        from .looks import coaster_look, holder_look, tray_look
+        {"holder": holder_look, "coaster": coaster_look, "tray": tray_look}[style](
+            worldbody, asset, name, base_rgba, xy, table_z, (hx, hy), wall_half_h, yaw)
     return table_z + 2 * base_h  # surface height inside the receptacle
 
 
@@ -259,6 +327,19 @@ def add_decor(worldbody, table_z, books=True, look="plain", asset=None, phone_si
     if real:
         from .looks import decor_look
         decor_look(worldbody, asset, table_z, phone_side)
+
+
+def add_decor_items(worldbody, table_z, items, look="plain", asset=None):
+    """Static clutter drawn per desk (xdesk): items = [(kind, x, y, yaw)] with kinds from looks.DECOR_ITEMS. Each has an
+    invisible collision box of its footprint and height; the visuals are drawn by looks.decor_items_look (the plain look
+    shows the boxes in grey)."""
+    from .looks import DECOR_ITEMS, decor_items_look
+    for i, (kind, x, y, yaw) in enumerate(items):
+        hx, hy, h = DECOR_ITEMS[kind]
+        _static(worldbody, f"decor_{kind}_{i}_box", [hx, hy, h / 2], [x, y, table_z + h / 2], [.5, .5, .52, 1],
+                [1, .005, .0001], yaw, visual=look != "real")
+    if look == "real":
+        decor_items_look(worldbody, asset, table_z, items)
 
 
 def add_stack(worldbody, name, xy, table_z, height, half=(.125, .09), yaw=0.0, covers=None, look="plain", asset=None,

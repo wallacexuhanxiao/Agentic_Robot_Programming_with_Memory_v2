@@ -15,7 +15,8 @@ import os
 
 import numpy as np
 
-from .assets import CACHE, MUG_HALF_HEIGHT, MUG_RADIUS, NOTEBOOK_HALF, PAPER_RADIUS, PEN_HALF
+from .assets import (BOOK_HALF, CACHE, CAN_HALF_HEIGHT, CAN_RADIUS, ERASER_HALF, MARKER_HALF, MUG_HALF_HEIGHT,
+                     MUG_RADIUS, NOTEBOOK_HALF, PAPER_RADIUS, PEN_HALF, STICKY_HALF, TAPE_HALF_HEIGHT, TAPE_RADIUS)
 
 VERSION = "v1"  # part of every texture file name: change it to redraw them
 TEX = CACHE / "textures"
@@ -468,6 +469,150 @@ def notebook_visual(rgba):
     return geoms, assets
 
 
+# ------------------------------------------------------------------ xdesk things (more kinds)
+def tex_can(rgba, key):
+    """A drink can's printed side (u around, v up): its colour, a white wave band and a made-up brand name."""
+    def draw(w, h):
+        from PIL import ImageDraw
+        c = np.array(_rgb(rgba), float)
+        arr = np.full((h, w, 3), c) + _noise(h, w, 3, 21)
+        img = _array_image(arr)
+        d = ImageDraw.Draw(img)
+        pts = [(x, int(h * (.52 + .06 * math.sin(2 * math.pi * x / w * 2)))) for x in range(0, w + 1, 8)]
+        d.polygon(pts + [(w, int(h * .66)), (0, int(h * .66))], fill=(245, 245, 245))
+        ink = (245, 245, 245) if c.mean() < 150 else (30, 30, 35)
+        for k in range(2):
+            d.text((w * (.25 + .5 * k), int(h * .34)), "FIZZ", font=_font(int(h * .16)), fill=ink, anchor="mm")
+        arr = np.asarray(img, float)
+        arr[: int(h * .07)] = [200, 200, 205]  # metal neck and foot
+        arr[int(h * .95):] = [190, 190, 195]
+        return _array_image(arr)
+    return _texture(f"can_{key}", draw, (512, 256))
+
+
+def tex_sleeve(rgba, key):
+    """An eraser's paper sleeve: its colour with a white stripe and a word."""
+    def draw(w, h):
+        from PIL import ImageDraw
+        c = np.array(_rgb(rgba), float)
+        img = _array_image(np.full((h, w, 3), c) + _noise(h, w, 2, 22))
+        d = ImageDraw.Draw(img)
+        d.rectangle([0, int(h * .38), w, int(h * .62)], fill=(250, 250, 250))
+        d.text((w // 2, h // 2), "ERASER", font=_font(int(h * .2)), fill=tuple(int(v) for v in c * .6), anchor="mm")
+        return img
+    return _texture(f"sleeve_{key}", draw, (256, 128))
+
+
+def tex_sheets(rgba, key):
+    """The edge of a stack of thin sheets in the stack's colour: fine lines along it."""
+    def draw(w, h):
+        c = np.array(_rgb(rgba), float)
+        arr = np.full((h, w, 3), c) + _noise(h, w, 2, 23)
+        arr[::4] *= .9
+        return _array_image(arr)
+    return _texture(f"sheets_{key}", draw, (128, 128))
+
+
+def marker_visual(rgba):
+    """A whiteboard marker along x (13 cm): a white barrel with a printed band in the ink colour, a cap of that colour at
+    +x with a clip, and an end plug of that colour at -x."""
+    hx, hy, _ = MARKER_HALF
+    r = hy
+    assets = (material("barrel", rgba=(.95, .95, .94, 1), specular=.4, shininess=.5) +
+              material("ink", rgba=rgba, specular=.5, shininess=.6))
+    geoms = [vgeom("v_barrel", "cylinder", [r, .044], [-.012, 0, 0], "barrel", X_AXIS),
+             vgeom("v_band", "cylinder", [r * 1.01, .010], [-.020, 0, 0], "ink", X_AXIS),
+             vgeom("v_plug", "cylinder", [r * .95, .004], [-hx + .004, 0, 0], "ink", X_AXIS),
+             vgeom("v_cap", "cylinder", [r * 1.06, .0185], [hx - .0185, 0, 0], "ink", X_AXIS),
+             vgeom("v_clip", "box", [.012, .0015, .0012], [hx - .017, 0, r * 1.06 + .001], "ink")]
+    return geoms, assets
+
+
+def can_visual(rgba):
+    """An empty drink can standing (6.6 x 12.2 cm): a printed side, an aluminium lid with a tab."""
+    r, h = CAN_RADIUS, CAN_HALF_HEIGHT
+    key = "_".join(f"{v:.2f}" for v in rgba[:3])
+    side = cup_mesh(r, r - .0008, -h, h - .004, -h + .002)
+    assets = (material("print", tex_can(rgba, key), specular=.7, shininess=.7) +
+              material("alu", tex_aluminium(), specular=.8, shininess=.7) +
+              mesh_asset("side", side.v, side.f, side.t))
+    geoms = [vmesh("v_side", "side", "print"),
+             vgeom("v_neck", "cylinder", [r * .86, .002], [0, 0, h - .002], "alu"),
+             vgeom("v_tab", "box", [.009, .0045, .0006], [.006, 0, h + .0006], "alu")]
+    return geoms, assets
+
+
+def eraser_visual(rgba):
+    """A white eraser in a paper sleeve of the eraser's colour covering its middle."""
+    hx, hy, hz = ERASER_HALF
+    key = "_".join(f"{v:.2f}" for v in rgba[:3])
+    assets = (material("rubber", rgba=(.96, .95, .92, 1), specular=.05) +
+              material("sleeve", tex_sleeve(rgba, key), specular=.1))
+    geoms = [vgeom("v_rubber", "box", [hx, hy, hz], [0, 0, 0], "rubber"),
+             vgeom("v_sleeve", "box", [hx * .62, hy + .0004, hz + .0004], [-hx * .2, 0, 0], "sleeve")]
+    return geoms, assets
+
+
+def sticky_visual(rgba):
+    """A pad of sticky notes in the pad's colour: a stack of sheets, a slightly lifted top sheet."""
+    hx, hy, hz = STICKY_HALF
+    key = "_".join(f"{v:.2f}" for v in rgba[:3])
+    assets = (material("stack", tex_sheets(rgba, key), specular=.05) + material("top", rgba=rgba, specular=.05))
+    geoms = [vgeom("v_stack", "box", [hx, hy, hz - .0006], [0, 0, -.0006], "stack"),
+             vgeom("v_top", "box", [hx, hy, .0006], [0, 0, hz - .0006], "top")]
+    return geoms, assets
+
+
+def tape_visual(rgba):
+    """A roll of masking tape lying flat: a ring of tape in the roll's colour round a brown cardboard core."""
+    r, h = TAPE_RADIUS, TAPE_HALF_HEIGHT
+    tape = tube_mesh(r, .0195, -h, h)
+    core = tube_mesh(.0195, .0175, -h, h)
+    assets = (material("tape", tex_sheets(rgba, "tape_" + "_".join(f"{v:.2f}" for v in rgba[:3])), specular=.1) +
+              material("core", rgba=(.55, .42, .28, 1), specular=.05) +
+              mesh_asset("ring", tape.v, tape.f, tape.t) + mesh_asset("core", core.v, core.f, core.t))
+    return [vmesh("v_ring", "ring", "tape"), vmesh("v_core", "core", "core")], assets
+
+
+def book_visual(rgba):
+    """A pocket book: a printed cover, a plain back, cream page edges."""
+    hx, hy, hz = BOOK_HALF
+    key = "pocket_" + "_".join(f"{v:.2f}" for v in rgba[:3])
+    cover = .0016
+    assets = (material("cover", tex_cover(rgba, "POEMS", "Pocket Edition", key), specular=.2) +
+              material("back", rgba=_shade(rgba, .9), specular=.2) + material("pages", tex_pages(), specular=.05))
+    geoms = [vgeom("v_cover", "box", [hx, hy, cover], [0, 0, hz - cover], "cover"),
+             vgeom("v_back", "box", [hx, hy, cover], [0, 0, -hz + cover], "back"),
+             vgeom("v_spine", "box", [.0016, hy, hz], [-hx + .0016, 0, 0], "back"),
+             vgeom("v_pages", "box", [hx - .003, hy - .002, hz - 2 * cover], [.0008, 0, 0], "pages")]
+    return geoms, assets
+
+
+# ------------------------------------------------------------------ desk surfaces (xdesk)
+DESK_SURFACES = ("white", "oak", "walnut", "grey")
+
+
+def tex_desk(kind):
+    """A desk top: plain white laminate, light oak, dark walnut (wood grain along the desk's y) or grey linoleum."""
+    def draw(w, h):
+        rng = np.random.default_rng(31)
+        if kind in ("oak", "walnut"):
+            base = np.array([196.0, 160, 112]) if kind == "oak" else np.array([102.0, 70, 46])
+            x = np.arange(w)[None, :, None]
+            y = np.arange(h)[:, None, None]
+            grain = (np.sin(x / 7.0 + 3 * np.sin(y / 90.0) + rng.normal(0, .2)) * 9 +
+                     np.sin(x / 2.3 + np.sin(y / 40.0)) * 4)
+            arr = base + grain + _noise(h, w, 4, 32)
+            for _ in range(6):  # a few darker streaks
+                c = int(rng.uniform(0, w))
+                arr[:, max(0, c - 2):c + 2] *= .9
+            return _array_image(arr)
+        if kind == "grey":
+            return _array_image(np.full((h, w, 3), [150.0, 152, 150]) + _noise(h, w, 6, 33))
+        return _array_image(np.full((h, w, 3), [236.0, 236, 232]) + _noise(h, w, 1.5, 34))
+    return _texture(f"desk_{kind}", draw, (1024, 1024))
+
+
 # ------------------------------------------------------------------ static scenery (into the arena)
 def _asset(asset_root, xml):
     """Add MJCF asset elements (a string of them) to the arena's <asset>, once per name."""
@@ -510,6 +655,26 @@ def holder_look(worldbody, asset, name, rgba, xy, table_z, half, wall_half_h, ya
                                           (0, hy + t, hx, t), (0, -hy - t, hx, t))):
         _vstatic(worldbody, f"{name}_v_wall_{i}", "box", [sx, sy, wall_half_h], at(dx, dy, table_z + wall_half_h),
                  f"{name}_mesh_mat", yaw)
+
+
+def tray_look(worldbody, asset, name, rgba, xy, table_z, half, wall_half_h, yaw):
+    """A desk letter tray of perforated metal in the tray's colour: a solid floor, mesh walls with a rolled top edge."""
+    _asset(asset, material(f"{name}_mesh_mat", tex_perforated(), rgba=rgba, specular=.6, shininess=.5) +
+           material(f"{name}_floor_mat", rgba=_shade(rgba, .8), specular=.4) +
+           material(f"{name}_edge_mat", rgba=_shade(rgba, 1.15), specular=.7, shininess=.6))
+    hx, hy = half
+    c, s = math.cos(yaw), math.sin(yaw)
+
+    def at(dx, dy, z):
+        return [xy[0] + c * dx - s * dy, xy[1] + s * dx + c * dy, z]
+    t = .004
+    _vstatic(worldbody, f"{name}_v_floor", "box", [hx, hy, .002], at(0, 0, table_z + .002), f"{name}_floor_mat", yaw)
+    for i, (dx, dy, sx, sy) in enumerate(((hx + t, 0, t, hy + 2 * t), (-hx - t, 0, t, hy + 2 * t),
+                                          (0, hy + t, hx, t), (0, -hy - t, hx, t))):
+        _vstatic(worldbody, f"{name}_v_wall_{i}", "box", [sx, sy, wall_half_h], at(dx, dy, table_z + wall_half_h),
+                 f"{name}_mesh_mat", yaw)
+        _vstatic(worldbody, f"{name}_v_edge_{i}", "box", [sx + .001, sy + .001, .002],
+                 at(dx, dy, table_z + 2 * wall_half_h), f"{name}_edge_mat", yaw)
 
 
 def coaster_look(worldbody, asset, name, rgba, xy, table_z, half, wall_half_h, yaw):
@@ -607,3 +772,85 @@ def decor_look(worldbody, asset, table_z, phone_side=1):
              "decor_phone_frame_mat", .3 * phone_side)
     _vstatic(worldbody, "decor_phone_v_screen", "box", [.032, .066, .0006], [-.31, .32 * phone_side, table_z + .0074],
              "decor_screen_mat", .3 * phone_side)
+
+
+# ------------------------------------------------------------------ varied desk clutter (xdesk)
+# Footprint half extents (x, y) and height of each static decor item, for the layout and the collision boxes.
+DECOR_ITEMS = {"laptop": (.075, .11, .016), "phone": (.035, .07, .008), "lamp": (.045, .045, .33),
+               "books": (.08, .058, .066), "plant": (.05, .05, .16), "keyboard": (.065, .17, .02),
+               "bottle": (.035, .035, .22)}
+
+
+def decor_items_look(worldbody, asset, table_z, items):
+    """Visuals of static clutter out of the arm's reach: items is a list of (kind, x, y, yaw) with kinds from
+    DECOR_ITEMS: a closed laptop, a phone, a desk lamp, a small stack of books, a potted plant, a keyboard, a water
+    bottle."""
+    _asset(asset, material("decor_alu_mat", tex_aluminium(), specular=.7, shininess=.6) +
+           material("decor_seam_mat", rgba=(.10, .10, .11, 1), specular=.2) +
+           material("decor_phone_frame_mat", rgba=(.06, .06, .07, 1), specular=.8, shininess=.8) +
+           material("decor_screen_mat", tex_phone_screen(), specular=.9, shininess=.9) +
+           material("decor_dark_mat", rgba=(.22, .22, .24, 1), specular=.3) +
+           material("decor_metal_mat", rgba=(.62, .62, .64, 1), specular=.8, shininess=.7) +
+           material("decor_pot_mat", rgba=(.70, .38, .24, 1), specular=.1) +
+           material("decor_soil_mat", rgba=(.25, .18, .12, 1), specular=0) +
+           material("decor_leaf_mat", rgba=(.20, .50, .22, 1), specular=.3) +
+           material("decor_keys_mat", tex_keys(), specular=.2) +
+           material("decor_bottle_mat", rgba=(.35, .60, .85, 1), specular=.8, shininess=.8) +
+           material("decor_cap_mat", rgba=(.15, .15, .17, 1), specular=.4))
+    for i, (kind, x, y, yaw) in enumerate(items):
+        c, s = math.cos(yaw), math.sin(yaw)
+
+        def at(dx, dy, z):
+            return [x + c * dx - s * dy, y + s * dx + c * dy, table_z + z]
+        n = f"decor_{kind}_{i}"
+        if kind == "laptop":
+            _vstatic(worldbody, n + "_lid", "box", [.075, .11, .0035], at(0, 0, .0125), "decor_alu_mat", yaw)
+            _vstatic(worldbody, n + "_seam", "box", [.0745, .1095, .001], at(0, 0, .0085), "decor_seam_mat", yaw)
+            _vstatic(worldbody, n + "_base", "box", [.075, .11, .0035], at(0, 0, .0035), "decor_alu_mat", yaw)
+        elif kind == "phone":
+            _vstatic(worldbody, n + "_frame", "box", [.035, .07, .0035], at(0, 0, .0035), "decor_phone_frame_mat", yaw)
+            _vstatic(worldbody, n + "_screen", "box", [.032, .066, .0006], at(0, 0, .0074), "decor_screen_mat", yaw)
+        elif kind == "lamp":
+            _vstatic(worldbody, n + "_base", "cylinder", [.045, .008], at(0, 0, .008), "decor_dark_mat")
+            _vstatic(worldbody, n + "_pole", "cylinder", [.006, .14], at(0, 0, .156), "decor_metal_mat")
+            # the head points sideways, not over the desk, where it would hide things from the camera above
+            _vstatic(worldbody, n + "_head", "box", [.025, .06, .015], at(0, .04 if y < .2 else -.04, .30),
+                     "decor_dark_mat", yaw)
+        elif kind == "books":
+            for k, (w, d, col) in enumerate(((.075, .055, (.55, .30, .25, 1)), (.07, .05, (.25, .35, .50, 1)),
+                                             (.08, .058, (.30, .45, .30, 1)))):
+                key = f"decor_book_{k}"
+                _asset(asset, material(key + "_mat", tex_cover(col, ["NOVEL", "ATLAS", "BOTANY"][k], "", key),
+                                       specular=.2))
+                _vstatic(worldbody, f"{n}_{k}", "box", [w, d, .011], at(0, 0, .011 + .022 * k), key + "_mat",
+                         yaw + .25 * k - .2)
+        elif kind == "plant":
+            _vstatic(worldbody, n + "_pot", "cylinder", [.045, .03], at(0, 0, .03), "decor_pot_mat")
+            _vstatic(worldbody, n + "_soil", "cylinder", [.040, .002], at(0, 0, .058), "decor_soil_mat")
+            rng = np.random.default_rng(int(abs(x * 1000 + y * 100)))
+            for k in range(7):
+                a = 2 * math.pi * k / 7 + rng.uniform(-.3, .3)
+                _vstatic(worldbody, f"{n}_leaf{k}", "ellipsoid", [.035, .012, .006],
+                         at(.028 * math.cos(a), .028 * math.sin(a), .085 + .03 * rng.random()), "decor_leaf_mat",
+                         quat=[math.cos(a / 2), 0, 0, math.sin(a / 2)])
+        elif kind == "keyboard":
+            _vstatic(worldbody, n + "_body", "box", [.065, .17, .01], at(0, 0, .01), "decor_keys_mat", yaw)
+        elif kind == "bottle":
+            _vstatic(worldbody, n + "_body", "cylinder", [.035, .095], at(0, 0, .095), "decor_bottle_mat")
+            _vstatic(worldbody, n + "_cap", "cylinder", [.02, .012], at(0, 0, .202), "decor_cap_mat")
+
+
+def tex_keys():
+    """A keyboard from above: dark keys in rows on a slightly lighter frame."""
+    def draw(w, h):
+        from PIL import ImageDraw
+        img = _array_image(np.full((h, w, 3), [70.0, 70, 74]) + _noise(h, w, 2, 41))
+        d = ImageDraw.Draw(img)
+        rows, cols = 5, 15
+        for r in range(rows):
+            for k in range(cols):
+                x0, y0 = int(w * (.03 + .94 * k / cols)), int(h * (.06 + .88 * r / rows))
+                d.rounded_rectangle([x0, y0, x0 + int(w * .94 / cols) - 6, y0 + int(h * .88 / rows) - 6], radius=4,
+                                    fill=(38, 38, 42))
+        return img
+    return _texture("keys", draw, (512, 256))

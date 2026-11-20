@@ -66,10 +66,11 @@ class TabletopEnv:
         self.frames = []
         self.env = None
         # Colour-coded desk: the camera names things by colour only; what each is comes from set_identity().
-        if getattr(task, "family", None) == "sdesk":  # shared colours: only class-agnostic segmentation tells things apart
+        if getattr(task, "family", None) in ("sdesk", "xdesk"):  # shared colours: only class-agnostic segmentation tells
+            # things apart
             self.perception = "sam"
             self.image_size = image_size or 512
-        self.neutral = getattr(task, "family", None) in ("cdesk", "sdesk") or os.environ.get("SMA_NEUTRAL") == "1" or \
+        self.neutral = getattr(task, "family", None) in ("cdesk", "sdesk", "xdesk") or os.environ.get("SMA_NEUTRAL") == "1" or \
             self.perception == "sam"
         self.identity = {}
         self._robot_geoms = None
@@ -1919,13 +1920,14 @@ class TabletopEnv:
             pos = np.array(state[name]["position"])
             kind = name.split("_", 1)[1]
             half_h = KIND_HALF_HEIGHT[kind]
-            if kind == "pen" and zones[zone]["style"] == "holder":
+            if kind in ("pen", "marker") and zones[zone]["style"] == "holder":
                 # Standing in the cup: lower end inside the footprint and on the floor, centre within 1 cm of the
                 # footprint, long axis within 40 degrees of vertical (a pen leaning on the rim of a 6 cm cup
                 # with 8 cm walls tilts by up to about 37 degrees).
-                from .assets import PEN_HALF
+                from .assets import MARKER_HALF, PEN_HALF
                 axis = np.array(state[name]["x_axis"])
-                bottom = min((pos + sgn * axis * PEN_HALF[0] for sgn in (-1, 1)), key=lambda e: e[2])
+                half_len = (PEN_HALF if kind == "pen" else MARKER_HALF)[0]
+                bottom = min((pos + sgn * axis * half_len for sgn in (-1, 1)), key=lambda e: e[2])
                 inside = bool(inside_zone(bottom, zones[zone]) and inside_zone(pos, zones[zone], -.01))
                 resting = bool(bottom[2] <= TABLE_Z + .004 + .02)
                 upright = bool(abs(axis[2]) > np.cos(np.radians(40)))
@@ -1966,7 +1968,12 @@ class TabletopEnv:
             inside = bool(inside)
             # base is 4 mm thick; a notebook lying over the 8 mm tray rim is 4 mm higher than one on the floor
             resting = bool(pos[2] <= TABLE_Z + .004 + half_h + {"pen": .006, "notebook": .003}.get(kind, .01))
-            upright = bool(kind == "paper" or abs(state[name]["z_axis"][2]) > (.99 if kind == "notebook" else .9))
+            if style == "box":  # a walled organizer: anywhere down inside it, below its rim (a roll may stand on edge)
+                from .scene import WALL_HALF_HEIGHT
+                resting = bool(pos[2] < TABLE_Z + 2 * WALL_HALF_HEIGHT["box"])
+            # in a container any pose will do for trash and small stationery; a mug stands, a notebook lies flat
+            upright = bool(kind in ("paper", "can", "eraser", "sticky", "tape") or
+                           abs(state[name]["z_axis"][2]) > (.99 if kind == "notebook" else .9))
             ok = inside and resting and upright
             details[name] = {"zone": zone, "inside": inside, "resting": resting, "upright": upright,
                              "position": state[name]["position"], **details_extra}

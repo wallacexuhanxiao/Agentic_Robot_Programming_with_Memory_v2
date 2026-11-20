@@ -15,8 +15,13 @@ CHAINS = {
     "pencil": ("pencil", "writing tool", "stationery"),
     "notebook": ("notebook", "book", "paper product", "stationery"),
     "book": ("book", "paper product"),
-    "paper": ("crumpled paper", "waste", "paper product"),
+    "marker": ("marker", "writing tool", "stationery"),
+    "paper": ("crumpled paper", "trash", "waste", "paper product"),
+    "can": ("empty can", "trash", "waste"),
     "mug": ("mug", "drinkware", "kitchenware"),
+    "eraser": ("eraser", "office supply", "stationery"),
+    "sticky": ("sticky notes", "office supply", "stationery"),
+    "tape": ("tape", "office supply", "stationery"),
     "block": ("toy block", "toy"),
 }
 # Zones that are themselves a group of things: zone -> (category, thickness of one item, to count them from the height).

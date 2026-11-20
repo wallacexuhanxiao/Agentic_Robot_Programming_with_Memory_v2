@@ -33,8 +33,10 @@ RECEPTACLES = {"orange": ("tray", "orange_tray"), "cyan": ("tray", "cyan_tray"),
                "pile": ("pile", "book_pile")}  # nbdesk: a pile of four textbooks the notebook goes on (no colour:
                                                # perception finds it from depth, a flat grey top 11 cm up)
 # Object half heights (m), used by the evaluator.
-KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035, "pen": .006, "paper": .02, "notebook": .005}
-KIND_RADIUS = {"block": .028, "book": .047, "mug": .04, "pen": .072, "paper": .025, "notebook": .128}
+KIND_HALF_HEIGHT = {"block": .02, "book": .0125, "mug": .035, "pen": .006, "paper": .02, "notebook": .005,
+                    "marker": .0085, "can": .044, "eraser": .007, "sticky": .008, "tape": .0095}
+KIND_RADIUS = {"block": .028, "book": .047, "mug": .04, "pen": .072, "paper": .025, "notebook": .128,
+               "marker": .067, "can": .0265, "eraser": .028, "sticky": .046, "tape": .026}
 ZONE_HALF = .055                               # default inner half width (toy box)
 # Trays are larger so a rotated book lies flat; the bin's value is its radius at the mouth (it is round, 14 cm
 # across at the floor: assets.BIN_BOTTOM_RADIUS).
@@ -86,6 +88,7 @@ class ZoneSpec:
     xy: tuple
     yaw: float = 0.0
     half: tuple = None  # inner half extents, if not the style's default (a letter tray for an A5 notebook)
+    wall_half: float = None  # half height of its walls, if not the style's default (the letter tray: 3 cm walls)
     paint: str = None   # cdesk: a palette colour for the whole receptacle (base, walls, books); `color` keeps the style
 
     @property
@@ -102,6 +105,8 @@ class Layout:
     stacks: list = field(default_factory=list)  # textbook piles: (x, y, height, yaw); a notebook may lie on one
     look: str = "plain"  # "real" (sdesk): things shaped and textured like real ones, same physics (looks.py)
     phone_side: int = 1  # the decor phone at the left (+1) or right (-1) near corner of the desk
+    decor_items: list = None  # xdesk: static clutter drawn per desk, [(kind, x, y, yaw)], instead of the fixed decor
+    desk: str = None  # xdesk: the desk top's surface (looks.DESK_SURFACES); None: robosuite's white table
 
 
 class TabletopOrganize(Lift):
@@ -144,8 +149,18 @@ class TabletopOrganize(Lift):
                 continue
             add_receptacle(arena.worldbody, zone.name, style, base,
                            zone.xy, TABLE_Z, half=receptacle_half(style, zone), yaw=zone.yaw,
-                           wall_half_height=WALL_HALF_HEIGHT[style], wall_rgba=wall, look=look, asset=arena.asset)
-        if getattr(self.layout, "decor", False):
+                           wall_half_height=getattr(zone, "wall_half", None) or WALL_HALF_HEIGHT[style], wall_rgba=wall,
+                           look=look, asset=arena.asset)
+        if getattr(self.layout, "desk", None):  # another desk top: the table's own texture file replaced
+            from .looks import tex_desk
+            for el in arena.asset.iter("texture"):
+                if el.get("name") == "tex-ceramic":
+                    el.set("file", tex_desk(self.layout.desk))
+        if getattr(self.layout, "decor_items", None):
+            from .assets import add_decor_items
+            add_decor_items(arena.worldbody, TABLE_Z, self.layout.decor_items,
+                            look=getattr(self.layout, "look", "plain"), asset=arena.asset)
+        elif getattr(self.layout, "decor", False):
             add_decor(arena.worldbody, TABLE_Z, books=getattr(self.layout, "decor_books", True),
                       phone_side=getattr(self.layout, "phone_side", 1),
                       look=getattr(self.layout, "look", "plain"), asset=arena.asset)

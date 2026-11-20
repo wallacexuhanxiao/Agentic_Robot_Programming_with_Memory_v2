@@ -4,13 +4,15 @@ Named scenes ("green_pen", "red_bin") carry it in the name. On the colour-coded 
 only, and the model's identification (category words from VOCABULARY) is the source; the harness maps those words to
 its short keys here."""
 
-VOCABULARY = ["pen", "pencil", "mug", "notebook", "book", "crumpled paper ball", "toy block", "wastebasket",
-              "pen holder", "coaster", "pile of books", "tray", "box", "pen case"]
+VOCABULARY = ["pen", "pencil", "marker", "mug", "notebook", "book", "crumpled paper ball", "drink can", "eraser",
+              "sticky notes", "tape roll", "toy block", "wastebasket", "pen holder", "coaster", "pile of books", "tray",
+              "desk organizer", "box", "pen case"]
 # category word -> the harness's object kind or receptacle style
-KIND_OF = {"pen": "pen", "pencil": "pen", "mug": "mug", "notebook": "notebook", "book": "book",
-           "crumpled paper ball": "paper", "toy block": "block"}
+KIND_OF = {"pen": "pen", "pencil": "pen", "marker": "marker", "mug": "mug", "notebook": "notebook", "book": "book",
+           "crumpled paper ball": "paper", "drink can": "can", "eraser": "eraser", "sticky notes": "sticky",
+           "tape roll": "tape", "toy block": "block"}
 STYLE_OF = {"wastebasket": "bin", "pen holder": "holder", "coaster": "coaster", "pile of books": "pile", "tray": "tray",
-            "box": "box", "pen case": "case"}
+            "desk organizer": "box", "box": "box", "pen case": "case"}
 
 
 def kind_of(name, scene=None):

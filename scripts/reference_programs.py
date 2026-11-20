@@ -130,5 +130,18 @@ move_by(dz=0.15)
 go_home()
 result = check("{obj}", "{zone}")
 '''
-PROGRAM = {"paper": PAPER, "mug": SET_DOWN, "book": SET_DOWN, "pen": PEN}
-ORDER = ("paper", "mug", "book", "pen")
+# A drink can into the wastebasket: as the paper ball, carried high enough that the can hanging below the fingers
+# clears the rim.
+CAN = GRASP + '''
+bin_ = observe()["zones"]["{zone}"]
+rim = bin_["rim_height"] or 0.12
+carry_to(bin_["center"][0], bin_["center"][1], min(0.3, rim + c["height"] + 0.03))
+open_gripper()
+retreat(0.05)
+go_home()
+result = check("{obj}", "{zone}")
+'''
+
+PROGRAM = {"paper": PAPER, "mug": SET_DOWN, "book": SET_DOWN, "pen": PEN, "can": CAN, "marker": PEN,
+           "eraser": SET_DOWN, "sticky": SET_DOWN, "tape": SET_DOWN}
+ORDER = ("paper", "can", "mug", "book", "eraser", "sticky", "tape", "marker", "pen")

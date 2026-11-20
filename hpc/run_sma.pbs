@@ -246,6 +246,32 @@ if [[ "${SMA_MODE:-dev}" == sam_gate ]]; then  # SAM2 perception on the shared-c
   "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
   exit 0
 fi
+if [[ "${SMA_MODE:-dev}" == xdesk_gate ]]; then  # new desks, no LLM: pictures of the first SMA_SUITE_SIZE desks of
+  # SMA_SUITES, then the SAM2 gate with the act-level reference programs on them (SMA_API_LEVEL=act)
+  "$SIM_PY" -X faulthandler scripts/look_preview.py "$OUT/look" ${SMA_SUITE_SIZE:-5} ${SMA_SUITES//:/ } > "$OUT/look.log" 2>&1 || echo "look preview failed: $?" >> "$OUT/look.log"
+  for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+    SMA_GATE_SUITE=${SMA_SUITES%%:*} "$SIM_PY" -X faulthandler scripts/sam_gate.py "$OUT/sam_gate" "$i" >> "$OUT/sam_gate.log" 2>&1 || echo "sam gate task $i failed: $?" >> "$OUT/sam_gate.log"
+  done
+  "$SIM_PY" scripts/sam_gate.py "$OUT/sam_gate" summarize >> "$OUT/sam_gate.log" 2>&1
+  if [[ "${SMA_SUITES%%:*}" == xdesk_nb* ]]; then  # the notebook at the desk edge: its own reference program
+    for i in $(seq 0 $(( ${SMA_SUITE_SIZE:-5} - 1 ))); do
+      SMA_GATE_SUITE=${SMA_SUITES%%:*} "$SIM_PY" -X faulthandler scripts/notebook_gate.py "$OUT/notebook_gate" "$i" >> "$OUT/notebook_gate.log" 2>&1 || echo "notebook gate task $i failed: $?" >> "$OUT/notebook_gate.log"
+    done
+    "$SIM_PY" scripts/notebook_gate.py "$OUT/notebook_gate" summarize >> "$OUT/notebook_gate.log" 2>&1
+  fi
+  exit 0
+fi
+if [[ "${SMA_MODE:-dev}" == skill_transfer ]]; then  # stored skills on many new desks, no LLM: SMA_MEMORY_INIT (a
+  # memory.json, frozen) on the first SMA_SUITE_SIZE desks of each suite in SMA_SUITES (":"-separated)
+  TRANSFER_PIDS=()
+  for s in ${SMA_SUITES//:/ }; do  # one process per suite, at the same time
+    { "$SIM_PY" -X faulthandler scripts/skill_transfer.py "$OUT/transfer_${s//@/_}" "${SMA_MEMORY_INIT:?}" "$s" > "$OUT/transfer_${s//@/_}.log" 2>&1 || echo "skill transfer failed: $?" >> "$OUT/transfer_${s//@/_}.log"; } &
+    TRANSFER_PIDS+=($!)
+    sleep 20
+  done
+  wait "${TRANSFER_PIDS[@]}"  # only these: the services started above never exit
+  exit 0
+fi
 if [[ "${SMA_MODE:-dev}" == track_debug ]]; then  # name tracking through scripted gates (no LLM): every look's
   # tracks, names and outlined top-down image, for the desks SMA_DESKS (indices joined by ":", default 0:1:2) and the
   # gate scripts SMA_TRACK_GATE (joined by ":", run one after the other as in sam_gate; default notebook_gate.py)
@@ -314,6 +340,12 @@ print('usage:', llm.usage())" >> "$OUT/model_ready.txt" 2>&1 || { echo "Gemini p
   if [[ "${SMA_MODE:-dev}" == memory_plan ]]; then  # long-term memory of observed habits, planning only
     SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler scripts/memory_plan.py \
       "$OUT/memory_plan" ${SMA_SUITES:-groupseq@15100} > "$OUT/memory_plan.log" 2>&1 || echo "memory plan failed: $?" >> "$OUT/memory_plan.log"
+    exit 0
+  fi
+  if [[ "${SMA_MODE:-dev}" == user_memory_plan ]]; then  # user memory vs none vs raw history, planning only, on the
+    # user-preference sessions; SMA_SUITES: the sequence numbers joined by ":" (default 0)
+    SMA_SPEND_LEDGER="$OUT/spend.json" SMA_GENERAL_NAME=$GENERAL_NAME "$SIM_PY" -X faulthandler scripts/user_memory_plan.py \
+      "$OUT/user_memory_plan" $(echo ${SMA_SUITES:-0} | tr : ' ') > "$OUT/user_memory_plan.log" 2>&1 || echo "user memory plan failed: $?" >> "$OUT/user_memory_plan.log"
     exit 0
   fi
   if [[ "${SMA_MODE:-dev}" == vision_ab ]]; then  # vision: the SAM2 gate and the scripted notebook (unless
@@ -405,20 +437,32 @@ else
   # A crashed simulator process (e.g. a native abort) is restarted with --resume: finished tasks and the memories on
   # disk are kept and the unfinished task is rerun. -X faulthandler prints the Python stack of a native crash.
   SMA_SETS=${SMA_SETS:-_}  # SMA_SETS: several independent task sets in one job, each with fresh memories ("+"-separated suite names);
-  # results go to $OUT/<set>/<condition>.
-  for set in ${SMA_SETS//:/ }; do
-  SET_OUT=$OUT; [[ "$set" != _ ]] && SUITES=$set && SET_OUT=$OUT/${set//@/_} && mkdir -p "$SET_OUT"
-  for condition in ${SMA_CONDITIONS//:/ }; do
-    RESUME=(); [[ -n "${SMA_RESUME:-}" ]] && RESUME=(--resume)
-    for try in 1 2 3 4; do
-      rc=0
-      "$SIM_PY" -X faulthandler -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
-        --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$SET_OUT/$condition" \
-        "${RESUME[@]}" >> "$SET_OUT/$condition.log" 2>&1 || rc=$?
-      [[ $rc == 0 ]] && break
-      echo "$(date +%T) run_suite $condition exited with code $rc (try $try); restarting with --resume" | tee -a "$SET_OUT/$condition.log" >> "$OUT/crashes.log"
-      RESUME=(--resume)
+  # results go to $OUT/<set>/<condition>. A set may name its own conditions: "none/xdesk@19001" (conditions joined by
+  # "."). SMA_PARALLEL=1: the sets run at the same time (independent desks; the GPU services are shared).
+  run_set() {
+    local SET_OUT=$1 SUITES=$2 CONDS=$3 condition RESUME try rc
+    for condition in ${CONDS//./ }; do
+      RESUME=(); [[ -n "${SMA_RESUME:-}" ]] && RESUME=(--resume)
+      for try in 1 2 3 4; do
+        rc=0
+        "$SIM_PY" -X faulthandler -m sma.eval.run_suite --condition "$condition" --suites "${SUITES//+/,}" \
+          --base-url "http://127.0.0.1:$PORT/v1" --model "$GENERAL_NAME" "${CODER_ARGS[@]}" --out "$SET_OUT/$condition" \
+          "${RESUME[@]}" >> "$SET_OUT/$condition.log" 2>&1 || rc=$?
+        [[ $rc == 0 ]] && break
+        echo "$(date +%T) run_suite $condition exited with code $rc (try $try); restarting with --resume" | tee -a "$SET_OUT/$condition.log" >> "$OUT/crashes.log"
+        RESUME=(--resume)
+      done
     done
+  }
+  SET_PIDS=()
+  for set in ${SMA_SETS//:/ }; do
+    SET_OUT=$OUT; CONDS=${SMA_CONDITIONS//:/.}
+    if [[ "$set" != _ ]]; then
+      [[ "$set" == */* ]] && CONDS=${set%%/*} && set=${set#*/}
+      SUITES=$set; SET_OUT=$OUT/${set//@/_}; mkdir -p "$SET_OUT"
+    fi
+    if [[ "${SMA_PARALLEL:-0}" == 1 ]]; then run_set "$SET_OUT" "$SUITES" "$CONDS" & SET_PIDS+=($!); sleep 20
+    else run_set "$SET_OUT" "$SUITES" "$CONDS"; fi
   done
-  done
+  [[ ${#SET_PIDS[@]} -gt 0 ]] && wait "${SET_PIDS[@]}"  # only the sets: the services started above never exit
 fi

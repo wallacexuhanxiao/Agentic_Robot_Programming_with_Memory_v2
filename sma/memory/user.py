@@ -10,7 +10,8 @@ from pathlib import Path
 
 LEARN = """Extract lasting preferences from ONE user's message to a tabletop robot.
 Message: "{message}"
-Object kinds: block (toy block), mug, book, pen. Objects currently visible: {objects}. Places: {zones}.
+Object kinds: block (toy block), mug, book, notebook, pen, paper (crumpled paper ball). Objects currently visible:
+{objects}. Places: {zones}.
 Return ONLY JSON: {{"updates": [{{"subject": "<kind or object name>", "zone": "<place name, e.g. purple_box>",
 "scope": "long_term" | "task_only", "evidence": "<verbatim quote from the message>"}}],
 "handling": [{{"subject": "<kind or object name>", "request": "<how the user wants it handled, in their terms>",

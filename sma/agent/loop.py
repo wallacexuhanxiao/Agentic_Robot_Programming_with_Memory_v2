@@ -10,7 +10,8 @@ import numpy as np
 
 from ..env.robot_env import RobotError, TabletopEnv
 from ..env.naming import kind_of, zone_style
-from ..env.tasks import REALDESK_ZONE, make_cdesk_task, make_realdesk_task, make_single_task, make_task
+from ..env.tasks import (REALDESK_ZONE, XDESK_HOME, make_cdesk_task, make_realdesk_task, make_single_task, make_task,
+                         make_xdesk_task)
 from ..memory.store import literal_coordinates, scene_features, zone_occupants
 from . import prompts
 from .refine import refine
@@ -443,7 +444,9 @@ def validate_skill(memory, function, kind, seeds, out_dir, log, video=False, sty
     results = []
     for seed in seeds:
         # A pen goes into its case or stands in its holder; other kinds are validated on single-object placements.
-        if family == "cdesk" and kind in REALDESK_ZONE:
+        if family == "xdesk" and kind in XDESK_HOME:
+            task = make_xdesk_task(seed, only=kind)
+        elif family == "cdesk" and kind in REALDESK_ZONE:
             task = make_cdesk_task(seed, only=kind)
         elif family in ("realdesk", "nbdesk") and kind in REALDESK_ZONE:
             task = make_realdesk_task(seed, only=kind, notebook=family == "nbdesk")
